@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kruh — LAN party</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-void:#0b0d12;
+    --bg-panel:#14171f;
+    --bg-panel-2:#1a1e28;
+    --line:#262b38;
+    --gold:#c9a24b;
+    --gold-dim:#8a733a;
+    --teal:#2f8f8f;
+    --text:#e8e3d8;
+    --text-muted:#8b90a0;
+    --crimson:#8b2635;
+    --radius:2px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg-void);
+    color:var(--text);
+    font-family:'Work Sans', sans-serif;
+    min-height:100vh;
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(201,162,75,0.05), transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(47,143,143,0.05), transparent 40%);
+  }
+  .headline, .brand, .nav-label, h1, h2, h3{
+    font-family:'Cinzel', serif;
+    letter-spacing:0.01em;
+  }
+  .app{
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+
+  /* ---- Top bar ---- */
+  .topbar{
+    width:100%;
+    background:linear-gradient(180deg, #1a1e28 0%, #101319 100%);
+    border-bottom:1px solid var(--line);
+    box-shadow:0 2px 18px rgba(0,0,0,0.45);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 32px;
+    height:68px;
+    flex-shrink:0;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-shrink:0;
+  }
+  .brand-mark{
+    width:26px; height:26px;
+    border:1.5px solid var(--gold);
+    border-radius:50%;
+    position:relative;
+    flex-shrink:0;
+    box-shadow:0 0 8px rgba(201,162,75,0.35);
+  }
+  .brand-mark::before{
+    content:'';
+    position:absolute;
+    inset:6px;
+    border:1px solid var(--gold-dim);
+    transform:rotate(45deg);
+  }
+  .brand-text{
+    font-size:17px;
+    font-weight:600;
+    color:var(--text);
+  }
+  .nav{
+    display:flex;
+    align-items:center;
+    gap:0;
+    height:100%;
+  }
+  .nav-sep{
+    width:5px; height:5px;
+    background:var(--gold-dim);
+    transform:rotate(45deg);
+    margin:0 2px;
+    opacity:.6;
+    flex-shrink:0;
+  }
+  .nav-item{
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:0 26px;
+    color:var(--text-muted);
+    text-decoration:none;
+    cursor:pointer;
+    font-size:13px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    height:42px;
+    margin-top:13px;
+    background:linear-gradient(180deg, #232838 0%, #171a24 100%);
+    border:1px solid #2c3140;
+    clip-path:polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    transition:background .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+  .nav-item svg{ width:15px; height:15px; flex-shrink:0; opacity:.7; transition:opacity .18s ease; }
+  .nav-item:hover{
+    color:var(--text);
+    background:linear-gradient(180deg, #2c3243 0%, #1c2029 100%);
+  }
+  .nav-item.active{
+    color:var(--gold);
+    background:linear-gradient(180deg, #3a3320 0%, #1c1912 100%);
+    border-color:var(--gold-dim);
+    box-shadow:0 0 14px rgba(201,162,75,0.25), inset 0 0 10px rgba(201,162,75,0.08);
+  }
+  .nav-item.active svg{ opacity:1; filter:drop-shadow(0 0 3px rgba(201,162,75,0.6)); }
+  .nav-item.active::after{
+    content:'';
+    position:absolute;
+    left:10px; right:10px; bottom:-1px;
+    height:2px;
+    background:linear-gradient(90deg, transparent, var(--gold), transparent);
+    box-shadow:0 0 8px rgba(201,162,75,0.7);
+  }
+  .topbar-meta{
+    font-size:12px;
+    color:var(--text-muted);
+    flex-shrink:0;
+  }
+
+  /* ---- Main ---- */
+  .main{ flex:1; padding:48px 56px; max-width:1100px; margin:0 auto; width:100%; }
+  .view{ display:none; }
+  .view.active{ display:block; animation:fadein .35s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .eyebrow{ color:var(--teal); font-size:13px; margin-bottom:10px; font-weight:500; }
+  h1.headline{ font-size:40px; font-weight:600; line-height:1.15; max-width:600px; }
+  .lede{ color:var(--text-muted); font-size:16px; margin-top:14px; max-width:520px; line-height:1.6; }
+
+  .hero{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:40px;
+    padding-bottom:36px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:36px;
+  }
+  .hero-card{
+    background:var(--bg-panel);
+    border:1px solid var(--line);
+    border-left:2px solid var(--gold);
+    padding:20px 22px;
+    min-width:260px;
+  }
+  .hero-card .label{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;}
+  .hero-card .val{ font-family:'Cinzel', serif; font-size:20px; margin-top:6px; color:var(--gold);}
+  .hero-card .sub{ font-size:13px; color:var(--text-muted); margin-top:10px;}
+
+  .section-title{ font-size:22px; font-weight:600; margin-bottom:18px; }
+
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:18px; margin-top:14px;}
+  .event-card{
+    background:var(--bg-panel);
+    border:1px solid var(--line);
+    padding:20px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .event-card .tag{
+    align-self:flex-start;
+    font-size:11px;
+    color:var(--teal);
+    border:1px solid var(--teal);
+    padding:2px 8px;
+    letter-spacing:.05em;
+  }
+  .event-card .tag.full{ color:var(--crimson); border-color:var(--crimson); }
+  .event-card h3{ font-size:18px; font-weight:600; }
+  .event-card .meta{ font-size:13px; color:var(--text-muted); }
+  .event-card .desc{ font-size:14px; color:var(--text-muted); line-height:1.5; flex:1; }
+  .event-card .row{ display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
+  .slots{ font-size:12px; color:var(--text-muted); }
+
+  button, .btn{
+    font-family:'Work Sans', sans-serif;
+    background:transparent;
+    border:1px solid var(--gold);
+    color:var(--gold);
+    padding:9px 16px;
+    font-size:13px;
+    font-weight:500;
+    cursor:pointer;
+    letter-spacing:.02em;
+  }
+  button:hover{ background:var(--gold); color:var(--bg-void); }
+  button:disabled{ opacity:.4; cursor:not-allowed; border-color:var(--text-muted); color:var(--text-muted); }
+  button:disabled:hover{ background:transparent; color:var(--text-muted); }
+
+  .btn-ghost{ border-color:var(--line); color:var(--text-muted); }
+  .btn-ghost:hover{ background:var(--bg-panel-2); color:var(--text); }
+
+  .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+
+  form.panel{
+    background:var(--bg-panel);
+    border:1px solid var(--line);
+    padding:24px;
+    max-width:480px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    margin-top:16px;
+  }
+  .field label{ display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px; }
+  .field input, .field select, .field textarea{
+    width:100%;
+    background:var(--bg-void);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:9px 10px;
+    font-family:'Work Sans', sans-serif;
+    font-size:14px;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{ outline:none; border-color:var(--gold); }
+  .field textarea{ resize:vertical; min-height:70px; }
+
+  .reg-list{ margin-top:22px; }
+  .reg-row{
+    display:flex; justify-content:space-between;
+    padding:10px 0; border-bottom:1px solid var(--line);
+    font-size:14px;
+  }
+  .reg-row .who{ color:var(--text); }
+  .reg-row .when{ color:var(--text-muted); font-size:12px; }
+  .empty{ color:var(--text-muted); font-size:14px; padding:20px 0; }
+
+  .note{
+    margin-top:40px;
+    font-size:12px;
+    color:var(--text-muted);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    max-width:600px;
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-text">Kruh</div>
+    </div>
+    <nav class="nav">
+      <a class="nav-item active" data-view="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9h14v-9"/></svg>
+        <span>Home</span>
+      </a>
+      <div class="nav-sep"></div>
+      <a class="nav-item" data-view="akce">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="5" width="17" height="15" rx="1"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>
+        <span>Akce</span>
+      </a>
+      <div class="nav-sep"></div>
+      <a class="nav-item" data-view="registrace">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8.5" r="3.2"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6"/></svg>
+        <span>Registrace</span>
+      </a>
+    </nav>
+    <div class="topbar-meta">Prototyp v0.1 · lokální data</div>
+  </header>
+
+  <main class="main">
+
+    <!-- HOME -->
+    <section class="view active" id="view-home">
+      <div class="eyebrow">Komunitní LAN party</div>
+      <h1 class="headline">Sejdeme se u obrazovek, ne u obrazovky.</h1>
+      <p class="lede">Kruh je místo, kde se domlouvají LAN party — kdo pořádá, kde se hraje a kdo dorazí. Bez placených serverů, bez sledování, jen seznam akcí a přihlášky.</p>
+
+      <div class="hero" style="margin-top:34px;">
+        <div class="hero-card" id="next-event-card">
+          <div class="label">Nejbližší akce</div>
+          <div class="val">—</div>
+          <div class="sub">Zatím žádná akce nevypsána.</div>
+        </div>
+        <button data-goto="akce">Zobrazit všechny akce</button>
+      </div>
+
+      <div class="section-title">Jak to funguje</div>
+      <div class="grid">
+        <div class="event-card">
+          <span class="tag">01</span>
+          <h3>Založíš akci</h3>
+          <p class="desc">Na stránce Akce vypíšeš termín, místo a kapacitu. Trvá to minutu.</p>
+        </div>
+        <div class="event-card">
+          <span class="tag">02</span>
+          <h3>Lidé se hlásí</h3>
+          <p class="desc">Zájemci se zaregistrují jménem a zprávou — vidíš, kdo přijde a kolik míst zbývá.</p>
+        </div>
+        <div class="event-card">
+          <span class="tag">03</span>
+          <h3>Sejdete se</h3>
+          <p class="desc">V den akce máš přehled účastníků na jednom místě, bez skupinových chatů.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- AKCE -->
+    <section class="view" id="view-akce">
+      <div class="toolbar">
+        <div>
+          <div class="eyebrow">Přehled</div>
+          <h1 class="headline" style="font-size:28px;">Akce</h1>
+        </div>
+        <button id="btn-new-event">+ Nová akce</button>
+      </div>
+
+      <form class="panel" id="form-event" style="display:none;">
+        <div class="field">
+          <label>Název akce</label>
+          <input type="text" id="ev-name" placeholder="Podzimní LAN v klubovně" required>
+        </div>
+        <div class="field">
+          <label>Datum</label>
+          <input type="date" id="ev-date" required>
+        </div>
+        <div class="field">
+          <label>Místo</label>
+          <input type="text" id="ev-place" placeholder="Klubovna, Pardubice" required>
+        </div>
+        <div class="field">
+          <label>Kapacita (počet míst)</label>
+          <input type="number" id="ev-cap" min="1" value="16" required>
+        </div>
+        <div class="field">
+          <label>Popis</label>
+          <textarea id="ev-desc" placeholder="Co se bude hrát, co s sebou přinést..."></textarea>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button type="submit">Uložit akci</button>
+          <button type="button" class="btn-ghost" id="btn-cancel-event">Zrušit</button>
+        </div>
+      </form>
+
+      <div class="grid" id="events-grid" style="margin-top:24px;"></div>
+    </section>
+
+    <!-- REGISTRACE -->
+    <section class="view" id="view-registrace">
+      <div class="eyebrow">Přihlášky</div>
+      <h1 class="headline" style="font-size:28px;">Registrace na akci</h1>
+      <p class="lede">Vyber akci a přihlas se, nebo se podívej, kdo už jde.</p>
+
+      <div class="field" style="max-width:400px; margin-top:20px;">
+        <label>Akce</label>
+        <select id="reg-event-select"></select>
+      </div>
+
+      <form class="panel" id="form-reg">
+        <div class="field">
+          <label>Jméno / přezdívka</label>
+          <input type="text" id="reg-name" placeholder="Tvoje jméno" required>
+        </div>
+        <div class="field">
+          <label>Poznámka (nepovinné)</label>
+          <input type="text" id="reg-note" placeholder="Přivezu monitor navíc, dorazím později...">
+        </div>
+        <button type="submit" id="btn-reg-submit">Přihlásit se</button>
+      </form>
+
+      <div class="reg-list">
+        <div class="section-title" style="font-size:16px;">Přihlášení</div>
+        <div id="reg-list-content"></div>
+      </div>
+
+      <div class="note">
+        Toto je funkční prototyp: data se ukládají jen ve tvém prohlížeči (localStorage), takže je vidíš jen ty a jen na tomto zařízení. Pro ostrou verzi, kde uvidí akce a přihlášky všichni návštěvníci, doporučuju napojit zdarma backend (Firebase nebo Supabase) — dej vědět a připravím i to.
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  const STORE_KEY = 'kruh_events_v1';
+
+  function loadEvents(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      return raw ? JSON.parse(raw) : seedEvents();
+    }catch(e){ return seedEvents(); }
+  }
+  function saveEvents(events){
+    localStorage.setItem(STORE_KEY, JSON.stringify(events));
+  }
+  function seedEvents(){
+    const events = [
+      {
+        id: cryptoId(),
+        name: 'Podzimní LAN v klubovně',
+        date: nextDate(14),
+        place: 'Klubovna, Pardubice',
+        cap: 16,
+        desc: 'Víkendová akce, přines si vlastní sestavu. Turnaj ve večerních hodinách.',
+        registrations: []
+      }
+    ];
+    saveEvents(events);
+    return events;
+  }
+  function nextDate(days){
+    const d = new Date();
+    d.setDate(d.getDate()+days);
+    return d.toISOString().slice(0,10);
+  }
+  function cryptoId(){
+    return 'e_' + Math.random().toString(36).slice(2,10);
+  }
+  function fmtDate(iso){
+    const d = new Date(iso+'T00:00:00');
+    return d.toLocaleDateString('cs-CZ', { day:'numeric', month:'long', year:'numeric' });
+  }
+
+  let events = loadEvents();
+
+  // ---- Navigation ----
+  const navItems = document.querySelectorAll('.nav-item');
+  const views = document.querySelectorAll('.view');
+  function showView(name){
+    navItems.forEach(n => n.classList.toggle('active', n.dataset.view === name));
+    views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+    if(name === 'akce') renderEvents();
+    if(name === 'registrace') renderRegView();
+    if(name === 'home') renderHome();
+  }
+  navItems.forEach(n => n.addEventListener('click', () => showView(n.dataset.view)));
+  document.querySelectorAll('[data-goto]').forEach(el => {
+    el.addEventListener('click', () => showView(el.dataset.goto));
+  });
+
+  // ---- Home ----
+  function renderHome(){
+    const card = document.getElementById('next-event-card');
+    if(events.length === 0){
+      card.querySelector('.val').textContent = '—';
+      card.querySelector('.sub').textContent = 'Zatím žádná akce nevypsána.';
+      return;
+    }
+    const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
+    const next = sorted[0];
+    card.querySelector('.val').textContent = next.name;
+    card.querySelector('.sub').textContent = fmtDate(next.date) + ' · ' + next.place;
+  }
+
+  // ---- Akce ----
+  const formEvent = document.getElementById('form-event');
+  document.getElementById('btn-new-event').addEventListener('click', () => {
+    formEvent.style.display = formEvent.style.display === 'none' ? 'flex' : 'none';
+  });
+  document.getElementById('btn-cancel-event').addEventListener('click', () => {
+    formEvent.style.display = 'none';
+    formEvent.reset();
+  });
+  formEvent.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const ev = {
+      id: cryptoId(),
+      name: document.getElementById('ev-name').value.trim(),
+      date: document.getElementById('ev-date').value,
+      place: document.getElementById('ev-place').value.trim(),
+      cap: parseInt(document.getElementById('ev-cap').value, 10) || 1,
+      desc: document.getElementById('ev-desc').value.trim(),
+      registrations: []
+    };
+    events.push(ev);
+    saveEvents(events);
+    formEvent.reset();
+    formEvent.style.display = 'none';
+    renderEvents();
+  });
+
+  function renderEvents(){
+    const grid = document.getElementById('events-grid');
+    grid.innerHTML = '';
+    if(events.length === 0){
+      grid.innerHTML = '<div class="empty">Zatím žádné akce. Přidej první pomocí tlačítka výše.</div>';
+      return;
+    }
+    const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
+    sorted.forEach(ev => {
+      const takenSlots = ev.registrations.length;
+      const full = takenSlots >= ev.cap;
+      const card = document.createElement('div');
+      card.className = 'event-card';
+      card.innerHTML = `
+        <span class="tag ${full ? 'full' : ''}">${full ? 'Obsazeno' : 'Volná místa'}</span>
+        <h3>${escapeHtml(ev.name)}</h3>
+        <div class="meta">${fmtDate(ev.date)} · ${escapeHtml(ev.place)}</div>
+        <p class="desc">${escapeHtml(ev.desc || 'Bez popisu.')}</p>
+        <div class="row">
+          <span class="slots">${takenSlots} / ${ev.cap} míst</span>
+          <button data-reg="${ev.id}">Přihlásit se</button>
+        </div>
+      `;
+      card.querySelector('[data-reg]').addEventListener('click', () => {
+        showView('registrace');
+        document.getElementById('reg-event-select').value = ev.id;
+        renderRegList();
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  // ---- Registrace ----
+  const regSelect = document.getElementById('reg-event-select');
+  function renderRegView(){
+    regSelect.innerHTML = '';
+    if(events.length === 0){
+      regSelect.innerHTML = '<option value="">Žádné akce k dispozici</option>';
+      document.getElementById('btn-reg-submit').disabled = true;
+      renderRegList();
+      return;
+    }
+    document.getElementById('btn-reg-submit').disabled = false;
+    const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
+    sorted.forEach(ev => {
+      const opt = document.createElement('option');
+      opt.value = ev.id;
+      opt.textContent = `${ev.name} — ${fmtDate(ev.date)}`;
+      regSelect.appendChild(opt);
+    });
+    renderRegList();
+  }
+  regSelect.addEventListener('change', renderRegList);
+
+  document.getElementById('form-reg').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const ev = events.find(x => x.id === regSelect.value);
+    if(!ev) return;
+    if(ev.registrations.length >= ev.cap){
+      alert('Tato akce je už plně obsazená.');
+      return;
+    }
+    const name = document.getElementById('reg-name').value.trim();
+    const note = document.getElementById('reg-note').value.trim();
+    if(!name) return;
+    ev.registrations.push({ name, note, ts: new Date().toISOString() });
+    saveEvents(events);
+    document.getElementById('form-reg').reset();
+    renderRegList();
+    renderEvents();
+  });
+
+  function renderRegList(){
+    const box = document.getElementById('reg-list-content');
+    const ev = events.find(x => x.id === regSelect.value);
+    if(!ev){
+      box.innerHTML = '<div class="empty">Vyber akci pro zobrazení přihlášených.</div>';
+      return;
+    }
+    if(ev.registrations.length === 0){
+      box.innerHTML = '<div class="empty">Zatím se nikdo nepřihlásil.</div>';
+      return;
+    }
+    box.innerHTML = ev.registrations.map(r => `
+      <div class="reg-row">
+        <span class="who">${escapeHtml(r.name)}${r.note ? ' — ' + escapeHtml(r.note) : ''}</span>
+        <span class="when">${new Date(r.ts).toLocaleDateString('cs-CZ')}</span>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  // init
+  renderHome();
+  renderEvents();
+  renderRegView();
+</script>
+</body>
+</html>
