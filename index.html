@@ -568,19 +568,26 @@
   });
 
  function startEditEvent(ev){
+    if (!ev) {
+      console.error("Chyba: Nebyla předána žádná data o akci!");
+      return;
+    }
     editingEventId = ev.id;
-    document.getElementById('ev-name').value = ev.name || '';
     
-    // Úprava: Načtení datumu Od a Do (pokud jsou uloženy staré akce s jedním datem, dá ho do obou)
-    document.getElementById('ev-date-start').value = ev.dateStart || ev.date || '';
-    document.getElementById('ev-date-end').value = ev.dateEnd || ev.date || '';
+    // Bezpečné naplnění textových polí (pokud na webu existují)
+    if(document.getElementById('ev-name')) document.getElementById('ev-name').value = ev.name || '';
+    if(document.getElementById('ev-place')) document.getElementById('ev-place').value = ev.place || '';
+    if(document.getElementById('ev-cap')) document.getElementById('ev-cap').value = ev.cap || 1;
+    if(document.getElementById('ev-desc')) document.getElementById('ev-desc').value = ev.desc || '';
+    if(document.getElementById('ev-image')) document.getElementById('ev-image').value = ev.imageUrl || '';
+    if(document.getElementById('ev-foodplan')) document.getElementById('ev-foodplan').value = ev.foodPlan || '';
+    if(document.getElementById('ev-deadline')) document.getElementById('ev-deadline').value = ev.changeDeadline || '';
+
+    // Bezpečné načtení datumu Od a Do (pokud jsou uloženy staré akce s jedním datem 'date', dá ho do obou)
+    if(document.getElementById('ev-date-start')) document.getElementById('ev-date-start').value = ev.dateStart || ev.date || '';
+    if(document.getElementById('ev-date-end')) document.getElementById('ev-date-end').value = ev.dateEnd || ev.date || '';
     
-    document.getElementById('ev-place').value = ev.place || '';
-    document.getElementById('ev-cap').value = ev.cap || 1;
-    document.getElementById('ev-desc').value = ev.desc || '';
-    document.getElementById('ev-image').value = ev.imageUrl || '';
-    
-    // Úprava: Načtení položkových her do našeho pomocného pole a vykreslení štítků
+    // Načtení položkových her do pomocného pole a vykreslení štítků
     if (Array.isArray(ev.games)) {
       currentEventGames = [...ev.games];
     } else if (typeof ev.games === 'string' && ev.games) {
@@ -588,11 +595,9 @@
     } else {
       currentEventGames = [];
     }
-    renderFormGames();
+    if (typeof renderFormGames === 'function') renderFormGames();
 
-    document.getElementById('ev-foodplan').value = ev.foodPlan || '';
-    
-    // Úprava: Načtení strukturovaného jídla do našeho pomocného objektu a vykreslení
+    // Načtení strukturovaného jídla do pomocného objektu a vykreslení
     if (ev.foodOptions && typeof ev.foodOptions === 'object' && !Array.isArray(ev.foodOptions)) {
       currentEventFood = {
         "fri-dinner": Array.isArray(ev.foodOptions["fri-dinner"]) ? [...ev.foodOptions["fri-dinner"]] : [],
@@ -602,16 +607,25 @@
         "sun-breakfast": Array.isArray(ev.foodOptions["sun-breakfast"]) ? [...ev.foodOptions["sun-breakfast"]] : []
       };
     } else {
-      // Pokud tam byla stará data (např. pole textů), vyčistíme to pro nový formát
       currentEventFood = { "fri-dinner": [], "sat-breakfast": [], "sat-lunch": [], "sat-dinner": [], "sun-breakfast": [] };
     }
-    renderFormFood();
+    if (typeof renderFormFood === 'function') renderFormFood();
 
-    document.getElementById('ev-deadline').value = ev.changeDeadline || '';
-    document.getElementById('btn-save-event').textContent = 'Uložit změny';
-    formEvent.style.display = 'flex';
-    showView('akce');
-    formEvent.scrollIntoView({ behavior:'smooth', block:'start' });
+    // Změna textu tlačítka na "Uložit změny"
+    if(document.getElementById('btn-save-event')) document.getElementById('btn-save-event').textContent = 'Uložit změny';
+    
+    // Bezpečné zobrazení formuláře, i kdyby proměnná formEvent neexistovala
+    const fEvent = document.getElementById('form-event');
+    if (fEvent) {
+      fEvent.style.display = 'block'; // Změněno z flex na block, aby se správně zobrazil panel
+      fEvent.scrollIntoView({ behavior:'smooth', block:'start' });
+    } else if (typeof formEvent !== 'undefined' && formEvent) {
+      formEvent.style.display = 'block';
+      formEvent.scrollIntoView({ behavior:'smooth', block:'start' });
+    }
+    
+    // Přepnutí pohledu (pokud funkce existuje)
+    if (typeof showView === 'function') showView('akce');
 }
 
   async function deleteEvent(eventId, eventName){
