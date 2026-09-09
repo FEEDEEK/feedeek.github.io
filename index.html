@@ -1178,6 +1178,89 @@
     }else{
       updateAuthUI();
     }
+    // --- POMOCNÉ PROMĚNNÉ PRO POLOŽKOVÉ HRY A JÍDLO ---
+let currentEventGames = [];
+let currentEventFood = {
+  "fri-dinner": [],
+  "sat-breakfast": [],
+  "sat-lunch": [],
+  "sat-dinner": [],
+  "sun-breakfast": []
+};
+
+// Funkce pro překreslení seznamu her ve formuláři
+function renderFormGames() {
+  const list = document.getElementById('ev-games-list');
+  if (!list) return;
+  list.innerHTML = '';
+  currentEventGames.forEach((game, index) => {
+    const li = document.createElement('li');
+    li.style = 'background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 4px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #fff;';
+    li.innerHTML = `<span>${game}</span><span style="color: #ff4a4a; cursor: pointer; font-weight: bold; font-size: 16px;" onclick="removeFormGame(${index})">×</span>`;
+    list.appendChild(li);
+  });
+}
+
+function removeFormGame(index) {
+  currentEventGames.splice(index, 1);
+  renderFormGames();
+}
+
+// Funkce pro překreslení rozpisů jídel ve formuláři
+function renderFormFood() {
+  const mealTypes = ["fri-dinner", "sat-breakfast", "sat-lunch", "sat-dinner", "sun-breakfast"];
+  mealTypes.forEach(type => {
+    const span = document.getElementById(`list-${type}`);
+    if (!span) return;
+    if (currentEventFood[type] && currentEventFood[type].length > 0) {
+      span.innerHTML = currentEventFood[type].map((food, index) => {
+        return `<span style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 3px; margin-right: 5px; margin-bottom: 5px; display: inline-flex; align-items: center; gap: 6px; color: #fff;">${food} <b style="color: #ff4a4a; cursor: pointer; font-size: 14px;" onclick="removeFormFood('${type}', ${index})">×</b></span>`;
+      }).join('');
+    } else {
+      span.innerHTML = '<span style="color: #888;">Žádné položky</span>';
+    }
+  });
+}
+
+function removeFormFood(type, index) {
+  currentEventFood[type].splice(index, 1);
+  renderFormFood();
+}
+
+// Aktivace tlačítek po kliknutí
+setTimeout(() => {
+  const btnAddGame = document.getElementById('btn-add-game');
+  if (btnAddGame) {
+    btnAddGame.addEventListener('click', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('input-add-game');
+      const value = input.value.trim();
+      if (value) {
+        currentEventGames.push(value);
+        input.value = '';
+        renderFormGames();
+      }
+    });
+  }
+
+  const btnAddFood = document.getElementById('btn-add-food');
+  if (btnAddFood) {
+    btnAddFood.addEventListener('click', (e) => {
+      e.preventDefault();
+      const select = document.getElementById('select-food-meal');
+      const input = document.getElementById('input-add-food');
+      const type = select.value;
+      const value = input.value.trim();
+      if (value) {
+        if (!currentEventFood[type]) currentEventFood[type] = [];
+        currentEventFood[type].push(value);
+        input.value = '';
+        renderFormFood();
+      }
+    });
+  }
+}, 500);
+// --- KONEC POMOCNÉHO KÓDU ---
   });
 </script>
 </body>
