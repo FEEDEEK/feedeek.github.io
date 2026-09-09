@@ -250,43 +250,85 @@
       </div>
     </section>
 
-      <!-- AKCE -->
+        <!-- AKCE -->
     <section class="view" id="view-akce">
       <div class="toolbar">
         <div>
           <div class="eyebrow">Přehled</div>
-          <h1 class="headline" style="font-size:28px;">Akce</h1>
+          <h1 class="headline" style="font-size:32px;">Akce</h1>
         </div>
         <button id="btn-new-event" style="display:none;">+ Nová akce</button>
       </div>
 
-      <form class="panel" id="form-event" style="display:none; max-width:520px;">
-        <div class="field"><label>Název akce</label><input type="text" id="ev-name" placeholder="Podzimní LAN v klubovně" required></div>
+      <form class="panel" id="form-event" style="display:none; max-width:560px; font-size: 16px;">
+        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Název akce</label><input type="text" id="ev-name" placeholder="Podzimní LAN v klubovně" style="width:100%; padding: 8px; font-size: 15px;" required></div>
         
-        <!-- Změna: Rozdělení data na OD a DO vedle sebe -->
-        <div style="display: flex; gap: 15px;">
-          <div class="field" style="flex: 1;"><label>Datum od</label><input type="date" id="ev-date-start" required></div>
-          <div class="field" style="flex: 1;"><label>Datum do</label><input type="date" id="ev-date-end" required></div>
+        <div style="display: flex; gap: 15px; margin-bottom: 16px;">
+          <div class="field" style="flex: 1;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Datum od</label><input type="date" id="ev-date-start" style="width:100%; padding: 8px; font-size: 15px;" required></div>
+          <div class="field" style="flex: 1;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Datum do</label><input type="date" id="ev-date-end" style="width:100%; padding: 8px; font-size: 15px;" required></div>
         </div>
 
-        <div class="field"><label>Místo</label><input type="text" id="ev-place" placeholder="Klubovna, Pardubice" required></div>
-        <div class="field"><label>Kapacita (počet míst)</label><input type="number" id="ev-cap" min="1" value="16" required></div>
-        <div class="field"><label>Popis</label><textarea id="ev-desc" placeholder="Co se bude hrát, co s sebou přinést..."></textarea></div>
-        <div class="field"><label>URL obrázku (nepovinné)</label><input type="url" id="ev-image" placeholder="https://..."></div>
-        <div class="field"><label>Hry, které se budou hrát (odděl čárkou)</label><input type="text" id="ev-games" placeholder="CS2, Age of Empires 2, Mario Kart"></div>
-        <div class="field"><label>Plán jídla (nepovinné)</label><textarea id="ev-foodplan" placeholder="Objednáme pizzu, platí se na místě..."></textarea></div>
-        <div class="field"><label>Možnosti jídla k výběru (nepovinné, odděl čárkou)</label><input type="text" id="ev-foodoptions" placeholder="Margherita, Salám, Vege"></div>
-        <div class="field"><label>Uzávěrka změn (jídlo / odhlášení)</label><input type="date" id="ev-deadline"><small>Do tohoto data mohou účastníci měnit jídlo nebo se odhlásit.</small></div>
-        <div style="display:flex; gap:10px;">
-          <button type="submit" id="btn-save-event">Uložit akci</button>
-          <button type="button" class="btn-ghost" id="btn-cancel-event">Zrušit</button>
+        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Místo</label><input type="text" id="ev-place" placeholder="Klubovna, Pardubice" style="width:100%; padding: 8px; font-size: 15px;" required></div>
+        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Kapacita (počet míst)</label><input type="number" id="ev-cap" min="1" value="16" style="width:100%; padding: 8px; font-size: 15px;" required></div>
+        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Popis</label><textarea id="ev-desc" placeholder="Co s sebou přinést..." style="width:100%; padding: 8px; font-size: 15px; height: 80px;"></textarea></div>
+        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">URL obrázku (nepovinné)</label><input type="url" id="ev-image" placeholder="https://..." style="width:100%; padding: 8px; font-size: 15px;"></div>
+        
+        <div class="field" style="margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+          <label style="font-weight: bold; display: block; margin-bottom: 6px;">🎮 Hry, které se budou hrát</label>
+          <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <input type="text" id="input-add-game" placeholder="Napiš hru (např. Dota 2)" style="flex: 1; padding: 8px; font-size: 15px;">
+            <button type="button" id="btn-add-game" style="padding: 8px 16px;">Přidat</button>
+          </div>
+          <ul id="ev-games-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px;">
+          </ul>
+        </div>
+
+        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Plán jídla (obecné info / poznámka)</label><textarea id="ev-foodplan" placeholder="Platí se na místě..." style="width:100%; padding: 8px; font-size: 15px; height: 60px;"></textarea></div>
+
+        <div class="field" style="margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+          <label style="font-weight: bold; display: block; margin-bottom: 12px;">🍔 Výběr jídla pro feedery</label>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px; flex-direction: column;">
+            <span style="font-size: 14px; color: #aaa;">Přidat položku do menu:</span>
+            <div style="display: flex; gap: 8px;">
+              <select id="select-food-meal" style="padding: 8px; font-size: 14px;">
+                <optgroup label="Pátek">
+                  <option value="fri-dinner">Pátek — Večeře</option>
+                </optgroup>
+                <optgroup label="Sobota">
+                  <option value="sat-breakfast">Sobota — Snídaně</option>
+                  <option value="sat-lunch">Sobota — Oběd</option>
+                  <option value="sat-dinner">Sobota — Večeře</option>
+                </optgroup>
+                <optgroup label="Neděle">
+                  <option value="sun-breakfast">Neděle — Snídaně</option>
+                </optgroup>
+              </select>
+              <input type="text" id="input-add-food" placeholder="Název jídla (např. Pizza Hawaii)" style="flex: 1; padding: 8px; font-size: 14px;">
+              <button type="button" id="btn-add-food" style="padding: 8px 12px;">Přidat</button>
+            </div>
+          </div>
+
+          <div id="food-schedule-preview" style="font-size: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div><strong>Pátek Večeře:</strong> <span id="list-fri-dinner" style="color: #bbb;">Žádné položky</span></div>
+            <div><strong>Sobota Snídaně:</strong> <span id="list-sat-breakfast" style="color: #bbb;">Žádné položky</span></div>
+            <div><strong>Sobota Oběd:</strong> <span id="list-sat-lunch" style="color: #bbb;">Žádné položky</span></div>
+            <div><strong>Sobota Večeře:</strong> <span id="list-sat-dinner" style="color: #bbb;">Žádné položky</span></div>
+            <div><strong>Neděle Snídaně:</strong> <span id="list-sun-breakfast" style="color: #bbb;">Žádné položky</span></div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom: 20px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Uzávěrka změn (jídlo / odhlášení)</label><input type="date" id="ev-deadline" style="width:100%; padding: 8px; font-size: 15px;"><small style="display:block; margin-top: 4px; color: #888;">Do tohoto data mohou účastníci měnit jídlo nebo se odhlásit.</small></div>
+        
+        <div style="display:flex; gap:10px; margin-top: 24px;">
+          <button type="submit" id="btn-save-event" style="padding: 10px 20px; font-size: 16px; font-weight: bold;">Uložit akci</button>
+          <button type="button" class="btn-ghost" id="btn-cancel-event" style="padding: 10px 20px; font-size: 16px;">Zrušit</button>
         </div>
       </form>
 
       <div id="featured-event-wrap"></div>
       <div class="grid" id="events-grid" style="margin-top:24px;"></div>
     </section>
-
 
     <!-- DETAIL AKCE -->
     <section class="view" id="view-event">
