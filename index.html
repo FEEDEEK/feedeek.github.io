@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kruh — LAN party</title>
+<title>FEEDEK — LAN party</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -267,7 +267,7 @@
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark"></div>
-      <div class="brand-text">Kruh</div>
+      <div class="brand-text">FEEDEK</div>
     </div>
     <nav class="nav">
       <a class="nav-item active" data-view="home">
@@ -280,12 +280,12 @@
         <span>Akce</span>
       </a>
       <div class="nav-sep"></div>
-      <a class="nav-item" data-view="registrace">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8.5" r="3.2"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6"/></svg>
-        <span>Registrace</span>
+      <a class="nav-item" data-view="ucet">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19c1.2-4.2 4.3-6.4 8-6.4s6.8 2.2 8 6.4"/><circle cx="12" cy="7.2" r="3.7"/></svg>
+        <span id="nav-ucet-label">Účet</span>
       </a>
     </nav>
-    <div class="topbar-meta">Prototyp v0.1 · lokální data</div>
+    <div class="topbar-meta"></div>
   </header>
 
   <main class="main">
@@ -294,7 +294,7 @@
     <section class="view active" id="view-home">
       <div class="eyebrow">Komunitní LAN party</div>
       <h1 class="headline">Sejdeme se u obrazovek, ne u obrazovky.</h1>
-      <p class="lede">Kruh je místo, kde se domlouvají LAN party — kdo pořádá, kde se hraje a kdo dorazí. Bez placených serverů, bez sledování, jen seznam akcí a přihlášky.</p>
+      <p class="lede">FEEDEK je místo, kde se domlouvají LAN party — kdo pořádá, kde se hraje a kdo dorazí. Bez placených serverů, bez sledování, jen seznam akcí a přihlášky.</p>
 
       <div class="hero" style="margin-top:34px;">
         <div class="hero-card" id="next-event-card">
@@ -332,7 +332,7 @@
           <div class="eyebrow">Přehled</div>
           <h1 class="headline" style="font-size:28px;">Akce</h1>
         </div>
-        <button id="btn-new-event">+ Nová akce</button>
+        <button id="btn-new-event" style="display:none;">+ Nová akce</button>
       </div>
 
       <form class="panel" id="form-event" style="display:none;">
@@ -357,7 +357,7 @@
           <textarea id="ev-desc" placeholder="Co se bude hrát, co s sebou přinést..."></textarea>
         </div>
         <div style="display:flex; gap:10px;">
-          <button type="submit">Uložit akci</button>
+          <button type="submit" id="btn-save-event">Uložit akci</button>
           <button type="button" class="btn-ghost" id="btn-cancel-event">Zrušit</button>
         </div>
       </form>
@@ -365,83 +365,153 @@
       <div class="grid" id="events-grid" style="margin-top:24px;"></div>
     </section>
 
-    <!-- REGISTRACE -->
-    <section class="view" id="view-registrace">
-      <div class="eyebrow">Přihlášky</div>
-      <h1 class="headline" style="font-size:28px;">Registrace na akci</h1>
-      <p class="lede">Vyber akci a přihlas se, nebo se podívej, kdo už jde.</p>
+    <!-- ÚČET -->
+    <section class="view" id="view-ucet">
+      <div class="eyebrow">Účet</div>
+      <h1 class="headline" style="font-size:28px;">Přihlášení / registrace</h1>
+      <p class="lede">Zadej přezdívku a heslo. Pokud pod tou přezdívkou účet ještě nemáš, rovnou tě necháme jeden založit.</p>
 
-      <div class="field" style="max-width:400px; margin-top:20px;">
-        <label>Akce</label>
-        <select id="reg-event-select"></select>
+      <div id="auth-logged-out" style="margin-top:20px;">
+        <form class="panel" id="form-auth">
+          <div class="field">
+            <label>Přezdívka</label>
+            <input type="text" id="auth-nick" placeholder="Tvoje přezdívka" required>
+          </div>
+          <div class="field">
+            <label>Heslo</label>
+            <input type="password" id="auth-password" placeholder="Aspoň 6 znaků" required minlength="6">
+          </div>
+          <div class="field" id="auth-email-field" style="display:none;">
+            <label>E-mail</label>
+            <input type="email" id="auth-email" placeholder="Potřebujeme ho pro založení účtu">
+          </div>
+          <button type="submit" id="auth-submit-btn">Pokračovat</button>
+          <div id="auth-message" style="font-size:13px; color:var(--text-muted); min-height:16px;"></div>
+        </form>
+
+        <div style="display:flex; align-items:center; gap:12px; max-width:480px; margin-top:20px;">
+          <div style="flex:1; height:1px; background:var(--line);"></div>
+          <span style="font-size:12px; color:var(--text-muted);">nebo</span>
+          <div style="flex:1; height:1px; background:var(--line);"></div>
+        </div>
+        <button type="button" class="btn-ghost" id="btn-google" style="margin-top:18px;">Pokračovat přes Google</button>
+
+        <div id="auth-google-nick-prompt" class="panel" style="display:none; max-width:480px; margin-top:18px;">
+          <p style="font-size:14px; color:var(--text-muted);">Ještě potřebujeme přezdívku, pod kterou tě uvidí ostatní.</p>
+          <div class="field">
+            <label>Přezdívka</label>
+            <input type="text" id="google-nick-input" placeholder="Tvoje přezdívka" required>
+          </div>
+          <button type="button" id="btn-google-nick-submit">Uložit přezdívku</button>
+        </div>
       </div>
 
-      <form class="panel" id="form-reg">
-        <div class="field">
-          <label>Jméno / přezdívka</label>
-          <input type="text" id="reg-name" placeholder="Tvoje jméno" required>
+      <div id="auth-logged-in" style="display:none; margin-top:20px;">
+        <div class="hero-card" style="max-width:340px;">
+          <div class="label">Přihlášen jako</div>
+          <div class="val" id="auth-current-nick">—</div>
+          <div class="sub" id="auth-current-email"></div>
         </div>
-        <div class="field">
-          <label>Poznámka (nepovinné)</label>
-          <input type="text" id="reg-note" placeholder="Přivezu monitor navíc, dorazím později...">
+        <button type="button" class="btn-ghost" id="btn-logout" style="margin-top:18px;">Odhlásit se</button>
+
+        <div style="margin-top:40px; padding-top:32px; border-top:1px solid var(--line);">
+          <div class="section-title">Přihlásit se na akci</div>
+
+          <div class="field" style="max-width:400px;">
+            <label>Akce</label>
+            <select id="reg-event-select"></select>
+          </div>
+
+          <form class="panel" id="form-reg">
+            <div class="field">
+              <label>Přihlašuješ se jako</label>
+              <input type="text" id="reg-name" readonly>
+            </div>
+            <div class="field">
+              <label>Poznámka (nepovinné)</label>
+              <input type="text" id="reg-note" placeholder="Přivezu monitor navíc, dorazím později...">
+            </div>
+            <button type="submit" id="btn-reg-submit">Přihlásit se</button>
+          </form>
+
+          <div class="reg-list">
+            <div class="section-title" style="font-size:16px;">Přihlášení</div>
+            <div id="reg-list-content"></div>
+          </div>
         </div>
-        <button type="submit" id="btn-reg-submit">Přihlásit se</button>
-      </form>
-
-      <div class="reg-list">
-        <div class="section-title" style="font-size:16px;">Přihlášení</div>
-        <div id="reg-list-content"></div>
-      </div>
-
-      <div class="note">
-        Toto je funkční prototyp: data se ukládají jen ve tvém prohlížeči (localStorage), takže je vidíš jen ty a jen na tomto zařízení. Pro ostrou verzi, kde uvidí akce a přihlášky všichni návštěvníci, doporučuju napojit zdarma backend (Firebase nebo Supabase) — dej vědět a připravím i to.
       </div>
     </section>
 
   </main>
 </div>
 
-<script>
-  const STORE_KEY = 'kruh_events_v1';
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    GoogleAuthProvider, signInWithPopup, signOut
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  function loadEvents(){
-    try{
-      const raw = localStorage.getItem(STORE_KEY);
-      return raw ? JSON.parse(raw) : seedEvents();
-    }catch(e){ return seedEvents(); }
-  }
-  function saveEvents(events){
-    localStorage.setItem(STORE_KEY, JSON.stringify(events));
-  }
-  function seedEvents(){
-    const events = [
-      {
-        id: cryptoId(),
-        name: 'Podzimní LAN v klubovně',
-        date: nextDate(14),
-        place: 'Klubovna, Pardubice',
-        cap: 16,
-        desc: 'Víkendová akce, přines si vlastní sestavu. Turnaj ve večerních hodinách.',
-        registrations: []
-      }
-    ];
-    saveEvents(events);
-    return events;
-  }
+  const firebaseConfig = {
+    apiKey: "AIzaSyA3iXxS2Ffr1-DDyGHVFW4O2a5dKkOX6Q0",
+    authDomain: "lan-feedek.firebaseapp.com",
+    projectId: "lan-feedek",
+    storageBucket: "lan-feedek.firebasestorage.app",
+    messagingSenderId: "632018940301",
+    appId: "1:632018940301:web:9f4869524c22c4ca460dc4"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  let events = [];
+  let regCounts = {};
+  let currentRegUnsub = null;
+  let currentUser = null;      // Firebase Auth user
+  let currentNick = null;      // přezdívka z Firestore
+  let currentIsAdmin = false;  // admin práva z Firestore (users/{uid}.isAdmin)
+  let pendingEventId = null;   // akce, na kterou se chtěl uživatel přihlásit před loginem
+  let pendingNickForRegistration = null; // přezdívka rozpracované registrace (krok 2)
+
   function nextDate(days){
     const d = new Date();
     d.setDate(d.getDate()+days);
     return d.toISOString().slice(0,10);
   }
-  function cryptoId(){
-    return 'e_' + Math.random().toString(36).slice(2,10);
-  }
   function fmtDate(iso){
     const d = new Date(iso+'T00:00:00');
     return d.toLocaleDateString('cs-CZ', { day:'numeric', month:'long', year:'numeric' });
   }
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
 
-  let events = loadEvents();
+  // ---- Živé napojení na kolekci akcí ----
+  const eventsQuery = query(collection(db, 'events'), orderBy('date'));
+  onSnapshot(eventsQuery, (snapshot) => {
+    events = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    events.forEach(ev => {
+      if(!(ev.id in regCounts)){
+        regCounts[ev.id] = 0;
+        onSnapshot(collection(db, 'events', ev.id, 'registrations'), (rsnap) => {
+          regCounts[ev.id] = rsnap.size;
+          renderHome();
+          renderEvents();
+        });
+      }
+    });
+    renderHome();
+    renderEvents();
+    renderRegSelect();
+  }, (err) => {
+    console.error('Chyba připojení k Firestore:', err);
+  });
 
   // ---- Navigation ----
   const navItems = document.querySelectorAll('.nav-item');
@@ -449,9 +519,6 @@
   function showView(name){
     navItems.forEach(n => n.classList.toggle('active', n.dataset.view === name));
     views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
-    if(name === 'akce') renderEvents();
-    if(name === 'registrace') renderRegView();
-    if(name === 'home') renderHome();
   }
   navItems.forEach(n => n.addEventListener('click', () => showView(n.dataset.view)));
   document.querySelectorAll('[data-goto]').forEach(el => {
@@ -466,50 +533,92 @@
       card.querySelector('.sub').textContent = 'Zatím žádná akce nevypsána.';
       return;
     }
-    const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
-    const next = sorted[0];
+    const next = events[0];
     card.querySelector('.val').textContent = next.name;
     card.querySelector('.sub').textContent = fmtDate(next.date) + ' · ' + next.place;
   }
 
   // ---- Akce ----
   const formEvent = document.getElementById('form-event');
-  document.getElementById('btn-new-event').addEventListener('click', () => {
-    formEvent.style.display = formEvent.style.display === 'none' ? 'flex' : 'none';
+  const btnNewEvent = document.getElementById('btn-new-event');
+  let editingEventId = null; // null = zakládáme novou akci, jinak editujeme existující
+
+  btnNewEvent.addEventListener('click', () => {
+    if(formEvent.style.display === 'none'){
+      editingEventId = null;
+      formEvent.reset();
+      document.getElementById('btn-save-event').textContent = 'Uložit akci';
+      formEvent.style.display = 'flex';
+    }else{
+      formEvent.style.display = 'none';
+    }
   });
   document.getElementById('btn-cancel-event').addEventListener('click', () => {
     formEvent.style.display = 'none';
     formEvent.reset();
+    editingEventId = null;
   });
-  formEvent.addEventListener('submit', (e) => {
+  formEvent.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const ev = {
-      id: cryptoId(),
+    const submitBtn = document.getElementById('btn-save-event');
+    submitBtn.disabled = true;
+    const payload = {
       name: document.getElementById('ev-name').value.trim(),
       date: document.getElementById('ev-date').value,
       place: document.getElementById('ev-place').value.trim(),
       cap: parseInt(document.getElementById('ev-cap').value, 10) || 1,
-      desc: document.getElementById('ev-desc').value.trim(),
-      registrations: []
+      desc: document.getElementById('ev-desc').value.trim()
     };
-    events.push(ev);
-    saveEvents(events);
-    formEvent.reset();
-    formEvent.style.display = 'none';
-    renderEvents();
+    try{
+      if(editingEventId){
+        await updateDoc(doc(db, 'events', editingEventId), payload);
+      }else{
+        await addDoc(collection(db, 'events'), payload);
+      }
+      formEvent.reset();
+      formEvent.style.display = 'none';
+      editingEventId = null;
+    }catch(err){
+      alert('Akci se nepodařilo uložit. Zkus to prosím znovu.');
+      console.error(err);
+    }finally{
+      submitBtn.disabled = false;
+    }
   });
 
+  function startEditEvent(ev){
+    editingEventId = ev.id;
+    document.getElementById('ev-name').value = ev.name || '';
+    document.getElementById('ev-date').value = ev.date || '';
+    document.getElementById('ev-place').value = ev.place || '';
+    document.getElementById('ev-cap').value = ev.cap || 1;
+    document.getElementById('ev-desc').value = ev.desc || '';
+    document.getElementById('btn-save-event').textContent = 'Uložit změny';
+    formEvent.style.display = 'flex';
+    formEvent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function deleteEvent(eventId, eventName){
+    if(!confirm(`Opravdu smazat akci "${eventName}"? Tohle nejde vrátit zpět.`)) return;
+    try{
+      await deleteDoc(doc(db, 'events', eventId));
+    }catch(err){
+      alert('Smazání se nepovedlo. Zkus to prosím znovu.');
+      console.error(err);
+    }
+  }
+
   function renderEvents(){
+    btnNewEvent.style.display = currentIsAdmin ? 'inline-flex' : 'none';
     const grid = document.getElementById('events-grid');
     grid.innerHTML = '';
     if(events.length === 0){
-      grid.innerHTML = '<div class="empty">Zatím žádné akce. Přidej první pomocí tlačítka výše.</div>';
+      grid.innerHTML = '<div class="empty">Zatím žádné akce.</div>';
       return;
     }
-    const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
-    sorted.forEach(ev => {
-      const takenSlots = ev.registrations.length;
-      const full = takenSlots >= ev.cap;
+    events.forEach(ev => {
+      const taken = regCounts[ev.id] || 0;
+      const full = taken >= ev.cap;
       const card = document.createElement('div');
       card.className = 'event-card';
       card.innerHTML = `
@@ -518,88 +627,283 @@
         <div class="meta">${fmtDate(ev.date)} · ${escapeHtml(ev.place)}</div>
         <p class="desc">${escapeHtml(ev.desc || 'Bez popisu.')}</p>
         <div class="row">
-          <span class="slots">${takenSlots} / ${ev.cap} míst</span>
+          <span class="slots">${taken} / ${ev.cap} míst</span>
           <button data-reg="${ev.id}">Přihlásit se</button>
         </div>
+        ${currentIsAdmin ? `
+        <div class="row" style="margin-top:2px;">
+          <button type="button" class="btn-ghost" data-edit="${ev.id}" style="flex:1;">Upravit</button>
+          <button type="button" class="btn-ghost" data-delete="${ev.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+        </div>` : ''}
       `;
       card.querySelector('[data-reg]').addEventListener('click', () => {
-        showView('registrace');
-        document.getElementById('reg-event-select').value = ev.id;
-        renderRegList();
+        goToRegistration(ev.id);
       });
+      const editBtn = card.querySelector('[data-edit]');
+      if(editBtn) editBtn.addEventListener('click', () => startEditEvent(ev));
+      const delBtn = card.querySelector('[data-delete]');
+      if(delBtn) delBtn.addEventListener('click', () => deleteEvent(ev.id, ev.name));
       grid.appendChild(card);
     });
   }
 
+  function goToRegistration(eventId){
+    if(!currentUser || !currentNick){
+      pendingEventId = eventId;
+      showView('ucet');
+      return;
+    }
+    showView('ucet');
+    regSelect.value = eventId;
+    subscribeToRegList(eventId);
+  }
+
   // ---- Registrace ----
   const regSelect = document.getElementById('reg-event-select');
-  function renderRegView(){
+  function renderRegSelect(){
+    const prevSelected = regSelect.value;
     regSelect.innerHTML = '';
     if(events.length === 0){
       regSelect.innerHTML = '<option value="">Žádné akce k dispozici</option>';
       document.getElementById('btn-reg-submit').disabled = true;
-      renderRegList();
+      document.getElementById('reg-list-content').innerHTML = '<div class="empty">Zatím nejsou vypsané žádné akce.</div>';
       return;
     }
     document.getElementById('btn-reg-submit').disabled = false;
-    const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
-    sorted.forEach(ev => {
+    events.forEach(ev => {
       const opt = document.createElement('option');
       opt.value = ev.id;
       opt.textContent = `${ev.name} — ${fmtDate(ev.date)}`;
       regSelect.appendChild(opt);
     });
-    renderRegList();
+    const stillExists = events.some(ev => ev.id === prevSelected);
+    regSelect.value = stillExists ? prevSelected : events[0].id;
+    subscribeToRegList(regSelect.value);
   }
-  regSelect.addEventListener('change', renderRegList);
+  regSelect.addEventListener('change', () => subscribeToRegList(regSelect.value));
 
-  document.getElementById('form-reg').addEventListener('submit', (e) => {
+  function subscribeToRegList(eventId){
+    if(currentRegUnsub) currentRegUnsub();
+    if(!eventId) return;
+    const box = document.getElementById('reg-list-content');
+    currentRegUnsub = onSnapshot(collection(db, 'events', eventId, 'registrations'), (snap) => {
+      if(snap.empty){
+        box.innerHTML = '<div class="empty">Zatím se nikdo nepřihlásil.</div>';
+        return;
+      }
+      const rows = snap.docs
+        .map(d => d.data())
+        .sort((a,b) => (a.ts || '').localeCompare(b.ts || ''));
+      box.innerHTML = rows.map(r => `
+        <div class="reg-row">
+          <span class="who">${escapeHtml(r.name)}${r.note ? ' — ' + escapeHtml(r.note) : ''}</span>
+          <span class="when">${r.ts ? new Date(r.ts).toLocaleDateString('cs-CZ') : ''}</span>
+        </div>
+      `).join('');
+    });
+  }
+
+  document.getElementById('form-reg').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const ev = events.find(x => x.id === regSelect.value);
+    if(!currentUser || !currentNick){
+      showView('ucet');
+      return;
+    }
+    const eventId = regSelect.value;
+    const ev = events.find(x => x.id === eventId);
     if(!ev) return;
-    if(ev.registrations.length >= ev.cap){
+    if((regCounts[eventId] || 0) >= ev.cap){
       alert('Tato akce je už plně obsazená.');
       return;
     }
-    const name = document.getElementById('reg-name').value.trim();
     const note = document.getElementById('reg-note').value.trim();
-    if(!name) return;
-    ev.registrations.push({ name, note, ts: new Date().toISOString() });
-    saveEvents(events);
-    document.getElementById('form-reg').reset();
-    renderRegList();
-    renderEvents();
+    const submitBtn = document.getElementById('btn-reg-submit');
+    submitBtn.disabled = true;
+    try{
+      await addDoc(collection(db, 'events', eventId, 'registrations'), {
+        name: currentNick, uid: currentUser.uid, note, ts: new Date().toISOString()
+      });
+      document.getElementById('reg-note').value = '';
+    }catch(err){
+      alert('Přihlášení se nepodařilo uložit. Zkus to prosím znovu.');
+      console.error(err);
+    }finally{
+      submitBtn.disabled = false;
+    }
   });
 
-  function renderRegList(){
-    const box = document.getElementById('reg-list-content');
-    const ev = events.find(x => x.id === regSelect.value);
-    if(!ev){
-      box.innerHTML = '<div class="empty">Vyber akci pro zobrazení přihlášených.</div>';
-      return;
-    }
-    if(ev.registrations.length === 0){
-      box.innerHTML = '<div class="empty">Zatím se nikdo nepřihlásil.</div>';
-      return;
-    }
-    box.innerHTML = ev.registrations.map(r => `
-      <div class="reg-row">
-        <span class="who">${escapeHtml(r.name)}${r.note ? ' — ' + escapeHtml(r.note) : ''}</span>
-        <span class="when">${new Date(r.ts).toLocaleDateString('cs-CZ')}</span>
-      </div>
-    `).join('');
+  // ==================== ÚČET / AUTENTIZACE ====================
+
+  function usernameDocRef(nick){
+    return doc(db, 'usernames', nick.trim().toLowerCase());
   }
 
-  function escapeHtml(str){
-    const div = document.createElement('div');
-    div.textContent = str || '';
-    return div.innerHTML;
+  function setAuthMessage(msg){
+    document.getElementById('auth-message').textContent = msg || '';
   }
 
-  // init
-  renderHome();
-  renderEvents();
-  renderRegView();
+  const formAuth = document.getElementById('form-auth');
+  const authEmailField = document.getElementById('auth-email-field');
+  const authSubmitBtn = document.getElementById('auth-submit-btn');
+  let authStep = 1; // 1 = zadání nicku+hesla, 2 = doplnění e-mailu pro registraci
+
+  formAuth.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nick = document.getElementById('auth-nick').value.trim();
+    const password = document.getElementById('auth-password').value;
+    if(!nick || !password) return;
+
+    authSubmitBtn.disabled = true;
+    setAuthMessage('');
+
+    try{
+      if(authStep === 1){
+        const unameSnap = await getDoc(usernameDocRef(nick));
+        if(unameSnap.exists()){
+          // Účet existuje -> přihlásit
+          const { email } = unameSnap.data();
+          await signInWithEmailAndPassword(auth, email, password);
+        }else{
+          // Účet neexistuje -> přepnout na krok 2 (doplnění e-mailu)
+          authStep = 2;
+          pendingNickForRegistration = nick;
+          authEmailField.style.display = 'block';
+          document.getElementById('auth-nick').readOnly = true;
+          authSubmitBtn.textContent = 'Dokončit registraci';
+          setAuthMessage(`Přezdívka "${nick}" je volná — doplň e-mail a založíme ti účet.`);
+        }
+      }else{
+        // krok 2: dokončení registrace
+        const email = document.getElementById('auth-email').value.trim();
+        if(!email){ setAuthMessage('Doplň prosím e-mail.'); authSubmitBtn.disabled = false; return; }
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(usernameDocRef(pendingNickForRegistration), { uid: cred.user.uid, email });
+        await setDoc(doc(db, 'users', cred.user.uid), { nick: pendingNickForRegistration, email });
+      }
+    }catch(err){
+      console.error(err);
+      if(err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'){
+        setAuthMessage('Nesprávné heslo. Zkus to znovu.');
+      }else if(err.code === 'auth/email-already-in-use'){
+        setAuthMessage('Tenhle e-mail už je použitý u jiného účtu.');
+      }else if(err.code === 'auth/weak-password'){
+        setAuthMessage('Heslo musí mít aspoň 6 znaků.');
+      }else{
+        setAuthMessage('Něco se nepovedlo. Zkus to prosím znovu.');
+      }
+    }finally{
+      authSubmitBtn.disabled = false;
+    }
+  });
+
+  function resetAuthForm(){
+    authStep = 1;
+    pendingNickForRegistration = null;
+    formAuth.reset();
+    authEmailField.style.display = 'none';
+    document.getElementById('auth-nick').readOnly = false;
+    authSubmitBtn.textContent = 'Pokračovat';
+    setAuthMessage('');
+  }
+
+  document.getElementById('btn-google').addEventListener('click', async () => {
+    try{
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    }catch(err){
+      console.error(err);
+      setAuthMessage('Přihlášení přes Google se nepovedlo. Zkus to znovu.');
+    }
+  });
+
+  document.getElementById('btn-google-nick-submit').addEventListener('click', async () => {
+    const nick = document.getElementById('google-nick-input').value.trim();
+    if(!nick || !currentUser) return;
+    const btn = document.getElementById('btn-google-nick-submit');
+    btn.disabled = true;
+    try{
+      const existing = await getDoc(usernameDocRef(nick));
+      if(existing.exists()){
+        alert('Tahle přezdívka je už obsazená, zkus jinou.');
+        btn.disabled = false;
+        return;
+      }
+      await setDoc(usernameDocRef(nick), { uid: currentUser.uid, email: currentUser.email });
+      await setDoc(doc(db, 'users', currentUser.uid), { nick, email: currentUser.email });
+      currentNick = nick;
+      updateAuthUI();
+    }catch(err){
+      console.error(err);
+      alert('Uložení přezdívky se nepovedlo. Zkus to znovu.');
+    }finally{
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    await signOut(auth);
+  });
+
+  function updateAuthUI(){
+    const loggedOutBox = document.getElementById('auth-logged-out');
+    const loggedInBox = document.getElementById('auth-logged-in');
+    const googleNickPrompt = document.getElementById('auth-google-nick-prompt');
+    const navLabel = document.getElementById('nav-ucet-label');
+
+    if(currentUser && currentNick){
+      loggedOutBox.style.display = 'none';
+      loggedInBox.style.display = 'block';
+      googleNickPrompt.style.display = 'none';
+      document.getElementById('auth-current-nick').textContent = currentNick + (currentIsAdmin ? ' (admin)' : '');
+      document.getElementById('auth-current-email').textContent = currentUser.email || '';
+      document.getElementById('reg-name').value = currentNick;
+      navLabel.textContent = currentNick;
+      renderRegSelect();
+    }else if(currentUser && !currentNick){
+      // přihlášen přes Google, ale ještě nemá přezdívku
+      loggedOutBox.style.display = 'block';
+      loggedInBox.style.display = 'none';
+      formAuth.style.display = 'none';
+      document.querySelector('#auth-logged-out > div').style.display = 'none';
+      document.getElementById('btn-google').style.display = 'none';
+      googleNickPrompt.style.display = 'block';
+      navLabel.textContent = 'Účet';
+    }else{
+      loggedOutBox.style.display = 'block';
+      loggedInBox.style.display = 'none';
+      formAuth.style.display = 'flex';
+      document.querySelector('#auth-logged-out > div').style.display = 'flex';
+      document.getElementById('btn-google').style.display = 'block';
+      googleNickPrompt.style.display = 'none';
+      resetAuthForm();
+      navLabel.textContent = 'Účet';
+    }
+    renderEvents();
+  }
+
+  onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    currentNick = null;
+    currentIsAdmin = false;
+    if(user){
+      try{
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if(userDoc.exists()){
+          currentNick = userDoc.data().nick;
+          currentIsAdmin = userDoc.data().isAdmin === true;
+        }
+      }catch(err){
+        console.error(err);
+      }
+      updateAuthUI();
+      if(currentNick && pendingEventId){
+        const evId = pendingEventId;
+        pendingEventId = null;
+        goToRegistration(evId);
+      }
+    }else{
+      updateAuthUI();
+    }
+  });
 </script>
 </body>
 </html>
