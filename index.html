@@ -34,11 +34,7 @@
     font-family:'Cinzel', serif;
     letter-spacing:0.01em;
   }
-  .app{
-    display:flex;
-    flex-direction:column;
-    min-height:100vh;
-  }
+  .app{ display:flex; flex-direction:column; min-height:100vh; }
 
   /* ---- Top bar ---- */
   .topbar{
@@ -46,128 +42,45 @@
     background:linear-gradient(180deg, #1a1e28 0%, #101319 100%);
     border-bottom:1px solid var(--line);
     box-shadow:0 2px 18px rgba(0,0,0,0.45);
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:0 32px;
-    height:68px;
-    flex-shrink:0;
-    position:sticky;
-    top:0;
-    z-index:10;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 32px; height:68px; flex-shrink:0;
+    position:sticky; top:0; z-index:10;
   }
-  .brand{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    flex-shrink:0;
-  }
-  .brand-mark{
-    width:26px; height:26px;
-    border:1.5px solid var(--gold);
-    border-radius:50%;
-    position:relative;
-    flex-shrink:0;
-    box-shadow:0 0 8px rgba(201,162,75,0.35);
-  }
-  .brand-mark::before{
-    content:'';
-    position:absolute;
-    inset:6px;
-    border:1px solid var(--gold-dim);
-    transform:rotate(45deg);
-  }
-  .brand-text{
-    font-size:17px;
-    font-weight:600;
-    color:var(--text);
-  }
-  .nav{
-    display:flex;
-    align-items:center;
-    gap:0;
-    height:100%;
-  }
-  .nav-sep{
-    width:5px; height:5px;
-    background:var(--gold-dim);
-    transform:rotate(45deg);
-    margin:0 2px;
-    opacity:.6;
-    flex-shrink:0;
-  }
+  .brand{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .brand-mark{ width:26px; height:26px; border:1.5px solid var(--gold); border-radius:50%; position:relative; flex-shrink:0; box-shadow:0 0 8px rgba(201,162,75,0.35); }
+  .brand-mark::before{ content:''; position:absolute; inset:6px; border:1px solid var(--gold-dim); transform:rotate(45deg); }
+  .brand-text{ font-size:17px; font-weight:600; color:var(--text); }
+  .nav{ display:flex; align-items:center; gap:0; height:100%; }
+  .nav-sep{ width:5px; height:5px; background:var(--gold-dim); transform:rotate(45deg); margin:0 2px; opacity:.6; flex-shrink:0; }
   .nav-item{
-    position:relative;
-    display:flex;
-    align-items:center;
-    gap:9px;
-    padding:0 26px;
-    color:var(--text-muted);
-    text-decoration:none;
-    cursor:pointer;
-    font-size:13px;
-    font-weight:600;
-    text-transform:uppercase;
-    letter-spacing:.08em;
-    height:42px;
-    margin-top:13px;
+    position:relative; display:flex; align-items:center; gap:9px; padding:0 26px;
+    color:var(--text-muted); text-decoration:none; cursor:pointer; font-size:13px; font-weight:600;
+    text-transform:uppercase; letter-spacing:.08em; height:42px; margin-top:13px;
     background:linear-gradient(180deg, #232838 0%, #171a24 100%);
     border:1px solid #2c3140;
     clip-path:polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
     transition:background .18s ease, color .18s ease, box-shadow .18s ease;
   }
   .nav-item svg{ width:15px; height:15px; flex-shrink:0; opacity:.7; transition:opacity .18s ease; }
-  .nav-item:hover{
-    color:var(--text);
-    background:linear-gradient(180deg, #2c3243 0%, #1c2029 100%);
-  }
-  .nav-item.active{
-    color:var(--gold);
-    background:linear-gradient(180deg, #3a3320 0%, #1c1912 100%);
-    border-color:var(--gold-dim);
-    box-shadow:0 0 14px rgba(201,162,75,0.25), inset 0 0 10px rgba(201,162,75,0.08);
-  }
+  .nav-item:hover{ color:var(--text); background:linear-gradient(180deg, #2c3243 0%, #1c2029 100%); }
+  .nav-item.active{ color:var(--gold); background:linear-gradient(180deg, #3a3320 0%, #1c1912 100%); border-color:var(--gold-dim); box-shadow:0 0 14px rgba(201,162,75,0.25), inset 0 0 10px rgba(201,162,75,0.08); }
   .nav-item.active svg{ opacity:1; filter:drop-shadow(0 0 3px rgba(201,162,75,0.6)); }
-  .nav-item.active::after{
-    content:'';
-    position:absolute;
-    left:10px; right:10px; bottom:-1px;
-    height:2px;
-    background:linear-gradient(90deg, transparent, var(--gold), transparent);
-    box-shadow:0 0 8px rgba(201,162,75,0.7);
-  }
-  .topbar-meta{
-    font-size:12px;
-    color:var(--text-muted);
-    flex-shrink:0;
-  }
+  .nav-item.active::after{ content:''; position:absolute; left:10px; right:10px; bottom:-1px; height:2px; background:linear-gradient(90deg, transparent, var(--gold), transparent); box-shadow:0 0 8px rgba(201,162,75,0.7); }
+  .topbar-meta{ font-size:12px; color:var(--text-muted); flex-shrink:0; }
 
   /* ---- Main ---- */
-  .main{ flex:1; padding:48px 56px; max-width:1100px; margin:0 auto; width:100%; }
+  .main{ flex:1; padding:48px 56px; max-width:1180px; margin:0 auto; width:100%; }
   .view{ display:none; }
   .view.active{ display:block; animation:fadein .35s ease; }
   @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
   .eyebrow{ color:var(--teal); font-size:13px; margin-bottom:10px; font-weight:500; }
-  h1.headline{ font-size:40px; font-weight:600; line-height:1.15; max-width:600px; }
-  .lede{ color:var(--text-muted); font-size:16px; margin-top:14px; max-width:520px; line-height:1.6; }
+  h1.headline{ font-size:40px; font-weight:600; line-height:1.15; max-width:700px; }
+  .lede{ color:var(--text-muted); font-size:16px; margin-top:14px; max-width:560px; line-height:1.6; }
 
-  .hero{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-end;
-    gap:40px;
-    padding-bottom:36px;
-    border-bottom:1px solid var(--line);
-    margin-bottom:36px;
-  }
-  .hero-card{
-    background:var(--bg-panel);
-    border:1px solid var(--line);
-    border-left:2px solid var(--gold);
-    padding:20px 22px;
-    min-width:260px;
-  }
+  .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:40px; padding-bottom:36px; border-bottom:1px solid var(--line); margin-bottom:36px; }
+  .hero-card{ background:var(--bg-panel); border:1px solid var(--line); border-left:2px solid var(--gold); padding:20px 22px; min-width:280px; cursor:pointer; transition:border-color .15s ease; }
+  .hero-card:hover{ border-color:var(--gold-dim); }
   .hero-card .label{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;}
   .hero-card .val{ font-family:'Cinzel', serif; font-size:20px; margin-top:6px; color:var(--gold);}
   .hero-card .sub{ font-size:13px; color:var(--text-muted); margin-top:10px;}
@@ -175,22 +88,9 @@
   .section-title{ font-size:22px; font-weight:600; margin-bottom:18px; }
 
   .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:18px; margin-top:14px;}
-  .event-card{
-    background:var(--bg-panel);
-    border:1px solid var(--line);
-    padding:20px;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-  }
-  .event-card .tag{
-    align-self:flex-start;
-    font-size:11px;
-    color:var(--teal);
-    border:1px solid var(--teal);
-    padding:2px 8px;
-    letter-spacing:.05em;
-  }
+  .event-card{ background:var(--bg-panel); border:1px solid var(--line); padding:20px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .15s ease; }
+  .event-card:hover{ border-color:var(--gold-dim); }
+  .event-card .tag{ align-self:flex-start; font-size:11px; color:var(--teal); border:1px solid var(--teal); padding:2px 8px; letter-spacing:.05em; }
   .event-card .tag.full{ color:var(--crimson); border-color:var(--crimson); }
   .event-card h3{ font-size:18px; font-weight:600; }
   .event-card .meta{ font-size:13px; color:var(--text-muted); }
@@ -198,68 +98,89 @@
   .event-card .row{ display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
   .slots{ font-size:12px; color:var(--text-muted); }
 
+  .featured-card{ background:var(--bg-panel); border:1px solid var(--gold-dim); border-left:3px solid var(--gold); padding:26px 28px; cursor:pointer; margin-bottom:28px; transition:box-shadow .15s ease; }
+  .featured-card:hover{ box-shadow:0 0 20px rgba(201,162,75,0.15); }
+  .featured-card .tag{ font-size:11px; color:var(--gold); border:1px solid var(--gold); padding:2px 8px; letter-spacing:.08em; }
+  .featured-card h3{ font-size:26px; font-weight:600; margin-top:12px; }
+  .featured-card .meta{ font-size:14px; color:var(--text-muted); margin-top:6px; }
+  .featured-card .desc{ font-size:14px; color:var(--text-muted); margin-top:10px; max-width:640px; line-height:1.6; }
+
   button, .btn{
-    font-family:'Work Sans', sans-serif;
-    background:transparent;
-    border:1px solid var(--gold);
-    color:var(--gold);
-    padding:9px 16px;
-    font-size:13px;
-    font-weight:500;
-    cursor:pointer;
-    letter-spacing:.02em;
+    font-family:'Work Sans', sans-serif; background:transparent; border:1px solid var(--gold); color:var(--gold);
+    padding:9px 16px; font-size:13px; font-weight:500; cursor:pointer; letter-spacing:.02em;
   }
   button:hover{ background:var(--gold); color:var(--bg-void); }
   button:disabled{ opacity:.4; cursor:not-allowed; border-color:var(--text-muted); color:var(--text-muted); }
   button:disabled:hover{ background:transparent; color:var(--text-muted); }
-
   .btn-ghost{ border-color:var(--line); color:var(--text-muted); }
   .btn-ghost:hover{ background:var(--bg-panel-2); color:var(--text); }
+  .btn-sm{ padding:5px 10px; font-size:12px; }
+  .btn-active{ background:var(--gold); color:var(--bg-void); }
 
   .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
 
-  form.panel{
-    background:var(--bg-panel);
-    border:1px solid var(--line);
-    padding:24px;
-    max-width:480px;
-    display:flex;
-    flex-direction:column;
-    gap:14px;
-    margin-top:16px;
+  form.panel, .panel{
+    background:var(--bg-panel); border:1px solid var(--line); padding:24px; max-width:480px;
+    display:flex; flex-direction:column; gap:14px; margin-top:16px;
   }
   .field label{ display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px; }
   .field input, .field select, .field textarea{
-    width:100%;
-    background:var(--bg-void);
-    border:1px solid var(--line);
-    color:var(--text);
-    padding:9px 10px;
-    font-family:'Work Sans', sans-serif;
-    font-size:14px;
+    width:100%; background:var(--bg-void); border:1px solid var(--line); color:var(--text);
+    padding:9px 10px; font-family:'Work Sans', sans-serif; font-size:14px;
   }
   .field input:focus, .field select:focus, .field textarea:focus{ outline:none; border-color:var(--gold); }
   .field textarea{ resize:vertical; min-height:70px; }
+  .field small{ display:block; color:var(--text-muted); font-size:11px; margin-top:5px; }
 
-  .reg-list{ margin-top:22px; }
-  .reg-row{
-    display:flex; justify-content:space-between;
-    padding:10px 0; border-bottom:1px solid var(--line);
-    font-size:14px;
-  }
-  .reg-row .who{ color:var(--text); }
-  .reg-row .when{ color:var(--text-muted); font-size:12px; }
   .empty{ color:var(--text-muted); font-size:14px; padding:20px 0; }
+  .small-msg{ font-size:13px; color:var(--text-muted); min-height:16px; }
 
-  .note{
-    margin-top:40px;
-    font-size:12px;
-    color:var(--text-muted);
-    border-top:1px solid var(--line);
-    padding-top:14px;
-    max-width:600px;
-    line-height:1.6;
-  }
+  /* ---- Detail akce ---- */
+  .stats-bar{ display:flex; gap:24px; flex-wrap:wrap; margin-top:20px; padding:16px 20px; background:var(--bg-panel); border:1px solid var(--line); }
+  .stat{ display:flex; flex-direction:column; gap:2px; }
+  .stat .n{ font-family:'Cinzel', serif; font-size:20px; color:var(--gold); }
+  .stat .l{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; }
+
+  .rsvp-box{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px; }
+  .rsvp-box .status-hint{ font-size:13px; color:var(--text-muted); }
+
+  .detail-grid{ display:grid; grid-template-columns:240px 1fr 250px; gap:26px; margin-top:30px; align-items:start; }
+  .detail-col-left, .detail-col-center{ display:flex; flex-direction:column; gap:16px; }
+  @media (max-width: 900px){ .detail-grid{ grid-template-columns:1fr; } }
+
+  .map-embed{ width:100%; height:180px; border:1px solid var(--line); background:var(--bg-panel); overflow:hidden; }
+  .map-embed iframe{ width:100%; height:100%; border:0; filter:grayscale(0.3) invert(0.92) contrast(0.9); }
+  .event-image{ width:100%; height:260px; background:var(--bg-panel) center/cover no-repeat; border:1px solid var(--line); }
+  .event-image.empty-img{ display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:13px; }
+
+  .tab-switch{ display:flex; flex-direction:column; gap:2px; }
+  .tab-btn{ text-align:left; border:1px solid var(--line); background:var(--bg-panel); color:var(--text-muted); padding:10px 14px; font-size:13px; cursor:pointer; }
+  .tab-btn:hover{ color:var(--text); background:var(--bg-panel-2); }
+  .tab-btn.active{ color:var(--gold); border-color:var(--gold-dim); background:var(--bg-panel-2); }
+
+  .chip-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .chip{ font-size:12px; padding:5px 12px; border:1px solid var(--teal); color:var(--teal); }
+
+  .suggestion-row{ display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); font-size:14px; gap:10px; }
+  .suggestion-row .txt{ flex:1; }
+  .like-btn{ display:flex; align-items:center; gap:5px; border:1px solid var(--line); color:var(--text-muted); padding:4px 10px; font-size:12px; cursor:pointer; background:transparent; }
+  .like-btn:hover{ border-color:var(--gold); color:var(--gold); background:transparent; }
+  .like-btn.liked{ border-color:var(--gold); color:var(--gold); }
+
+  .comment-row{ padding:10px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .comment-row .who{ color:var(--gold); font-size:12px; font-weight:600; }
+  .comment-row .when{ color:var(--text-muted); font-size:11px; margin-left:8px; }
+  .comment-row .txt{ margin-top:4px; color:var(--text); line-height:1.5; }
+
+  .attendee-sidebar{ background:var(--bg-panel); border:1px solid var(--line); padding:16px; position:sticky; top:88px; }
+  .attendee-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .attendee-row:last-child{ border-bottom:none; }
+  .status-pill{ font-size:10px; padding:2px 8px; text-transform:uppercase; letter-spacing:.04em; }
+  .status-pill.going{ color:var(--teal); border:1px solid var(--teal); }
+  .status-pill.maybe{ color:var(--gold-dim); border:1px solid var(--gold-dim); }
+
+  .back-link{ display:inline-block; margin-bottom:20px; }
+  .food-pick-row{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-top:14px; }
 </style>
 </head>
 <body>
@@ -294,33 +215,11 @@
     <section class="view active" id="view-home">
       <div class="eyebrow">Komunitní LAN party</div>
       <h1 class="headline">Sejdeme se u obrazovek, ne u obrazovky.</h1>
-      <p class="lede">FEEDEK je místo, kde se domlouvají LAN party — kdo pořádá, kde se hraje a kdo dorazí. Bez placených serverů, bez sledování, jen seznam akcí a přihlášky.</p>
-
-      <div class="hero" style="margin-top:34px;">
+      <div class="hero" style="margin-top:34px; border-bottom:none; padding-bottom:0;">
         <div class="hero-card" id="next-event-card">
           <div class="label">Nejbližší akce</div>
           <div class="val">—</div>
           <div class="sub">Zatím žádná akce nevypsána.</div>
-        </div>
-        <button data-goto="akce">Zobrazit všechny akce</button>
-      </div>
-
-      <div class="section-title">Jak to funguje</div>
-      <div class="grid">
-        <div class="event-card">
-          <span class="tag">01</span>
-          <h3>Založíš akci</h3>
-          <p class="desc">Na stránce Akce vypíšeš termín, místo a kapacitu. Trvá to minutu.</p>
-        </div>
-        <div class="event-card">
-          <span class="tag">02</span>
-          <h3>Lidé se hlásí</h3>
-          <p class="desc">Zájemci se zaregistrují jménem a zprávou — vidíš, kdo přijde a kolik míst zbývá.</p>
-        </div>
-        <div class="event-card">
-          <span class="tag">03</span>
-          <h3>Sejdete se</h3>
-          <p class="desc">V den akce máš přehled účastníků na jednom místě, bez skupinových chatů.</p>
         </div>
       </div>
     </section>
@@ -335,34 +234,55 @@
         <button id="btn-new-event" style="display:none;">+ Nová akce</button>
       </div>
 
-      <form class="panel" id="form-event" style="display:none;">
-        <div class="field">
-          <label>Název akce</label>
-          <input type="text" id="ev-name" placeholder="Podzimní LAN v klubovně" required>
-        </div>
-        <div class="field">
-          <label>Datum</label>
-          <input type="date" id="ev-date" required>
-        </div>
-        <div class="field">
-          <label>Místo</label>
-          <input type="text" id="ev-place" placeholder="Klubovna, Pardubice" required>
-        </div>
-        <div class="field">
-          <label>Kapacita (počet míst)</label>
-          <input type="number" id="ev-cap" min="1" value="16" required>
-        </div>
-        <div class="field">
-          <label>Popis</label>
-          <textarea id="ev-desc" placeholder="Co se bude hrát, co s sebou přinést..."></textarea>
-        </div>
+      <form class="panel" id="form-event" style="display:none; max-width:520px;">
+        <div class="field"><label>Název akce</label><input type="text" id="ev-name" placeholder="Podzimní LAN v klubovně" required></div>
+        <div class="field"><label>Datum</label><input type="date" id="ev-date" required></div>
+        <div class="field"><label>Místo</label><input type="text" id="ev-place" placeholder="Klubovna, Pardubice" required></div>
+        <div class="field"><label>Kapacita (počet míst)</label><input type="number" id="ev-cap" min="1" value="16" required></div>
+        <div class="field"><label>Popis</label><textarea id="ev-desc" placeholder="Co se bude hrát, co s sebou přinést..."></textarea></div>
+        <div class="field"><label>URL obrázku (nepovinné)</label><input type="url" id="ev-image" placeholder="https://..."></div>
+        <div class="field"><label>Hry, které se budou hrát (odděl čárkou)</label><input type="text" id="ev-games" placeholder="CS2, Age of Empires 2, Mario Kart"></div>
+        <div class="field"><label>Plán jídla (nepovinné)</label><textarea id="ev-foodplan" placeholder="Objednáme pizzu, platí se na místě..."></textarea></div>
+        <div class="field"><label>Možnosti jídla k výběru (nepovinné, odděl čárkou)</label><input type="text" id="ev-foodoptions" placeholder="Margherita, Salám, Vege"></div>
+        <div class="field"><label>Uzávěrka změn (jídlo / odhlášení)</label><input type="date" id="ev-deadline"><small>Do tohoto data mohou účastníci měnit jídlo nebo se odhlásit.</small></div>
         <div style="display:flex; gap:10px;">
           <button type="submit" id="btn-save-event">Uložit akci</button>
           <button type="button" class="btn-ghost" id="btn-cancel-event">Zrušit</button>
         </div>
       </form>
 
+      <div id="featured-event-wrap"></div>
       <div class="grid" id="events-grid" style="margin-top:24px;"></div>
+    </section>
+
+    <!-- DETAIL AKCE -->
+    <section class="view" id="view-event">
+      <button type="button" class="btn-ghost back-link" id="btn-back-to-akce">← Zpět na akce</button>
+      <div class="eyebrow" id="ed-eyebrow">Akce</div>
+      <h1 class="headline" id="ed-title" style="font-size:32px;">—</h1>
+      <p class="lede" id="ed-meta"></p>
+      <p class="lede" id="ed-desc"></p>
+
+      <div class="stats-bar" id="ed-stats"></div>
+      <div class="rsvp-box" id="ed-rsvp"></div>
+
+      <div class="detail-grid">
+        <div class="detail-col-left">
+          <div class="map-embed" id="ed-map"></div>
+          <div class="tab-switch" id="ed-tabs">
+            <button type="button" class="tab-btn active" data-tab="prehled">Přehled</button>
+            <button type="button" class="tab-btn" data-tab="jidlo">Jídlo</button>
+          </div>
+        </div>
+        <div class="detail-col-center">
+          <div class="event-image" id="ed-image"></div>
+          <div class="tab-panel" id="tab-prehled"></div>
+          <div class="tab-panel" id="tab-jidlo" style="display:none;"></div>
+        </div>
+        <div class="detail-col-right">
+          <div class="attendee-sidebar" id="ed-attendees"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ÚČET -->
@@ -373,20 +293,11 @@
 
       <div id="auth-logged-out" style="margin-top:20px;">
         <form class="panel" id="form-auth">
-          <div class="field">
-            <label>Přezdívka</label>
-            <input type="text" id="auth-nick" placeholder="Tvoje přezdívka" required>
-          </div>
-          <div class="field">
-            <label>Heslo</label>
-            <input type="password" id="auth-password" placeholder="Aspoň 6 znaků" required minlength="6">
-          </div>
-          <div class="field" id="auth-email-field" style="display:none;">
-            <label>E-mail</label>
-            <input type="email" id="auth-email" placeholder="Potřebujeme ho pro založení účtu">
-          </div>
+          <div class="field"><label>Přezdívka</label><input type="text" id="auth-nick" placeholder="Tvoje přezdívka" required></div>
+          <div class="field"><label>Heslo</label><input type="password" id="auth-password" placeholder="Aspoň 6 znaků" required minlength="6"></div>
+          <div class="field" id="auth-email-field" style="display:none;"><label>E-mail</label><input type="email" id="auth-email" placeholder="Potřebujeme ho pro založení účtu"></div>
           <button type="submit" id="auth-submit-btn">Pokračovat</button>
-          <div id="auth-message" style="font-size:13px; color:var(--text-muted); min-height:16px;"></div>
+          <div id="auth-message" class="small-msg"></div>
         </form>
 
         <div style="display:flex; align-items:center; gap:12px; max-width:480px; margin-top:20px;">
@@ -398,46 +309,34 @@
 
         <div id="auth-google-nick-prompt" class="panel" style="display:none; max-width:480px; margin-top:18px;">
           <p style="font-size:14px; color:var(--text-muted);">Ještě potřebujeme přezdívku, pod kterou tě uvidí ostatní.</p>
-          <div class="field">
-            <label>Přezdívka</label>
-            <input type="text" id="google-nick-input" placeholder="Tvoje přezdívka" required>
-          </div>
+          <div class="field"><label>Přezdívka</label><input type="text" id="google-nick-input" placeholder="Tvoje přezdívka" required></div>
           <button type="button" id="btn-google-nick-submit">Uložit přezdívku</button>
         </div>
       </div>
 
       <div id="auth-logged-in" style="display:none; margin-top:20px;">
-        <div class="hero-card" style="max-width:340px;">
+        <div class="hero-card" style="max-width:340px; cursor:default;">
           <div class="label">Přihlášen jako</div>
           <div class="val" id="auth-current-nick">—</div>
           <div class="sub" id="auth-current-email"></div>
         </div>
         <button type="button" class="btn-ghost" id="btn-logout" style="margin-top:18px;">Odhlásit se</button>
 
-        <div style="margin-top:40px; padding-top:32px; border-top:1px solid var(--line);">
-          <div class="section-title">Přihlásit se na akci</div>
+        <div style="margin-top:40px; padding-top:28px; border-top:1px solid var(--line); max-width:480px;">
+          <div class="section-title" style="font-size:16px;">Nastavení účtu</div>
 
-          <div class="field" style="max-width:400px;">
-            <label>Akce</label>
-            <select id="reg-event-select"></select>
+          <div class="panel" id="pw-reset-panel">
+            <p style="font-size:13px; color:var(--text-muted);">Odešleme ti e-mail s odkazem pro nastavení nového hesla.</p>
+            <button type="button" id="btn-change-password" class="btn-ghost">Odeslat odkaz pro změnu hesla</button>
+            <div id="pw-reset-msg" class="small-msg"></div>
           </div>
 
-          <form class="panel" id="form-reg">
-            <div class="field">
-              <label>Přihlašuješ se jako</label>
-              <input type="text" id="reg-name" readonly>
-            </div>
-            <div class="field">
-              <label>Poznámka (nepovinné)</label>
-              <input type="text" id="reg-note" placeholder="Přivezu monitor navíc, dorazím později...">
-            </div>
-            <button type="submit" id="btn-reg-submit">Přihlásit se</button>
+          <form class="panel" id="form-change-email">
+            <div class="field"><label>Nový e-mail</label><input type="email" id="new-email" required></div>
+            <div class="field" id="reauth-password-field"><label>Aktuální heslo (pro ověření)</label><input type="password" id="reauth-password"></div>
+            <button type="submit">Změnit e-mail</button>
+            <div id="email-change-msg" class="small-msg"></div>
           </form>
-
-          <div class="reg-list">
-            <div class="section-title" style="font-size:16px;">Přihlášení</div>
-            <div id="reg-list-content"></div>
-          </div>
         </div>
       </div>
     </section>
@@ -448,11 +347,13 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
-    getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc
+    getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, setDoc,
+    updateDoc, deleteDoc, arrayUnion, arrayRemove
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
     getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    GoogleAuthProvider, signInWithPopup, signOut
+    GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail,
+    EmailAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, verifyBeforeUpdateEmail
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const firebaseConfig = {
@@ -470,18 +371,11 @@
 
   let events = [];
   let regCounts = {};
-  let currentRegUnsub = null;
-  let currentUser = null;      // Firebase Auth user
-  let currentNick = null;      // přezdívka z Firestore
-  let currentIsAdmin = false;  // admin práva z Firestore (users/{uid}.isAdmin)
-  let pendingEventId = null;   // akce, na kterou se chtěl uživatel přihlásit před loginem
-  let pendingNickForRegistration = null; // přezdívka rozpracované registrace (krok 2)
+  let currentUser = null;
+  let currentNick = null;
+  let currentIsAdmin = false;
+  let pendingEventId = null;
 
-  function nextDate(days){
-    const d = new Date();
-    d.setDate(d.getDate()+days);
-    return d.toISOString().slice(0,10);
-  }
   function fmtDate(iso){
     const d = new Date(iso+'T00:00:00');
     return d.toLocaleDateString('cs-CZ', { day:'numeric', month:'long', year:'numeric' });
@@ -491,6 +385,7 @@
     div.textContent = str || '';
     return div.innerHTML;
   }
+  function todayIso(){ return new Date().toISOString().slice(0,10); }
 
   // ---- Živé napojení na kolekci akcí ----
   const eventsQuery = query(collection(db, 'events'), orderBy('date'));
@@ -498,20 +393,23 @@
     events = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     events.forEach(ev => {
       if(!(ev.id in regCounts)){
-        regCounts[ev.id] = 0;
+        regCounts[ev.id] = { going:0, maybe:0 };
         onSnapshot(collection(db, 'events', ev.id, 'registrations'), (rsnap) => {
-          regCounts[ev.id] = rsnap.size;
-          renderHome();
-          renderEvents();
+          let going=0, maybe=0;
+          rsnap.forEach(r => { const st=r.data().status; if(st==='maybe') maybe++; else going++; });
+          regCounts[ev.id] = { going, maybe };
+          renderHome(); renderEvents();
+          if(currentDetailEventId === ev.id) renderStatsAndRsvp();
         });
       }
     });
     renderHome();
     renderEvents();
-    renderRegSelect();
-  }, (err) => {
-    console.error('Chyba připojení k Firestore:', err);
-  });
+    if(currentDetailEventId){
+      const ev = events.find(x=>x.id===currentDetailEventId);
+      if(ev) renderEventDetailStatic(ev);
+    }
+  }, (err) => console.error('Chyba připojení k Firestore:', err));
 
   // ---- Navigation ----
   const navItems = document.querySelectorAll('.nav-item');
@@ -521,27 +419,28 @@
     views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
   }
   navItems.forEach(n => n.addEventListener('click', () => showView(n.dataset.view)));
-  document.querySelectorAll('[data-goto]').forEach(el => {
-    el.addEventListener('click', () => showView(el.dataset.goto));
-  });
+  document.getElementById('btn-back-to-akce').addEventListener('click', () => showView('akce'));
 
   // ---- Home ----
   function renderHome(){
     const card = document.getElementById('next-event-card');
-    if(events.length === 0){
+    const upcoming = events.filter(e => e.date >= todayIso());
+    if(upcoming.length === 0){
       card.querySelector('.val').textContent = '—';
       card.querySelector('.sub').textContent = 'Zatím žádná akce nevypsána.';
+      card.onclick = null;
       return;
     }
-    const next = events[0];
+    const next = upcoming[0];
     card.querySelector('.val').textContent = next.name;
     card.querySelector('.sub').textContent = fmtDate(next.date) + ' · ' + next.place;
+    card.onclick = () => openEventDetail(next.id);
   }
 
-  // ---- Akce ----
+  // ---- Akce: založení / editace / mazání ----
   const formEvent = document.getElementById('form-event');
   const btnNewEvent = document.getElementById('btn-new-event');
-  let editingEventId = null; // null = zakládáme novou akci, jinak editujeme existující
+  let editingEventId = null;
 
   btnNewEvent.addEventListener('click', () => {
     if(formEvent.style.display === 'none'){
@@ -562,12 +461,19 @@
     e.preventDefault();
     const submitBtn = document.getElementById('btn-save-event');
     submitBtn.disabled = true;
+    const games = document.getElementById('ev-games').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const foodOptions = document.getElementById('ev-foodoptions').value.split(',').map(s=>s.trim()).filter(Boolean);
     const payload = {
       name: document.getElementById('ev-name').value.trim(),
       date: document.getElementById('ev-date').value,
       place: document.getElementById('ev-place').value.trim(),
       cap: parseInt(document.getElementById('ev-cap').value, 10) || 1,
-      desc: document.getElementById('ev-desc').value.trim()
+      desc: document.getElementById('ev-desc').value.trim(),
+      imageUrl: document.getElementById('ev-image').value.trim(),
+      games,
+      foodPlan: document.getElementById('ev-foodplan').value.trim(),
+      foodOptions,
+      changeDeadline: document.getElementById('ev-deadline').value || ''
     };
     try{
       if(editingEventId){
@@ -593,51 +499,73 @@
     document.getElementById('ev-place').value = ev.place || '';
     document.getElementById('ev-cap').value = ev.cap || 1;
     document.getElementById('ev-desc').value = ev.desc || '';
+    document.getElementById('ev-image').value = ev.imageUrl || '';
+    document.getElementById('ev-games').value = (ev.games || []).join(', ');
+    document.getElementById('ev-foodplan').value = ev.foodPlan || '';
+    document.getElementById('ev-foodoptions').value = (ev.foodOptions || []).join(', ');
+    document.getElementById('ev-deadline').value = ev.changeDeadline || '';
     document.getElementById('btn-save-event').textContent = 'Uložit změny';
     formEvent.style.display = 'flex';
-    formEvent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showView('akce');
+    formEvent.scrollIntoView({ behavior:'smooth', block:'start' });
   }
 
   async function deleteEvent(eventId, eventName){
     if(!confirm(`Opravdu smazat akci "${eventName}"? Tohle nejde vrátit zpět.`)) return;
-    try{
-      await deleteDoc(doc(db, 'events', eventId));
-    }catch(err){
-      alert('Smazání se nepovedlo. Zkus to prosím znovu.');
-      console.error(err);
-    }
+    try{ await deleteDoc(doc(db, 'events', eventId)); }
+    catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
   }
 
   function renderEvents(){
     btnNewEvent.style.display = currentIsAdmin ? 'inline-flex' : 'none';
+    const featuredWrap = document.getElementById('featured-event-wrap');
     const grid = document.getElementById('events-grid');
+    featuredWrap.innerHTML = '';
     grid.innerHTML = '';
+
     if(events.length === 0){
       grid.innerHTML = '<div class="empty">Zatím žádné akce.</div>';
       return;
     }
-    events.forEach(ev => {
-      const taken = regCounts[ev.id] || 0;
-      const full = taken >= ev.cap;
+
+    const upcoming = events.filter(e => e.date >= todayIso());
+    const featured = upcoming[0] || events[0];
+    const rest = events.filter(e => e.id !== featured.id);
+
+    const taken = (regCounts[featured.id]?.going) || 0;
+    const full = taken >= featured.cap;
+    const fc = document.createElement('div');
+    fc.className = 'featured-card';
+    fc.innerHTML = `
+      <span class="tag">${full ? 'Obsazeno' : 'Nejbližší akce'}</span>
+      <h3>${escapeHtml(featured.name)}</h3>
+      <div class="meta">${fmtDate(featured.date)} · ${escapeHtml(featured.place)} · ${taken}/${featured.cap} míst</div>
+      <p class="desc">${escapeHtml(featured.desc || '')}</p>
+    `;
+    fc.addEventListener('click', () => openEventDetail(featured.id));
+    featuredWrap.appendChild(fc);
+
+    if(rest.length === 0) return;
+    rest.forEach(ev => {
+      const t = (regCounts[ev.id]?.going) || 0;
+      const f = t >= ev.cap;
       const card = document.createElement('div');
       card.className = 'event-card';
       card.innerHTML = `
-        <span class="tag ${full ? 'full' : ''}">${full ? 'Obsazeno' : 'Volná místa'}</span>
+        <span class="tag ${f ? 'full' : ''}">${f ? 'Obsazeno' : 'Volná místa'}</span>
         <h3>${escapeHtml(ev.name)}</h3>
         <div class="meta">${fmtDate(ev.date)} · ${escapeHtml(ev.place)}</div>
         <p class="desc">${escapeHtml(ev.desc || 'Bez popisu.')}</p>
-        <div class="row">
-          <span class="slots">${taken} / ${ev.cap} míst</span>
-          <button data-reg="${ev.id}">Přihlásit se</button>
-        </div>
+        <div class="row"><span class="slots">${t} / ${ev.cap} míst</span></div>
         ${currentIsAdmin ? `
         <div class="row" style="margin-top:2px;">
-          <button type="button" class="btn-ghost" data-edit="${ev.id}" style="flex:1;">Upravit</button>
-          <button type="button" class="btn-ghost" data-delete="${ev.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+          <button type="button" class="btn-ghost btn-sm" data-edit="${ev.id}" style="flex:1;">Upravit</button>
+          <button type="button" class="btn-ghost btn-sm" data-delete="${ev.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
         </div>` : ''}
       `;
-      card.querySelector('[data-reg]').addEventListener('click', () => {
-        goToRegistration(ev.id);
+      card.addEventListener('click', (e) => {
+        if(e.target.closest('[data-edit]') || e.target.closest('[data-delete]')) return;
+        openEventDetail(ev.id);
       });
       const editBtn = card.querySelector('[data-edit]');
       if(editBtn) editBtn.addEventListener('click', () => startEditEvent(ev));
@@ -647,124 +575,348 @@
     });
   }
 
-  function goToRegistration(eventId){
-    if(!currentUser || !currentNick){
-      pendingEventId = eventId;
-      showView('ucet');
-      return;
-    }
-    showView('ucet');
-    regSelect.value = eventId;
-    subscribeToRegList(eventId);
+  // ==================== DETAIL AKCE ====================
+  let currentDetailEventId = null;
+  let currentTab = 'prehled';
+  let detailUnsubs = [];
+  let currentRegistrationsMap = {}; // uid -> registration data pro otevřenou akci
+
+  function clearDetailListeners(){
+    detailUnsubs.forEach(u => u());
+    detailUnsubs = [];
   }
 
-  // ---- Registrace ----
-  const regSelect = document.getElementById('reg-event-select');
-  function renderRegSelect(){
-    const prevSelected = regSelect.value;
-    regSelect.innerHTML = '';
-    if(events.length === 0){
-      regSelect.innerHTML = '<option value="">Žádné akce k dispozici</option>';
-      document.getElementById('btn-reg-submit').disabled = true;
-      document.getElementById('reg-list-content').innerHTML = '<div class="empty">Zatím nejsou vypsané žádné akce.</div>';
-      return;
-    }
-    document.getElementById('btn-reg-submit').disabled = false;
-    events.forEach(ev => {
-      const opt = document.createElement('option');
-      opt.value = ev.id;
-      opt.textContent = `${ev.name} — ${fmtDate(ev.date)}`;
-      regSelect.appendChild(opt);
-    });
-    const stillExists = events.some(ev => ev.id === prevSelected);
-    regSelect.value = stillExists ? prevSelected : events[0].id;
-    subscribeToRegList(regSelect.value);
-  }
-  regSelect.addEventListener('change', () => subscribeToRegList(regSelect.value));
-
-  function subscribeToRegList(eventId){
-    if(currentRegUnsub) currentRegUnsub();
-    if(!eventId) return;
-    const box = document.getElementById('reg-list-content');
-    currentRegUnsub = onSnapshot(collection(db, 'events', eventId, 'registrations'), (snap) => {
-      if(snap.empty){
-        box.innerHTML = '<div class="empty">Zatím se nikdo nepřihlásil.</div>';
-        return;
-      }
-      const rows = snap.docs
-        .map(d => d.data())
-        .sort((a,b) => (a.ts || '').localeCompare(b.ts || ''));
-      box.innerHTML = rows.map(r => `
-        <div class="reg-row">
-          <span class="who">${escapeHtml(r.name)}${r.note ? ' — ' + escapeHtml(r.note) : ''}</span>
-          <span class="when">${r.ts ? new Date(r.ts).toLocaleDateString('cs-CZ') : ''}</span>
-        </div>
-      `).join('');
-    });
-  }
-
-  document.getElementById('form-reg').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if(!currentUser || !currentNick){
-      showView('ucet');
-      return;
-    }
-    const eventId = regSelect.value;
+  function openEventDetail(eventId){
+    currentDetailEventId = eventId;
+    currentTab = 'prehled';
     const ev = events.find(x => x.id === eventId);
     if(!ev) return;
-    if((regCounts[eventId] || 0) >= ev.cap){
-      alert('Tato akce je už plně obsazená.');
+    showView('event');
+    renderEventDetailStatic(ev);
+    clearDetailListeners();
+
+    // registrace (RSVP)
+    const unsubReg = onSnapshot(collection(db, 'events', eventId, 'registrations'), (snap) => {
+      currentRegistrationsMap = {};
+      snap.forEach(d => currentRegistrationsMap[d.id] = d.data());
+      renderStatsAndRsvp();
+      renderAttendees();
+      if(currentTab === 'jidlo') renderTabJidlo(ev);
+    });
+    detailUnsubs.push(unsubReg);
+
+    // návrhy her
+    const unsubSug = onSnapshot(collection(db, 'events', eventId, 'suggestions'), (snap) => {
+      currentSuggestions = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+      if(currentTab === 'prehled') renderTabPrehled(ev);
+    });
+    detailUnsubs.push(unsubSug);
+
+    // poznámky
+    const unsubComments = onSnapshot(collection(db, 'events', eventId, 'comments'), (snap) => {
+      currentComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+      if(currentTab === 'prehled') renderTabPrehled(ev);
+    });
+    detailUnsubs.push(unsubComments);
+
+    // diskuze k jídlu
+    const unsubFood = onSnapshot(collection(db, 'events', eventId, 'foodComments'), (snap) => {
+      currentFoodComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+      if(currentTab === 'jidlo') renderTabJidlo(ev);
+    });
+    detailUnsubs.push(unsubFood);
+  }
+
+  let currentSuggestions = [];
+  let currentComments = [];
+  let currentFoodComments = [];
+
+  function renderEventDetailStatic(ev){
+    document.getElementById('ed-title').textContent = ev.name;
+    document.getElementById('ed-meta').textContent = fmtDate(ev.date) + ' · ' + ev.place;
+    document.getElementById('ed-desc').textContent = ev.desc || '';
+
+    const img = document.getElementById('ed-image');
+    if(ev.imageUrl){
+      img.style.backgroundImage = `url('${ev.imageUrl.replace(/'/g,"")}')`;
+      img.classList.remove('empty-img');
+      img.textContent = '';
+    }else{
+      img.style.backgroundImage = 'none';
+      img.classList.add('empty-img');
+      img.textContent = 'Bez obrázku';
+    }
+
+    const mapBox = document.getElementById('ed-map');
+    const q = encodeURIComponent(ev.place || '');
+    mapBox.innerHTML = `<iframe src="https://www.google.com/maps?q=${q}&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+
+    // tabs
+    document.querySelectorAll('#ed-tabs .tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === currentTab);
+      btn.onclick = () => {
+        currentTab = btn.dataset.tab;
+        document.querySelectorAll('#ed-tabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+        document.getElementById('tab-prehled').style.display = currentTab === 'prehled' ? 'block' : 'none';
+        document.getElementById('tab-jidlo').style.display = currentTab === 'jidlo' ? 'block' : 'none';
+        if(currentTab === 'prehled') renderTabPrehled(ev);
+        else renderTabJidlo(ev);
+      };
+    });
+
+    renderStatsAndRsvp();
+    renderAttendees();
+    renderTabPrehled(ev);
+  }
+
+  function isPastDeadline(ev){
+    return !!ev.changeDeadline && todayIso() > ev.changeDeadline;
+  }
+
+  function renderStatsAndRsvp(){
+    const ev = events.find(x => x.id === currentDetailEventId);
+    if(!ev) return;
+    const counts = regCounts[ev.id] || { going:0, maybe:0 };
+    const statsBox = document.getElementById('ed-stats');
+    statsBox.innerHTML = `
+      <div class="stat"><div class="n">${counts.going} / ${ev.cap}</div><div class="l">Obsazeno míst</div></div>
+      <div class="stat"><div class="n">${counts.going}</div><div class="l">Určitě jedou</div></div>
+      <div class="stat"><div class="n">${counts.maybe}</div><div class="l">Možná pojedou</div></div>
+    `;
+
+    const rsvpBox = document.getElementById('ed-rsvp');
+    if(!currentUser || !currentNick){
+      rsvpBox.innerHTML = `<span class="status-hint">Pro účast na akci se nejdřív přihlas.</span> <button type="button" id="rsvp-login-btn" class="btn-sm">Přihlásit se</button>`;
+      document.getElementById('rsvp-login-btn').addEventListener('click', () => { pendingEventId = ev.id; showView('ucet'); });
       return;
     }
-    const note = document.getElementById('reg-note').value.trim();
-    const submitBtn = document.getElementById('btn-reg-submit');
-    submitBtn.disabled = true;
-    try{
-      await addDoc(collection(db, 'events', eventId, 'registrations'), {
-        name: currentNick, uid: currentUser.uid, note, ts: new Date().toISOString()
-      });
-      document.getElementById('reg-note').value = '';
-    }catch(err){
-      alert('Přihlášení se nepodařilo uložit. Zkus to prosím znovu.');
-      console.error(err);
-    }finally{
-      submitBtn.disabled = false;
+    const myReg = currentRegistrationsMap[currentUser.uid];
+    const deadlinePassed = isPastDeadline(ev);
+    const full = counts.going >= ev.cap;
+
+    let html = '';
+    html += `<button type="button" class="rsvp-status-btn ${myReg?.status==='going' ? 'btn-active' : ''}" data-status="going" ${(!myReg && full) ? 'disabled' : ''}>Určitě jedu</button>`;
+    html += `<button type="button" class="rsvp-status-btn ${myReg?.status==='maybe' ? 'btn-active' : ''}" data-status="maybe">Možná pojedu</button>`;
+    if(myReg){
+      html += `<button type="button" class="btn-ghost" id="rsvp-cancel" ${deadlinePassed ? 'disabled title="Uzávěrka změn už proběhla"' : ''}>Odhlásit se</button>`;
     }
-  });
+    if(deadlinePassed) html += `<span class="status-hint">Uzávěrka změn: ${fmtDate(ev.changeDeadline)}</span>`;
+    rsvpBox.innerHTML = html;
+
+    rsvpBox.querySelectorAll('.rsvp-status-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try{
+          await setDoc(doc(db, 'events', ev.id, 'registrations', currentUser.uid), {
+            nick: currentNick, uid: currentUser.uid, status: btn.dataset.status,
+            food: myReg?.food || '', ts: myReg?.ts || new Date().toISOString()
+          }, { merge:true });
+        }catch(err){ alert('Nepovedlo se uložit účast.'); console.error(err); }
+      });
+    });
+    const cancelBtn = document.getElementById('rsvp-cancel');
+    if(cancelBtn) cancelBtn.addEventListener('click', async () => {
+      if(!confirm('Opravdu se chceš z akce odhlásit?')) return;
+      try{ await deleteDoc(doc(db, 'events', ev.id, 'registrations', currentUser.uid)); }
+      catch(err){ alert('Odhlášení se nepovedlo.'); console.error(err); }
+    });
+  }
+
+  function renderAttendees(){
+    const box = document.getElementById('ed-attendees');
+    const list = Object.values(currentRegistrationsMap).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+    if(list.length === 0){
+      box.innerHTML = '<div class="empty">Zatím se nikdo nepřihlásil.</div>';
+      return;
+    }
+    box.innerHTML = list.map(r => `
+      <div class="attendee-row">
+        <span>${escapeHtml(r.nick)}</span>
+        <span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderTabPrehled(ev){
+    const box = document.getElementById('tab-prehled');
+    const games = ev.games || [];
+    box.innerHTML = `
+      <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
+      <div class="chip-row">${games.length ? games.map(g=>`<span class="chip">${escapeHtml(g)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
+
+      <div class="section-title" style="font-size:16px; margin-top:28px;">Chtěl by sis zahrát ještě něco jiného?</div>
+      <div class="field" style="max-width:360px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+        <div style="flex:1;"><input type="text" id="suggestion-input" placeholder="Např. HALO"></div>
+        <button type="button" id="btn-add-suggestion" class="btn-sm">Přidat</button>
+      </div>
+      <div id="suggestions-list" style="margin-top:6px;"></div>
+
+      <div class="section-title" style="font-size:16px; margin-top:28px;">Poznámky</div>
+      <div class="field" style="max-width:420px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+        <div style="flex:1;"><input type="text" id="comment-input" placeholder="Napiš poznámku..."></div>
+        <button type="button" id="btn-add-comment" class="btn-sm">Odeslat</button>
+      </div>
+      <div id="comments-list" style="margin-top:6px;"></div>
+    `;
+
+    const sugList = document.getElementById('suggestions-list');
+    if(currentSuggestions.length === 0){
+      sugList.innerHTML = '<div class="empty">Zatím nikdo nic nenavrhl.</div>';
+    }else{
+      sugList.innerHTML = currentSuggestions.map(s => {
+        const liked = currentUser && (s.likes||[]).includes(currentUser.uid);
+        const likers = (s.likeNicks||[]).join(', ');
+        return `
+        <div class="suggestion-row">
+          <span class="txt">Hráč: ${escapeHtml(s.author)} — ${escapeHtml(s.text)}</span>
+          <button type="button" class="like-btn ${liked?'liked':''}" data-sug="${s.id}" title="${escapeHtml(likers)}">♥ ${ (s.likes||[]).length }</button>
+        </div>`;
+      }).join('');
+      sugList.querySelectorAll('[data-sug]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if(!currentUser || !currentNick){ showView('ucet'); return; }
+          const sug = currentSuggestions.find(s => s.id === btn.dataset.sug);
+          const liked = (sug.likes||[]).includes(currentUser.uid);
+          try{
+            await updateDoc(doc(db,'events',ev.id,'suggestions',sug.id), {
+              likes: liked ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
+              likeNicks: liked ? arrayRemove(currentNick) : arrayUnion(currentNick)
+            });
+          }catch(err){ console.error(err); }
+        });
+      });
+    }
+
+    document.getElementById('btn-add-suggestion').addEventListener('click', async () => {
+      if(!currentUser || !currentNick){ showView('ucet'); return; }
+      const input = document.getElementById('suggestion-input');
+      const text = input.value.trim();
+      if(!text) return;
+      try{
+        await addDoc(collection(db,'events',ev.id,'suggestions'), { text, author: currentNick, uid: currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
+        input.value = '';
+      }catch(err){ console.error(err); }
+    });
+
+    const commentsList = document.getElementById('comments-list');
+    commentsList.innerHTML = currentComments.length === 0
+      ? '<div class="empty">Zatím žádné poznámky.</div>'
+      : currentComments.map(c => `
+        <div class="comment-row">
+          <span class="who">${escapeHtml(c.author)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
+          <div class="txt">${escapeHtml(c.text)}</div>
+        </div>`).join('');
+
+    document.getElementById('btn-add-comment').addEventListener('click', async () => {
+      if(!currentUser || !currentNick){ showView('ucet'); return; }
+      const input = document.getElementById('comment-input');
+      const text = input.value.trim();
+      if(!text) return;
+      try{
+        await addDoc(collection(db,'events',ev.id,'comments'), { text, author: currentNick, uid: currentUser.uid, ts: new Date().toISOString() });
+        input.value = '';
+      }catch(err){ console.error(err); }
+    });
+  }
+
+  function renderTabJidlo(ev){
+    const box = document.getElementById('tab-jidlo');
+    const myReg = currentUser ? currentRegistrationsMap[currentUser.uid] : null;
+    const deadlinePassed = isPastDeadline(ev);
+
+    let pickHtml = '';
+    if(!myReg){
+      pickHtml = `<p class="lede" style="margin-top:10px;">Nejdřív se přihlas na akci, ať můžeš vybrat jídlo.</p>`;
+    }else if(ev.foodOptions && ev.foodOptions.length){
+      const opts = ev.foodOptions.map(o => `<option value="${escapeHtml(o)}" ${myReg.food===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+      pickHtml = `
+        <div class="food-pick-row">
+          <div class="field" style="max-width:240px;">
+            <label>Tvůj výběr</label>
+            <select id="food-select" ${deadlinePassed?'disabled':''}><option value="">— nevybráno —</option>${opts}</select>
+          </div>
+          <button type="button" id="btn-save-food" class="btn-sm" ${deadlinePassed?'disabled':''}>Uložit výběr</button>
+          ${deadlinePassed ? '<span class="status-hint">Uzávěrka změn proběhla.</span>' : ''}
+        </div>`;
+    }else{
+      pickHtml = `
+        <div class="food-pick-row">
+          <div class="field" style="max-width:300px;">
+            <label>Co si přivezeš / co bys chtěl</label>
+            <input type="text" id="food-select" value="${escapeHtml(myReg.food||'')}" ${deadlinePassed?'disabled':''}>
+          </div>
+          <button type="button" id="btn-save-food" class="btn-sm" ${deadlinePassed?'disabled':''}>Uložit</button>
+        </div>`;
+    }
+
+    const foodList = Object.values(currentRegistrationsMap).filter(r => r.food).map(r => `${escapeHtml(r.nick)}: ${escapeHtml(r.food)}`).join('<br>') || '<span class="empty">Zatím nikdo nic nevybral.</span>';
+
+    box.innerHTML = `
+      <div class="section-title" style="font-size:16px;">Plán jídla</div>
+      <p class="lede" style="margin-top:0;">${escapeHtml(ev.foodPlan || 'Zatím nic naplánováno.')}</p>
+      ${pickHtml}
+      <div class="section-title" style="font-size:16px; margin-top:28px;">Kdo si co vybral</div>
+      <p style="font-size:14px; line-height:1.8;">${foodList}</p>
+
+      <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze k jídlu</div>
+      <div class="field" style="max-width:420px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+        <div style="flex:1;"><input type="text" id="food-comment-input" placeholder="Kdo co doveze, návrhy..." ${deadlinePassed?'':''}></div>
+        <button type="button" id="btn-add-food-comment" class="btn-sm">Odeslat</button>
+      </div>
+      <div id="food-comments-list" style="margin-top:6px;"></div>
+    `;
+
+    const saveFoodBtn = document.getElementById('btn-save-food');
+    if(saveFoodBtn) saveFoodBtn.addEventListener('click', async () => {
+      const val = document.getElementById('food-select').value;
+      try{ await updateDoc(doc(db,'events',ev.id,'registrations',currentUser.uid), { food: val }); }
+      catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
+    });
+
+    const foodCommentsList = document.getElementById('food-comments-list');
+    foodCommentsList.innerHTML = currentFoodComments.length === 0
+      ? '<div class="empty">Zatím žádná diskuze.</div>'
+      : currentFoodComments.map(c => `
+        <div class="comment-row">
+          <span class="who">${escapeHtml(c.author)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
+          <div class="txt">${escapeHtml(c.text)}</div>
+        </div>`).join('');
+
+    document.getElementById('btn-add-food-comment').addEventListener('click', async () => {
+      if(!currentUser || !currentNick){ showView('ucet'); return; }
+      const input = document.getElementById('food-comment-input');
+      const text = input.value.trim();
+      if(!text) return;
+      try{
+        await addDoc(collection(db,'events',ev.id,'foodComments'), { text, author: currentNick, uid: currentUser.uid, ts: new Date().toISOString() });
+        input.value = '';
+      }catch(err){ console.error(err); }
+    });
+  }
 
   // ==================== ÚČET / AUTENTIZACE ====================
-
-  function usernameDocRef(nick){
-    return doc(db, 'usernames', nick.trim().toLowerCase());
-  }
-
-  function setAuthMessage(msg){
-    document.getElementById('auth-message').textContent = msg || '';
-  }
+  function usernameDocRef(nick){ return doc(db, 'usernames', nick.trim().toLowerCase()); }
+  function setAuthMessage(msg){ document.getElementById('auth-message').textContent = msg || ''; }
 
   const formAuth = document.getElementById('form-auth');
   const authEmailField = document.getElementById('auth-email-field');
   const authSubmitBtn = document.getElementById('auth-submit-btn');
-  let authStep = 1; // 1 = zadání nicku+hesla, 2 = doplnění e-mailu pro registraci
+  let authStep = 1;
+  let pendingNickForRegistration = null;
 
   formAuth.addEventListener('submit', async (e) => {
     e.preventDefault();
     const nick = document.getElementById('auth-nick').value.trim();
     const password = document.getElementById('auth-password').value;
     if(!nick || !password) return;
-
     authSubmitBtn.disabled = true;
     setAuthMessage('');
-
     try{
       if(authStep === 1){
         const unameSnap = await getDoc(usernameDocRef(nick));
         if(unameSnap.exists()){
-          // Účet existuje -> přihlásit
           const { email } = unameSnap.data();
           await signInWithEmailAndPassword(auth, email, password);
         }else{
-          // Účet neexistuje -> přepnout na krok 2 (doplnění e-mailu)
           authStep = 2;
           pendingNickForRegistration = nick;
           authEmailField.style.display = 'block';
@@ -773,7 +925,6 @@
           setAuthMessage(`Přezdívka "${nick}" je volná — doplň e-mail a založíme ti účet.`);
         }
       }else{
-        // krok 2: dokončení registrace
         const email = document.getElementById('auth-email').value.trim();
         if(!email){ setAuthMessage('Doplň prosím e-mail.'); authSubmitBtn.disabled = false; return; }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -782,15 +933,10 @@
       }
     }catch(err){
       console.error(err);
-      if(err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'){
-        setAuthMessage('Nesprávné heslo. Zkus to znovu.');
-      }else if(err.code === 'auth/email-already-in-use'){
-        setAuthMessage('Tenhle e-mail už je použitý u jiného účtu.');
-      }else if(err.code === 'auth/weak-password'){
-        setAuthMessage('Heslo musí mít aspoň 6 znaků.');
-      }else{
-        setAuthMessage('Něco se nepovedlo. Zkus to prosím znovu.');
-      }
+      if(err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') setAuthMessage('Nesprávné heslo. Zkus to znovu.');
+      else if(err.code === 'auth/email-already-in-use') setAuthMessage('Tenhle e-mail už je použitý u jiného účtu.');
+      else if(err.code === 'auth/weak-password') setAuthMessage('Heslo musí mít aspoň 6 znaků.');
+      else setAuthMessage('Něco se nepovedlo. Zkus to prosím znovu.');
     }finally{
       authSubmitBtn.disabled = false;
     }
@@ -807,12 +953,8 @@
   }
 
   document.getElementById('btn-google').addEventListener('click', async () => {
-    try{
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    }catch(err){
-      console.error(err);
-      setAuthMessage('Přihlášení přes Google se nepovedlo. Zkus to znovu.');
-    }
+    try{ await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch(err){ console.error(err); setAuthMessage('Přihlášení přes Google se nepovedlo. Zkus to znovu.'); }
   });
 
   document.getElementById('btn-google-nick-submit').addEventListener('click', async () => {
@@ -822,25 +964,53 @@
     btn.disabled = true;
     try{
       const existing = await getDoc(usernameDocRef(nick));
-      if(existing.exists()){
-        alert('Tahle přezdívka je už obsazená, zkus jinou.');
-        btn.disabled = false;
-        return;
-      }
+      if(existing.exists()){ alert('Tahle přezdívka je už obsazená, zkus jinou.'); btn.disabled = false; return; }
       await setDoc(usernameDocRef(nick), { uid: currentUser.uid, email: currentUser.email });
       await setDoc(doc(db, 'users', currentUser.uid), { nick, email: currentUser.email });
       currentNick = nick;
       updateAuthUI();
-    }catch(err){
-      console.error(err);
-      alert('Uložení přezdívky se nepovedlo. Zkus to znovu.');
-    }finally{
-      btn.disabled = false;
-    }
+    }catch(err){ console.error(err); alert('Uložení přezdívky se nepovedlo. Zkus to znovu.'); }
+    finally{ btn.disabled = false; }
   });
 
-  document.getElementById('btn-logout').addEventListener('click', async () => {
-    await signOut(auth);
+  document.getElementById('btn-logout').addEventListener('click', async () => { await signOut(auth); });
+
+  function hasPasswordProvider(user){
+    return user.providerData.some(p => p.providerId === 'password');
+  }
+
+  document.getElementById('btn-change-password').addEventListener('click', async () => {
+    if(!currentUser || !currentUser.email) return;
+    const msg = document.getElementById('pw-reset-msg');
+    try{
+      await sendPasswordResetEmail(auth, currentUser.email);
+      msg.textContent = `Odkaz pro změnu hesla byl odeslán na ${currentUser.email}.`;
+    }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se odeslat odkaz. Zkus to znovu.'; }
+  });
+
+  document.getElementById('form-change-email').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if(!currentUser) return;
+    const msg = document.getElementById('email-change-msg');
+    const newEmail = document.getElementById('new-email').value.trim();
+    if(!newEmail) return;
+    msg.textContent = '';
+    try{
+      if(hasPasswordProvider(currentUser)){
+        const pw = document.getElementById('reauth-password').value;
+        const cred = EmailAuthProvider.credential(currentUser.email, pw);
+        await reauthenticateWithCredential(currentUser, cred);
+      }else{
+        await reauthenticateWithPopup(currentUser, new GoogleAuthProvider());
+      }
+      await verifyBeforeUpdateEmail(currentUser, newEmail);
+      msg.textContent = `Ověřovací odkaz byl odeslán na ${newEmail}. Po kliknutí na něj se e-mail změní.`;
+    }catch(err){
+      console.error(err);
+      if(err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg.textContent = 'Nesprávné heslo.';
+      else if(err.code === 'auth/email-already-in-use') msg.textContent = 'Tenhle e-mail už používá jiný účet.';
+      else msg.textContent = 'Nepovedlo se — zkus to prosím znovu.';
+    }
   });
 
   function updateAuthUI(){
@@ -855,11 +1025,10 @@
       googleNickPrompt.style.display = 'none';
       document.getElementById('auth-current-nick').textContent = currentNick + (currentIsAdmin ? ' (admin)' : '');
       document.getElementById('auth-current-email').textContent = currentUser.email || '';
-      document.getElementById('reg-name').value = currentNick;
+      document.getElementById('reauth-password-field').style.display = hasPasswordProvider(currentUser) ? 'block' : 'none';
+      document.getElementById('pw-reset-panel').style.display = hasPasswordProvider(currentUser) ? 'flex' : 'none';
       navLabel.textContent = currentNick;
-      renderRegSelect();
     }else if(currentUser && !currentNick){
-      // přihlášen přes Google, ale ještě nemá přezdívku
       loggedOutBox.style.display = 'block';
       loggedInBox.style.display = 'none';
       formAuth.style.display = 'none';
@@ -878,6 +1047,7 @@
       navLabel.textContent = 'Účet';
     }
     renderEvents();
+    if(currentDetailEventId) { renderStatsAndRsvp(); }
   }
 
   onAuthStateChanged(auth, async (user) => {
@@ -890,15 +1060,20 @@
         if(userDoc.exists()){
           currentNick = userDoc.data().nick;
           currentIsAdmin = userDoc.data().isAdmin === true;
+          // self-heal: pokud se e-mail účtu změnil (ověřený odkazem), promítni to i do usernames/users
+          if(userDoc.data().email !== user.email){
+            try{
+              await updateDoc(doc(db,'users',user.uid), { email: user.email });
+              await updateDoc(usernameDocRef(currentNick), { email: user.email });
+            }catch(e){ /* tichý fail, není kritické */ }
+          }
         }
-      }catch(err){
-        console.error(err);
-      }
+      }catch(err){ console.error(err); }
       updateAuthUI();
       if(currentNick && pendingEventId){
         const evId = pendingEventId;
         pendingEventId = null;
-        goToRegistration(evId);
+        openEventDetail(evId);
       }
     }else{
       updateAuthUI();
