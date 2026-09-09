@@ -541,8 +541,20 @@
       <h3>${escapeHtml(featured.name)}</h3>
       <div class="meta">${fmtDate(featured.date)} · ${escapeHtml(featured.place)} · ${taken}/${featured.cap} míst</div>
       <p class="desc">${escapeHtml(featured.desc || '')}</p>
+      ${currentIsAdmin ? `
+      <div class="row" style="margin-top:14px; max-width:280px;">
+        <button type="button" class="btn-ghost btn-sm" data-edit-featured style="flex:1;">Upravit</button>
+        <button type="button" class="btn-ghost btn-sm" data-delete-featured style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+      </div>` : ''}
     `;
-    fc.addEventListener('click', () => openEventDetail(featured.id));
+    fc.addEventListener('click', (e) => {
+      if(e.target.closest('[data-edit-featured]') || e.target.closest('[data-delete-featured]')) return;
+      openEventDetail(featured.id);
+    });
+    const featEditBtn = fc.querySelector('[data-edit-featured]');
+    if(featEditBtn) featEditBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditEvent(featured); });
+    const featDelBtn = fc.querySelector('[data-delete-featured]');
+    if(featDelBtn) featDelBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteEvent(featured.id, featured.name); });
     featuredWrap.appendChild(fc);
 
     if(rest.length === 0) return;
@@ -598,7 +610,7 @@
     // registrace (RSVP)
     const unsubReg = onSnapshot(collection(db, 'events', eventId, 'registrations'), (snap) => {
       currentRegistrationsMap = {};
-      snap.forEach(d => currentRegistrationsMap[d.id] = d.data());
+      snap.forEach(d => currentRegistrationsMap[d.id] = { ...d.data(), _docId: d.id });
       renderStatsAndRsvp();
       renderAttendees();
       if(currentTab === 'jidlo') renderTabJidlo(ev);
@@ -730,10 +742,23 @@
     }
     box.innerHTML = list.map(r => `
       <div class="attendee-row">
-        <span>${escapeHtml(r.nick)}</span>
-        <span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>
+        <span>${escapeHtml(r.nick || '(bez jména — starý záznam)')}</span>
+        <span style="display:flex; align-items:center; gap:6px;">
+          <span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>
+          ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-remove-attendee="${r._docId}" title="Odebrat" style="padding:2px 7px; color:var(--crimson); border-color:var(--crimson);">×</button>` : ''}
+        </span>
       </div>
     `).join('');
+
+    if(currentIsAdmin){
+      box.querySelectorAll('[data-remove-attendee]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if(!confirm('Odebrat tohoto účastníka z akce?')) return;
+          try{ await deleteDoc(doc(db, 'events', currentDetailEventId, 'registrations', btn.dataset.removeAttendee)); }
+          catch(err){ alert('Odebrání se nepovedlo.'); console.error(err); }
+        });
+      });
+    }
   }
 
   function renderTabPrehled(ev){
