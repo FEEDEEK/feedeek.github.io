@@ -567,23 +567,52 @@
     }
   });
 
-  function startEditEvent(ev){
+ function startEditEvent(ev){
     editingEventId = ev.id;
     document.getElementById('ev-name').value = ev.name || '';
-    document.getElementById('ev-date').value = ev.date || '';
+    
+    // Úprava: Načtení datumu Od a Do (pokud jsou uloženy staré akce s jedním datem, dá ho do obou)
+    document.getElementById('ev-date-start').value = ev.dateStart || ev.date || '';
+    document.getElementById('ev-date-end').value = ev.dateEnd || ev.date || '';
+    
     document.getElementById('ev-place').value = ev.place || '';
     document.getElementById('ev-cap').value = ev.cap || 1;
     document.getElementById('ev-desc').value = ev.desc || '';
     document.getElementById('ev-image').value = ev.imageUrl || '';
-    document.getElementById('ev-games').value = (ev.games || []).join(', ');
+    
+    // Úprava: Načtení položkových her do našeho pomocného pole a vykreslení štítků
+    if (Array.isArray(ev.games)) {
+      currentEventGames = [...ev.games];
+    } else if (typeof ev.games === 'string' && ev.games) {
+      currentEventGames = ev.games.split(',').map(g => g.trim()).filter(g => g);
+    } else {
+      currentEventGames = [];
+    }
+    renderFormGames();
+
     document.getElementById('ev-foodplan').value = ev.foodPlan || '';
-    document.getElementById('ev-foodoptions').value = (ev.foodOptions || []).join(', ');
+    
+    // Úprava: Načtení strukturovaného jídla do našeho pomocného objektu a vykreslení
+    if (ev.foodOptions && typeof ev.foodOptions === 'object' && !Array.isArray(ev.foodOptions)) {
+      currentEventFood = {
+        "fri-dinner": Array.isArray(ev.foodOptions["fri-dinner"]) ? [...ev.foodOptions["fri-dinner"]] : [],
+        "sat-breakfast": Array.isArray(ev.foodOptions["sat-breakfast"]) ? [...ev.foodOptions["sat-breakfast"]] : [],
+        "sat-lunch": Array.isArray(ev.foodOptions["sat-lunch"]) ? [...ev.foodOptions["sat-lunch"]] : [],
+        "sat-dinner": Array.isArray(ev.foodOptions["sat-dinner"]) ? [...ev.foodOptions["sat-dinner"]] : [],
+        "sun-breakfast": Array.isArray(ev.foodOptions["sun-breakfast"]) ? [...ev.foodOptions["sun-breakfast"]] : []
+      };
+    } else {
+      // Pokud tam byla stará data (např. pole textů), vyčistíme to pro nový formát
+      currentEventFood = { "fri-dinner": [], "sat-breakfast": [], "sat-lunch": [], "sat-dinner": [], "sun-breakfast": [] };
+    }
+    renderFormFood();
+
     document.getElementById('ev-deadline').value = ev.changeDeadline || '';
     document.getElementById('btn-save-event').textContent = 'Uložit změny';
     formEvent.style.display = 'flex';
     showView('akce');
     formEvent.scrollIntoView({ behavior:'smooth', block:'start' });
-  }
+}
 
   async function deleteEvent(eventId, eventName){
     if(!confirm(`Opravdu smazat akci "${eventName}"? Tohle nejde vrátit zpět.`)) return;
