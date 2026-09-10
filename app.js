@@ -571,7 +571,7 @@ function renderTabPrehled(ev){
     <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
     <div class="chip-row">${games.length ? games.map(g=>`<span class="chip">${escapeHtml(g)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
 
-    <div class="section-title" style="font-size:16px; margin-top:28px;">Chtěl by sis zahrát ještě něco jiného?</div>
+    <div class="section-title" style="font-size:16px; margin-top:28px;">Co by sis rád zahrál?</div>
     <div class="field" style="max-width:360px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
       <div style="flex:1;"><input type="text" id="suggestion-input" placeholder="Např. HALO"></div>
       <button type="button" id="btn-add-suggestion" class="btn-sm">Přidat</button>
