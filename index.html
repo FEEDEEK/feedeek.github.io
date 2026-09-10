@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FEEDEEK — LAN party</title>
+<title>FEEDEK — LAN party</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -211,118 +211,43 @@
 
   <main class="main">
 
-      <!-- HOME -->
+    <!-- HOME -->
     <section class="view active" id="view-home">
-      <div class="eyebrow">Komunitní LAN-PARTY</div>
-      
-      <h1 class="headline">Posbírejte ty svý kalkulačky a doražte na klasický feedek!</h1>
-      
-      <p style="font-size: 1.1em; line-height: 1.5; margin-bottom: 24px;">
-        Tady je hlavní mid or feed. Tady organizujeme naše lanky, aby z nikoho nebyla jenom warda.
-      </p>
-
-      <div class="lan-info-grid" style="margin-bottom: 34px;">
-        <div class="info-block" style="margin-bottom: 20px;">
-          <h3 style="margin-bottom: 8px;">🎮 Co se u nás točí nejvíc?</h3>
-          <ul style="list-style-type: none; padding-left: 0; line-height: 1.6;">
-            <li style="margin-bottom: 8px;"><strong>Dota 2:</strong> Naše srdcovka. Připrav si nervy, wardy support nekupuje, je to přece carry a hlavně chcankopták.</li>
-            <li style="margin-bottom: 8px;"><strong>Další klasiky:</strong> Když už chceme na 5 minut změnu, vytáhneme klasiky jako Call of Duty, FlatOut a další.</li>
-            <li style="margin-bottom: 8px;"><strong>Cokoliv, co rozjede každej střep:</strong> Hrajeme věci, u kterých nemusíš kvůli grafice upgradovat kompa. Hlavní je hratelnost a to, že u stolu sedíme spolu.</li>
-          </ul>
-        </div>
-
-        <div class="info-block" style="margin-bottom: 20px;">
-          <h3 style="margin-bottom: 8px;">🛠️ Jak to u nás funguje?</h3>
-          <ul style="list-style-type: decimal; padding-left: 20px; line-height: 1.6;">
-            <li style="margin-bottom: 6px;"><strong>Máš účet?</strong> Pokud už to znáš, tak se jen přihlaš.</li>
-            <li style="margin-bottom: 6px;"><strong>Jsi tu novej?</strong> Jakožto nový feeďa se nejdřív zaregistruj, přihlas a do poznámky nám uveď, komu vlastně děláš couriera (kdo tě z party přitáhl).</li>
-            <li style="margin-bottom: 6px;"><strong>Potvrď účast:</strong> Klikni, že jedeš a označ jistotu, ať víme s čím počítat.</li>
-          </ul>
-        </div>
-      </div>
-
+      <div class="eyebrow">Komunitní LAN party</div>
+      <h1 class="headline">Sejdeme se u obrazovek, ne u obrazovky.</h1>
       <div class="hero" style="margin-top:34px; border-bottom:none; padding-bottom:0;">
         <div class="hero-card" id="next-event-card">
           <div class="label">Nejbližší akce</div>
           <div class="val">—</div>
-          <div class="sub">Aktuálně se nic nepeče. Sleduj to tu, nebo hoď echo na Discord, ať se rozhoupeme.</div>
+          <div class="sub">Zatím žádná akce nevypsána.</div>
         </div>
       </div>
     </section>
 
-        <!-- AKCE -->
+    <!-- AKCE -->
     <section class="view" id="view-akce">
       <div class="toolbar">
         <div>
           <div class="eyebrow">Přehled</div>
-          <h1 class="headline" style="font-size:32px;">Akce</h1>
+          <h1 class="headline" style="font-size:28px;">Akce</h1>
         </div>
         <button id="btn-new-event" style="display:none;">+ Nová akce</button>
       </div>
 
-      <form class="panel" id="form-event" style="display:none; max-width:560px; font-size: 16px;">
-        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Název akce</label><input type="text" id="ev-name" placeholder="Podzimní LAN v klubovně" style="width:100%; padding: 8px; font-size: 15px;" required></div>
-        
-        <div style="display: flex; gap: 15px; margin-bottom: 16px;">
-          <div class="field" style="flex: 1;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Datum od</label><input type="date" id="ev-date-start" style="width:100%; padding: 8px; font-size: 15px;" required></div>
-          <div class="field" style="flex: 1;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Datum do</label><input type="date" id="ev-date-end" style="width:100%; padding: 8px; font-size: 15px;" required></div>
-        </div>
-
-        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Místo</label><input type="text" id="ev-place" placeholder="Klubovna, Pardubice" style="width:100%; padding: 8px; font-size: 15px;" required></div>
-        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Kapacita (počet míst)</label><input type="number" id="ev-cap" min="1" value="16" style="width:100%; padding: 8px; font-size: 15px;" required></div>
-        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Popis</label><textarea id="ev-desc" placeholder="Co s sebou přinést..." style="width:100%; padding: 8px; font-size: 15px; height: 80px;"></textarea></div>
-        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">URL obrázku (nepovinné)</label><input type="url" id="ev-image" placeholder="https://..." style="width:100%; padding: 8px; font-size: 15px;"></div>
-        
-        <div class="field" style="margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">
-          <label style="font-weight: bold; display: block; margin-bottom: 6px;">🎮 Hry, které se budou hrát</label>
-          <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <input type="text" id="input-add-game" placeholder="Napiš hru (např. Dota 2)" style="flex: 1; padding: 8px; font-size: 15px;">
-            <button type="button" id="btn-add-game" style="padding: 8px 16px;">Přidat</button>
-          </div>
-          <ul id="ev-games-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px;">
-          </ul>
-        </div>
-
-        <div class="field" style="margin-bottom: 16px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Plán jídla (obecné info / poznámka)</label><textarea id="ev-foodplan" placeholder="Platí se na místě..." style="width:100%; padding: 8px; font-size: 15px; height: 60px;"></textarea></div>
-
-        <div class="field" style="margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">
-          <label style="font-weight: bold; display: block; margin-bottom: 12px;">🍔 Výběr jídla pro feedery</label>
-
-          <div style="display: flex; gap: 8px; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px; flex-direction: column;">
-            <span style="font-size: 14px; color: #aaa;">Přidat položku do menu:</span>
-            <div style="display: flex; gap: 8px;">
-              <select id="select-food-meal" style="padding: 8px; font-size: 14px;">
-                <optgroup label="Pátek">
-                  <option value="fri-dinner">Pátek — Večeře</option>
-                </optgroup>
-                <optgroup label="Sobota">
-                  <option value="sat-breakfast">Sobota — Snídaně</option>
-                  <option value="sat-lunch">Sobota — Oběd</option>
-                  <option value="sat-dinner">Sobota — Večeře</option>
-                </optgroup>
-                <optgroup label="Neděle">
-                  <option value="sun-breakfast">Neděle — Snídaně</option>
-                </optgroup>
-              </select>
-              <input type="text" id="input-add-food" placeholder="Název jídla (např. Pizza Hawaii)" style="flex: 1; padding: 8px; font-size: 14px;">
-              <button type="button" id="btn-add-food" style="padding: 8px 12px;">Přidat</button>
-            </div>
-          </div>
-
-          <div id="food-schedule-preview" style="font-size: 14px; display: flex; flex-direction: column; gap: 10px;">
-            <div><strong>Pátek Večeře:</strong> <span id="list-fri-dinner" style="color: #bbb;">Žádné položky</span></div>
-            <div><strong>Sobota Snídaně:</strong> <span id="list-sat-breakfast" style="color: #bbb;">Žádné položky</span></div>
-            <div><strong>Sobota Oběd:</strong> <span id="list-sat-lunch" style="color: #bbb;">Žádné položky</span></div>
-            <div><strong>Sobota Večeře:</strong> <span id="list-sat-dinner" style="color: #bbb;">Žádné položky</span></div>
-            <div><strong>Neděle Snídaně:</strong> <span id="list-sun-breakfast" style="color: #bbb;">Žádné položky</span></div>
-          </div>
-        </div>
-
-        <div class="field" style="margin-bottom: 20px;"><label style="font-weight: bold; display: block; margin-bottom: 6px;">Uzávěrka změn (jídlo / odhlášení)</label><input type="date" id="ev-deadline" style="width:100%; padding: 8px; font-size: 15px;"><small style="display:block; margin-top: 4px; color: #888;">Do tohoto data mohou účastníci měnit jídlo nebo se odhlásit.</small></div>
-        
-        <div style="display:flex; gap:10px; margin-top: 24px;">
-          <button type="submit" id="btn-save-event" style="padding: 10px 20px; font-size: 16px; font-weight: bold;">Uložit akci</button>
-          <button type="button" class="btn-ghost" id="btn-cancel-event" style="padding: 10px 20px; font-size: 16px;">Zrušit</button>
+      <form class="panel" id="form-event" style="display:none; max-width:520px;">
+        <div class="field"><label>Název akce</label><input type="text" id="ev-name" placeholder="Podzimní LAN v klubovně" required></div>
+        <div class="field"><label>Datum</label><input type="date" id="ev-date" required></div>
+        <div class="field"><label>Místo</label><input type="text" id="ev-place" placeholder="Klubovna, Pardubice" required></div>
+        <div class="field"><label>Kapacita (počet míst)</label><input type="number" id="ev-cap" min="1" value="16" required></div>
+        <div class="field"><label>Popis</label><textarea id="ev-desc" placeholder="Co se bude hrát, co s sebou přinést..."></textarea></div>
+        <div class="field"><label>URL obrázku (nepovinné)</label><input type="url" id="ev-image" placeholder="https://..."></div>
+        <div class="field"><label>Hry, které se budou hrát (odděl čárkou)</label><input type="text" id="ev-games" placeholder="CS2, Age of Empires 2, Mario Kart"></div>
+        <div class="field"><label>Plán jídla (nepovinné)</label><textarea id="ev-foodplan" placeholder="Objednáme pizzu, platí se na místě..."></textarea></div>
+        <div class="field"><label>Možnosti jídla k výběru (nepovinné, odděl čárkou)</label><input type="text" id="ev-foodoptions" placeholder="Margherita, Salám, Vege"></div>
+        <div class="field"><label>Uzávěrka změn (jídlo / odhlášení)</label><input type="date" id="ev-deadline"><small>Do tohoto data mohou účastníci měnit jídlo nebo se odhlásit.</small></div>
+        <div style="display:flex; gap:10px;">
+          <button type="submit" id="btn-save-event">Uložit akci</button>
+          <button type="button" class="btn-ghost" id="btn-cancel-event">Zrušit</button>
         </div>
       </form>
 
@@ -567,66 +492,23 @@
     }
   });
 
- function startEditEvent(ev){
-    if (!ev) {
-      console.error("Chyba: Nebyla předána žádná data o akci!");
-      return;
-    }
+  function startEditEvent(ev){
     editingEventId = ev.id;
-    
-    // Bezpečné naplnění textových polí (pokud na webu existují)
-    if(document.getElementById('ev-name')) document.getElementById('ev-name').value = ev.name || '';
-    if(document.getElementById('ev-place')) document.getElementById('ev-place').value = ev.place || '';
-    if(document.getElementById('ev-cap')) document.getElementById('ev-cap').value = ev.cap || 1;
-    if(document.getElementById('ev-desc')) document.getElementById('ev-desc').value = ev.desc || '';
-    if(document.getElementById('ev-image')) document.getElementById('ev-image').value = ev.imageUrl || '';
-    if(document.getElementById('ev-foodplan')) document.getElementById('ev-foodplan').value = ev.foodPlan || '';
-    if(document.getElementById('ev-deadline')) document.getElementById('ev-deadline').value = ev.changeDeadline || '';
-
-    // Bezpečné načtení datumu Od a Do (pokud jsou uloženy staré akce s jedním datem 'date', dá ho do obou)
-    if(document.getElementById('ev-date-start')) document.getElementById('ev-date-start').value = ev.dateStart || ev.date || '';
-    if(document.getElementById('ev-date-end')) document.getElementById('ev-date-end').value = ev.dateEnd || ev.date || '';
-    
-    // Načtení položkových her do pomocného pole a vykreslení štítků
-    if (Array.isArray(ev.games)) {
-      currentEventGames = [...ev.games];
-    } else if (typeof ev.games === 'string' && ev.games) {
-      currentEventGames = ev.games.split(',').map(g => g.trim()).filter(g => g);
-    } else {
-      currentEventGames = [];
-    }
-    if (typeof renderFormGames === 'function') renderFormGames();
-
-    // Načtení strukturovaného jídla do pomocného objektu a vykreslení
-    if (ev.foodOptions && typeof ev.foodOptions === 'object' && !Array.isArray(ev.foodOptions)) {
-      currentEventFood = {
-        "fri-dinner": Array.isArray(ev.foodOptions["fri-dinner"]) ? [...ev.foodOptions["fri-dinner"]] : [],
-        "sat-breakfast": Array.isArray(ev.foodOptions["sat-breakfast"]) ? [...ev.foodOptions["sat-breakfast"]] : [],
-        "sat-lunch": Array.isArray(ev.foodOptions["sat-lunch"]) ? [...ev.foodOptions["sat-lunch"]] : [],
-        "sat-dinner": Array.isArray(ev.foodOptions["sat-dinner"]) ? [...ev.foodOptions["sat-dinner"]] : [],
-        "sun-breakfast": Array.isArray(ev.foodOptions["sun-breakfast"]) ? [...ev.foodOptions["sun-breakfast"]] : []
-      };
-    } else {
-      currentEventFood = { "fri-dinner": [], "sat-breakfast": [], "sat-lunch": [], "sat-dinner": [], "sun-breakfast": [] };
-    }
-    if (typeof renderFormFood === 'function') renderFormFood();
-
-    // Změna textu tlačítka na "Uložit změny"
-    if(document.getElementById('btn-save-event')) document.getElementById('btn-save-event').textContent = 'Uložit změny';
-    
-    // Bezpečné zobrazení formuláře, i kdyby proměnná formEvent neexistovala
-    const fEvent = document.getElementById('form-event');
-    if (fEvent) {
-      fEvent.style.display = 'block'; // Změněno z flex na block, aby se správně zobrazil panel
-      fEvent.scrollIntoView({ behavior:'smooth', block:'start' });
-    } else if (typeof formEvent !== 'undefined' && formEvent) {
-      formEvent.style.display = 'block';
-      formEvent.scrollIntoView({ behavior:'smooth', block:'start' });
-    }
-    
-    // Přepnutí pohledu (pokud funkce existuje)
-    if (typeof showView === 'function') showView('akce');
-}
+    document.getElementById('ev-name').value = ev.name || '';
+    document.getElementById('ev-date').value = ev.date || '';
+    document.getElementById('ev-place').value = ev.place || '';
+    document.getElementById('ev-cap').value = ev.cap || 1;
+    document.getElementById('ev-desc').value = ev.desc || '';
+    document.getElementById('ev-image').value = ev.imageUrl || '';
+    document.getElementById('ev-games').value = (ev.games || []).join(', ');
+    document.getElementById('ev-foodplan').value = ev.foodPlan || '';
+    document.getElementById('ev-foodoptions').value = (ev.foodOptions || []).join(', ');
+    document.getElementById('ev-deadline').value = ev.changeDeadline || '';
+    document.getElementById('btn-save-event').textContent = 'Uložit změny';
+    formEvent.style.display = 'flex';
+    showView('akce');
+    formEvent.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
 
   async function deleteEvent(eventId, eventName){
     if(!confirm(`Opravdu smazat akci "${eventName}"? Tohle nejde vrátit zpět.`)) return;
@@ -1221,89 +1103,6 @@
     }else{
       updateAuthUI();
     }
-    // --- POMOCNÉ PROMĚNNÉ PRO POLOŽKOVÉ HRY A JÍDLO ---
-let currentEventGames = [];
-let currentEventFood = {
-  "fri-dinner": [],
-  "sat-breakfast": [],
-  "sat-lunch": [],
-  "sat-dinner": [],
-  "sun-breakfast": []
-};
-
-// Funkce pro překreslení seznamu her ve formuláři
-function renderFormGames() {
-  const list = document.getElementById('ev-games-list');
-  if (!list) return;
-  list.innerHTML = '';
-  currentEventGames.forEach((game, index) => {
-    const li = document.createElement('li');
-    li.style = 'background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 4px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #fff;';
-    li.innerHTML = `<span>${game}</span><span style="color: #ff4a4a; cursor: pointer; font-weight: bold; font-size: 16px;" onclick="removeFormGame(${index})">×</span>`;
-    list.appendChild(li);
-  });
-}
-
-function removeFormGame(index) {
-  currentEventGames.splice(index, 1);
-  renderFormGames();
-}
-
-// Funkce pro překreslení rozpisů jídel ve formuláři
-function renderFormFood() {
-  const mealTypes = ["fri-dinner", "sat-breakfast", "sat-lunch", "sat-dinner", "sun-breakfast"];
-  mealTypes.forEach(type => {
-    const span = document.getElementById(`list-${type}`);
-    if (!span) return;
-    if (currentEventFood[type] && currentEventFood[type].length > 0) {
-      span.innerHTML = currentEventFood[type].map((food, index) => {
-        return `<span style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 3px; margin-right: 5px; margin-bottom: 5px; display: inline-flex; align-items: center; gap: 6px; color: #fff;">${food} <b style="color: #ff4a4a; cursor: pointer; font-size: 14px;" onclick="removeFormFood('${type}', ${index})">×</b></span>`;
-      }).join('');
-    } else {
-      span.innerHTML = '<span style="color: #888;">Žádné položky</span>';
-    }
-  });
-}
-
-function removeFormFood(type, index) {
-  currentEventFood[type].splice(index, 1);
-  renderFormFood();
-}
-
-// Aktivace tlačítek po kliknutí
-setTimeout(() => {
-  const btnAddGame = document.getElementById('btn-add-game');
-  if (btnAddGame) {
-    btnAddGame.addEventListener('click', (e) => {
-      e.preventDefault();
-      const input = document.getElementById('input-add-game');
-      const value = input.value.trim();
-      if (value) {
-        currentEventGames.push(value);
-        input.value = '';
-        renderFormGames();
-      }
-    });
-  }
-
-  const btnAddFood = document.getElementById('btn-add-food');
-  if (btnAddFood) {
-    btnAddFood.addEventListener('click', (e) => {
-      e.preventDefault();
-      const select = document.getElementById('select-food-meal');
-      const input = document.getElementById('input-add-food');
-      const type = select.value;
-      const value = input.value.trim();
-      if (value) {
-        if (!currentEventFood[type]) currentEventFood[type] = [];
-        currentEventFood[type].push(value);
-        input.value = '';
-        renderFormFood();
-      }
-    });
-  }
-}, 500);
-// --- KONEC POMOCNÉHO KÓDU ---
   });
 </script>
 </body>
