@@ -48,7 +48,7 @@ let currentEventFood = emptyFoodSchedule();
 function fmtDate(iso){
   if(!iso) return '';
   const d = new Date(iso+'T00:00:00');
-  return d.toLocaleDateString('cs-CZ', { day:'numeric', month:'long', year:'numeric' });
+  return d.toLocaleDateString('cs-CZ', { day:'numeric', month:'numeric', year:'numeric' });
 }
 function fmtDateShort(iso){
   if(!iso) return '';
@@ -104,25 +104,34 @@ function showView(name){
   views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
 }
 navItems.forEach(n => n.addEventListener('click', () => {
-  // Pokud opouštíme Akce s otevřeným, neuloženým formulářem, zavřít ho.
   if(n.dataset.view !== 'akce') closeEventForm();
   showView(n.dataset.view);
 }));
+document.getElementById('brand-home-link').addEventListener('click', () => {
+  closeEventForm();
+  showView('home');
+});
 document.getElementById('btn-back-to-akce').addEventListener('click', () => { showView('akce'); });
 
 // ---- Home ----
 function renderHome(){
   const card = document.getElementById('next-event-card');
   const upcoming = events.filter(e => e.dateEnd >= todayIso());
+  const metaBox = document.getElementById('next-event-metastrong');
+  const subBox = document.getElementById('next-event-sub');
   if(upcoming.length === 0){
-    card.querySelector('.val').textContent = '—';
-    card.querySelector('.sub').textContent = 'Aktuálně se nic nepeče. Sleduj to tu, nebo hoď echo na Discord, ať se rozhoupeme.';
+    card.querySelector('h2').textContent = '—';
+    metaBox.textContent = '';
+    subBox.textContent = 'Aktuálně se nic nepeče. Sleduj to tu, nebo hoď echo na Discord, ať se rozhoupeme.';
+    card.style.backgroundImage = 'none';
     card.onclick = null;
     return;
   }
   const next = upcoming[0];
-  card.querySelector('.val').textContent = next.name;
-  card.querySelector('.sub').textContent = fmtDateRange(next) + ' · ' + next.place;
+  card.querySelector('h2').textContent = (next.number ? next.number + ' — ' : '') + next.name;
+  metaBox.innerHTML = `${fmtDateRange(next)} · <span class="place">${escapeHtml(next.place)}</span>`;
+  subBox.textContent = next.desc || '';
+  card.style.backgroundImage = next.imageUrl ? `url('${next.imageUrl.replace(/'/g,"")}')` : 'none';
   card.onclick = () => openEventDetail(next.id);
 }
 
@@ -224,6 +233,7 @@ formEvent.addEventListener('submit', async (e) => {
   const submitBtn = document.getElementById('btn-save-event');
   submitBtn.disabled = true;
   const payload = {
+    number: document.getElementById('ev-number').value.trim(),
     name: document.getElementById('ev-name').value.trim(),
     dateStart: document.getElementById('ev-date-start').value,
     dateEnd: document.getElementById('ev-date-end').value,
@@ -231,6 +241,8 @@ formEvent.addEventListener('submit', async (e) => {
     cap: parseInt(document.getElementById('ev-cap').value, 10) || 1,
     desc: document.getElementById('ev-desc').value.trim(),
     imageUrl: document.getElementById('ev-image').value.trim(),
+    fee: parseInt(document.getElementById('ev-fee').value, 10) || 0,
+    qrUrl: document.getElementById('ev-qr').value.trim(),
     games: [...currentEventGames],
     foodPlan: document.getElementById('ev-foodplan').value.trim(),
     foodSchedule: JSON.parse(JSON.stringify(currentEventFood)),
@@ -258,6 +270,7 @@ formEvent.addEventListener('submit', async (e) => {
 
 function startEditEvent(ev){
   editingEventId = ev.id;
+  document.getElementById('ev-number').value = ev.number || '';
   document.getElementById('ev-name').value = ev.name || '';
   document.getElementById('ev-date-start').value = ev.dateStart || '';
   document.getElementById('ev-date-end').value = ev.dateEnd || ev.dateStart || '';
@@ -265,6 +278,8 @@ function startEditEvent(ev){
   document.getElementById('ev-cap').value = ev.cap || 1;
   document.getElementById('ev-desc').value = ev.desc || '';
   document.getElementById('ev-image').value = ev.imageUrl || '';
+  document.getElementById('ev-fee').value = ev.fee || '';
+  document.getElementById('ev-qr').value = ev.qrUrl || '';
   document.getElementById('ev-foodplan').value = ev.foodPlan || '';
   document.getElementById('ev-deadline').value = ev.changeDeadline || '';
 
@@ -294,8 +309,10 @@ function renderEvents(){
   btnNewEvent.style.display = currentIsAdmin ? 'inline-flex' : 'none';
   const featuredWrap = document.getElementById('featured-event-wrap');
   const grid = document.getElementById('events-grid');
+  const historyWrap = document.getElementById('history-wrap');
   featuredWrap.innerHTML = '';
   grid.innerHTML = '';
+  historyWrap.innerHTML = '';
 
   if(events.length === 0){
     grid.innerHTML = '<div class="empty">Zatím žádné akce.</div>';
@@ -303,62 +320,92 @@ function renderEvents(){
   }
 
   const upcoming = events.filter(e => e.dateEnd >= todayIso());
-  const featured = upcoming[0] || events[0];
-  const rest = events.filter(e => e.id !== featured.id);
+  const past = events.filter(e => e.dateEnd < todayIso()).sort((a,b)=> b.dateStart.localeCompare(a.dateStart));
 
-  const taken = (regCounts[featured.id]?.going) || 0;
-  const full = taken >= featured.cap;
-  const fc = document.createElement('div');
-  fc.className = 'featured-card';
-  fc.innerHTML = `
-    <span class="tag">${full ? 'Obsazeno' : 'Nejbližší akce'}</span>
-    <h3>${escapeHtml(featured.name)}</h3>
-    <div class="meta">${fmtDateRange(featured)} · ${escapeHtml(featured.place)} · ${taken}/${featured.cap} míst</div>
-    <p class="desc">${escapeHtml(featured.desc || '')}</p>
-    ${currentIsAdmin ? `
-    <div class="row" style="margin-top:14px; max-width:280px;">
-      <button type="button" class="btn-ghost btn-sm" data-edit-featured style="flex:1;">Upravit</button>
-      <button type="button" class="btn-ghost btn-sm" data-delete-featured style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
-    </div>` : ''}
-  `;
-  fc.addEventListener('click', (e) => {
-    if(e.target.closest('[data-edit-featured]') || e.target.closest('[data-delete-featured]')) return;
-    openEventDetail(featured.id);
-  });
-  const featEditBtn = fc.querySelector('[data-edit-featured]');
-  if(featEditBtn) featEditBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditEvent(featured); });
-  const featDelBtn = fc.querySelector('[data-delete-featured]');
-  if(featDelBtn) featDelBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteEvent(featured.id, featured.name); });
-  featuredWrap.appendChild(fc);
+  if(upcoming.length === 0 && past.length > 0){
+    grid.innerHTML = '<div class="empty">Žádná nadcházející akce zatím není vypsaná.</div>';
+  }
 
-  if(rest.length === 0) return;
-  rest.forEach(ev => {
-    const t = (regCounts[ev.id]?.going) || 0;
-    const f = t >= ev.cap;
-    const card = document.createElement('div');
-    card.className = 'event-card';
-    card.innerHTML = `
-      <span class="tag ${f ? 'full' : ''}">${f ? 'Obsazeno' : 'Volná místa'}</span>
-      <h3>${escapeHtml(ev.name)}</h3>
-      <div class="meta">${fmtDateRange(ev)} · ${escapeHtml(ev.place)}</div>
-      <p class="desc">${escapeHtml(ev.desc || 'Bez popisu.')}</p>
-      <div class="row"><span class="slots">${t} / ${ev.cap} míst</span></div>
-      ${currentIsAdmin ? `
-      <div class="row" style="margin-top:2px;">
-        <button type="button" class="btn-ghost btn-sm" data-edit="${ev.id}" style="flex:1;">Upravit</button>
-        <button type="button" class="btn-ghost btn-sm" data-delete="${ev.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
-      </div>` : ''}
+  if(upcoming.length > 0){
+    const featured = upcoming[0];
+    const rest = upcoming.slice(1);
+
+    const taken = (regCounts[featured.id]?.going) || 0;
+    const full = taken >= featured.cap;
+    const fc = document.createElement('div');
+    fc.className = 'featured-card';
+    fc.style.backgroundImage = featured.imageUrl ? `url('${featured.imageUrl.replace(/'/g,"")}')` : 'none';
+    fc.style.backgroundSize = 'cover';
+    fc.style.backgroundPosition = 'center';
+    fc.innerHTML = `
+      <div style="background:linear-gradient(90deg, rgba(20,23,31,0.95), rgba(20,23,31,0.75)); margin:-26px -28px; padding:26px 28px;">
+        <span class="tag">${full ? 'Obsazeno' : 'Nejbližší akce'}</span>
+        <h3>${featured.number ? escapeHtml(featured.number) + ' — ' : ''}${escapeHtml(featured.name)}</h3>
+        <div class="meta-strong">${fmtDateRange(featured)} · <span class="place">${escapeHtml(featured.place)}</span> · ${taken}/${featured.cap} míst</div>
+        <p class="desc">${escapeHtml(featured.desc || '')}</p>
+        ${currentIsAdmin ? `
+        <div class="row" style="margin-top:14px; max-width:280px;">
+          <button type="button" class="btn-ghost btn-sm" data-edit-featured style="flex:1;">Upravit</button>
+          <button type="button" class="btn-ghost btn-sm" data-delete-featured style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+        </div>` : ''}
+      </div>
     `;
-    card.addEventListener('click', (e) => {
-      if(e.target.closest('[data-edit]') || e.target.closest('[data-delete]')) return;
-      openEventDetail(ev.id);
+    fc.addEventListener('click', (e) => {
+      if(e.target.closest('[data-edit-featured]') || e.target.closest('[data-delete-featured]')) return;
+      openEventDetail(featured.id);
     });
-    const editBtn = card.querySelector('[data-edit]');
-    if(editBtn) editBtn.addEventListener('click', () => startEditEvent(ev));
-    const delBtn = card.querySelector('[data-delete]');
-    if(delBtn) delBtn.addEventListener('click', () => deleteEvent(ev.id, ev.name));
-    grid.appendChild(card);
-  });
+    const featEditBtn = fc.querySelector('[data-edit-featured]');
+    if(featEditBtn) featEditBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditEvent(featured); });
+    const featDelBtn = fc.querySelector('[data-delete-featured]');
+    if(featDelBtn) featDelBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteEvent(featured.id, featured.name); });
+    featuredWrap.appendChild(fc);
+
+    rest.forEach(ev => {
+      const t = (regCounts[ev.id]?.going) || 0;
+      const f = t >= ev.cap;
+      const card = document.createElement('div');
+      card.className = 'event-card';
+      card.innerHTML = `
+        <span class="tag ${f ? 'full' : ''}">${f ? 'Obsazeno' : 'Volná místa'}</span>
+        <h3>${ev.number ? escapeHtml(ev.number) + ' — ' : ''}${escapeHtml(ev.name)}</h3>
+        <div class="meta" style="font-weight:600; color:var(--gold); font-size:14px;">${fmtDateRange(ev)} · <span style="color:var(--teal);">${escapeHtml(ev.place)}</span></div>
+        <p class="desc">${escapeHtml(ev.desc || 'Bez popisu.')}</p>
+        <div class="row"><span class="slots">${t} / ${ev.cap} míst</span></div>
+        ${currentIsAdmin ? `
+        <div class="row" style="margin-top:2px;">
+          <button type="button" class="btn-ghost btn-sm" data-edit="${ev.id}" style="flex:1;">Upravit</button>
+          <button type="button" class="btn-ghost btn-sm" data-delete="${ev.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+        </div>` : ''}
+      `;
+      card.addEventListener('click', (e) => {
+        if(e.target.closest('[data-edit]') || e.target.closest('[data-delete]')) return;
+        openEventDetail(ev.id);
+      });
+      const editBtn = card.querySelector('[data-edit]');
+      if(editBtn) editBtn.addEventListener('click', () => startEditEvent(ev));
+      const delBtn = card.querySelector('[data-delete]');
+      if(delBtn) delBtn.addEventListener('click', () => deleteEvent(ev.id, ev.name));
+      grid.appendChild(card);
+    });
+  }
+
+  if(past.length > 0){
+    historyWrap.innerHTML = `<div class="section-title" style="font-size:18px;">Proběhlé akce</div><div class="history-grid" id="history-grid"></div>`;
+    const hgrid = document.getElementById('history-grid');
+    past.forEach(ev => {
+      const card = document.createElement('div');
+      card.className = 'history-card';
+      card.innerHTML = `
+        <div class="thumb ${ev.imageUrl ? '' : 'empty-thumb'}" style="${ev.imageUrl ? `background-image:url('${ev.imageUrl.replace(/'/g,"")}')` : ''}">${ev.imageUrl ? '' : 'Bez fotky'}</div>
+        <div class="info">
+          <h4>${ev.number ? escapeHtml(ev.number) + ' — ' : ''}${escapeHtml(ev.name)}</h4>
+          <div class="meta">${fmtDateRange(ev)}</div>
+        </div>
+      `;
+      card.addEventListener('click', () => openEventDetail(ev.id));
+      hgrid.appendChild(card);
+    });
+  }
 }
 
 // ==================== DETAIL AKCE ====================
@@ -375,6 +422,8 @@ function clearDetailListeners(){
 function openEventDetail(eventId){
   currentDetailEventId = eventId;
   currentTab = 'prehled';
+  currentTournamentIndex = 0;
+  teamEditorOpen = false;
   const ev = events.find(x => x.id === eventId);
   if(!ev) return;
   showView('event');
@@ -421,12 +470,14 @@ let currentFoodComments = [];
 let currentPhotos = [];
 
 function renderEventDetailStatic(ev){
-  document.getElementById('ed-title').textContent = ev.name;
+  document.getElementById('ed-title').textContent = (ev.number ? ev.number + ' — ' : '') + ev.name;
   document.getElementById('ed-meta').textContent = fmtDateRange(ev) + ' · ' + ev.place;
   document.getElementById('ed-desc').textContent = ev.desc || '';
 
   const header = document.getElementById('ed-header');
   header.style.backgroundImage = ev.imageUrl ? `url('${ev.imageUrl.replace(/'/g,"")}')` : 'none';
+
+  renderEntryFeeBlock(ev);
 
   const mapBox = document.getElementById('ed-map');
   const q = encodeURIComponent(ev.place || '');
@@ -441,16 +492,35 @@ function renderEventDetailStatic(ev){
       Object.entries(tabPanels).forEach(([key, id]) => {
         document.getElementById(id).style.display = (key === currentTab) ? 'block' : 'none';
       });
-      if(currentTab === 'prehled') renderTabPrehled(ev);
-      else if(currentTab === 'jidlo') renderTabJidlo(ev);
-      else if(currentTab === 'turnaj') renderTabTurnaj(ev);
-      else renderTabFoto(ev);
+      renderActiveTab(ev);
     };
   });
 
   renderStatsAndRsvp();
   renderAttendees();
-  renderTabPrehled(ev);
+  renderActiveTab(ev);
+}
+
+function renderActiveTab(ev){
+  if(currentTab === 'prehled') renderTabPrehled(ev);
+  else if(currentTab === 'jidlo') renderTabJidlo(ev);
+  else if(currentTab === 'turnaj') renderTabTurnaj(ev);
+  else renderTabFoto(ev);
+}
+
+function renderEntryFeeBlock(ev){
+  let box = document.getElementById('ed-entryfee');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'ed-entryfee';
+    document.getElementById('ed-rsvp').insertAdjacentElement('afterend', box);
+  }
+  if(!ev.fee && !ev.qrUrl){ box.innerHTML = ''; return; }
+  box.className = 'entry-fee-box';
+  box.innerHTML = `
+    ${ev.fee ? `<div><div class="eyebrow" style="margin-bottom:4px;">Vstupné</div><div style="font-size:20px; font-weight:600; color:var(--gold);">${ev.fee} Kč</div></div>` : ''}
+    ${ev.qrUrl ? `<div><div class="eyebrow" style="margin-bottom:4px;">QR platba</div><img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu"></div>` : ''}
+  `;
 }
 
 function isPastDeadline(ev){
@@ -534,9 +604,12 @@ function renderAttendees(){
     }else{
       statusHtml = `<span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>`;
     }
+    const coinHtml = (ev && ev.fee)
+      ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} ${currentIsAdmin ? 'admin-toggle' : ''}" data-toggle-paid="${currentIsAdmin ? r._docId : ''}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}"></span>`
+      : '';
     return `
       <div class="attendee-row">
-        <span>${escapeHtml(r.nick || '(bez jména)')}</span>
+        <span style="display:flex; align-items:center; gap:6px;">${coinHtml}${escapeHtml(r.nick || '(bez jména)')}</span>
         <span style="display:flex; align-items:center; gap:6px;">
           ${statusHtml}
           ${(currentIsAdmin && !isSelf) ? `<button type="button" class="btn-ghost btn-sm" data-remove-attendee="${r._docId}" title="Odebrat" style="padding:2px 7px; color:var(--crimson); border-color:var(--crimson);">×</button>` : ''}
@@ -546,6 +619,15 @@ function renderAttendees(){
   }).join('');
 
   box.innerHTML = html;
+
+  box.querySelectorAll('[data-toggle-paid]').forEach(el => {
+    if(!el.dataset.togglePaid) return;
+    el.addEventListener('click', async () => {
+      const r = currentRegistrationsMap[el.dataset.togglePaid];
+      try{ await updateDoc(doc(db, 'events', currentDetailEventId, 'registrations', el.dataset.togglePaid), { paid: !r.paid }); }
+      catch(err){ console.error(err); }
+    });
+  });
 
   box.querySelectorAll('[data-self-status]').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -571,7 +653,7 @@ function renderTabPrehled(ev){
     <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
     <div class="chip-row">${games.length ? games.map(g=>`<span class="chip">${escapeHtml(g)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
 
-    <div class="section-title" style="font-size:16px; margin-top:28px;">Co by sis rád zahrál?</div>
+    <div class="section-title" style="font-size:16px; margin-top:28px;">Chtěl by sis zahrát ještě něco jiného?</div>
     <div class="field" style="max-width:360px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
       <div style="flex:1;"><input type="text" id="suggestion-input" placeholder="Např. HALO"></div>
       <button type="button" id="btn-add-suggestion" class="btn-sm">Přidat</button>
@@ -579,8 +661,8 @@ function renderTabPrehled(ev){
     <div id="suggestions-list" style="margin-top:6px;"></div>
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze</div>
-    <div class="field" style="max-width:420px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
-      <div style="flex:1;"><input type="text" id="comment-input" placeholder="Napiš příspěvek do diskuze..."></div>
+    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+      <div style="flex:1;"><textarea class="discussion-input" id="comment-input" placeholder="Napiš příspěvek do diskuze..."></textarea></div>
       <button type="button" id="btn-add-comment" class="btn-sm">Odeslat</button>
     </div>
     <div id="comments-list" style="margin-top:6px;"></div>
@@ -724,7 +806,7 @@ function renderComments(ev){
   });
 }
 
-// ---- Jídlo po blocích ----
+// ---- Jídlo: zaškrtávací výběr + potvrzení + počty porcí pro admina ----
 function renderTabJidlo(ev){
   const box = document.getElementById('tab-jidlo');
   const myReg = currentUser ? currentRegistrationsMap[currentUser.uid] : null;
@@ -738,22 +820,28 @@ function renderTabJidlo(ev){
   }else{
     slotsHtml = activeSlots.map(slot => {
       const options = schedule[slot.key];
-      const myChoice = myReg && myReg.food ? myReg.food[slot.key] : '';
-      const optionsHtml = options.map(o => `<option value="${escapeHtml(o)}" ${myChoice===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
-      const pickerHtml = myReg
-        ? `<select data-food-slot="${slot.key}" ${deadlinePassed?'disabled':''}><option value="">— nevybráno —</option>${optionsHtml}</select>`
-        : `<span class="status-hint">Přihlas se na akci, ať můžeš vybrat.</span>`;
+      const myChoices = (myReg && myReg.food && Array.isArray(myReg.food[slot.key])) ? myReg.food[slot.key] : [];
 
-      const whoPicked = Object.values(currentRegistrationsMap)
-        .filter(r => r.food && r.food[slot.key])
-        .map(r => `${escapeHtml(r.nick)}: ${escapeHtml(r.food[slot.key])}`)
-        .join(', ') || 'Zatím nikdo nic nevybral.';
+      const portionCounts = {};
+      options.forEach(o => portionCounts[o] = 0);
+      Object.values(currentRegistrationsMap).forEach(r => {
+        if(r.food && Array.isArray(r.food[slot.key])){
+          r.food[slot.key].forEach(o => { if(portionCounts[o] !== undefined) portionCounts[o]++; });
+        }
+      });
+
+      const checkboxesHtml = options.map((o,idx) => `
+        <label class="food-checkbox-row">
+          <input type="checkbox" data-slot="${slot.key}" value="${escapeHtml(o)}" ${myChoices.includes(o)?'checked':''} ${(!myReg || deadlinePassed) ? 'disabled' : ''}>
+          <span>${escapeHtml(o)}</span>
+          ${currentIsAdmin ? `<span class="portion-count">${portionCounts[o]}×</span>` : ''}
+        </label>
+      `).join('');
 
       return `
-        <div class="meal-slot-block" style="margin-bottom:22px;">
+        <div class="meal-slot-block" style="margin-bottom:24px;">
           <b style="font-size:14px;">${slot.label}</b>
-          <div style="margin-top:6px;">${pickerHtml}</div>
-          <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">${whoPicked}</div>
+          <div style="margin-top:6px;">${myReg ? checkboxesHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš vybrat.</span>'}</div>
         </div>
       `;
     }).join('');
@@ -764,23 +852,36 @@ function renderTabJidlo(ev){
     <p class="lede" style="margin-top:0;">${escapeHtml(ev.foodPlan || 'Zatím nic naplánováno.')}</p>
     ${deadlinePassed ? '<p class="status-hint">Uzávěrka změn proběhla — výběr už nejde měnit.</p>' : ''}
     ${slotsHtml}
+    ${(myReg && activeSlots.length > 0 && !deadlinePassed) ? `
+      <div class="food-confirm-row">
+        <button type="button" id="btn-confirm-food">Potvrdit menu</button>
+        <span class="small-msg" id="food-confirm-msg"></span>
+      </div>` : ''}
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze k jídlu</div>
-    <div class="field" style="max-width:420px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
-      <div style="flex:1;"><input type="text" id="food-comment-input" placeholder="Kdo co doveze, návrhy..."></div>
+    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+      <div style="flex:1;"><textarea class="discussion-input" id="food-comment-input" placeholder="Kdo co doveze, návrhy..."></textarea></div>
       <button type="button" id="btn-add-food-comment" class="btn-sm">Odeslat</button>
     </div>
     <div id="food-comments-list" style="margin-top:6px;"></div>
   `;
 
-  box.querySelectorAll('[data-food-slot]').forEach(sel => {
-    sel.addEventListener('change', async () => {
-      const key = sel.dataset.foodSlot;
-      const newFood = { ...(myReg.food || {}) };
-      newFood[key] = sel.value;
-      try{ await updateDoc(doc(db,'events',ev.id,'registrations',currentUser.uid), { food: newFood }); }
-      catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
+  const confirmBtn = document.getElementById('btn-confirm-food');
+  if(confirmBtn) confirmBtn.addEventListener('click', async () => {
+    const newFood = {};
+    activeSlots.forEach(slot => {
+      const checked = Array.from(box.querySelectorAll(`input[data-slot="${slot.key}"]:checked`)).map(el => el.value);
+      newFood[slot.key] = checked;
     });
+    confirmBtn.disabled = true;
+    try{
+      await updateDoc(doc(db,'events',ev.id,'registrations',currentUser.uid), { food: newFood });
+      document.getElementById('food-confirm-msg').textContent = 'Menu uloženo.';
+    }catch(err){
+      alert('Nepovedlo se uložit.'); console.error(err);
+    }finally{
+      confirmBtn.disabled = false;
+    }
   });
 
   const foodCommentsList = document.getElementById('food-comments-list');
@@ -816,90 +917,371 @@ function renderTabJidlo(ev){
   });
 }
 
-// ---- Turnaj: pavouci ----
-function buildBracketRoundCounts(size){
-  const rounds = [];
-  let n = size;
-  while(n >= 1){ rounds.push(n); n = Math.floor(n/2); if(n===0) break; }
-  return rounds;
+// ---- Turnaj: double elimination ----
+let currentTournamentIndex = 0;
+let teamEditorOpen = false;
+
+function nextPowerOfTwo(n){ let p=1; while(p<n) p*=2; return Math.max(p,2); }
+
+function computeDoubleElim(t){
+  const teams = t.teams || [];
+  const results = t.results || {};
+  const realCount = teams.length;
+  const size = nextPowerOfTwo(Math.max(realCount,2));
+  const isBye = idx => idx===null || idx===undefined;
+  const teamLabel = idx => isBye(idx) ? null : (teams[idx] ? teams[idx].name : `Tým ${idx+1}`);
+
+  function resolveMatch(m){
+    m.isDeadSlot = isBye(m.teamA) && isBye(m.teamB);
+    if(m.isDeadSlot){ m.winner=null; m.loser=null; m.result=null; return; }
+    if(isBye(m.teamB)){ m.winner=m.teamA; m.loser=null; m.result=null; return; }
+    if(isBye(m.teamA)){ m.winner=m.teamB; m.loser=null; m.result=null; return; }
+    const res = results[m.key];
+    if(res && typeof res.a==='number' && typeof res.b==='number' && (res.a>=2||res.b>=2) && res.a!==res.b){
+      m.winner = res.a>res.b ? m.teamA : m.teamB;
+      m.loser = res.a>res.b ? m.teamB : m.teamA;
+      m.result = res;
+    }else{
+      m.winner=null; m.loser=null; m.result=res||null;
+    }
+  }
+
+  const slots = [];
+  for(let i=0;i<size;i++) slots.push(i<realCount ? i : null);
+
+  let wRounds = [];
+  let round0 = [];
+  for(let i=0;i<size;i+=2) round0.push({ key:`W0-${i/2}`, teamA:slots[i], teamB:slots[i+1] });
+  wRounds.push(round0);
+
+  const n = Math.log2(size);
+  let wbLosersFlat = [];
+  for(let r=0; r<n-1; r++){
+    const round = wRounds[r];
+    round.forEach(resolveMatch);
+    const complete = round.every(m => m.winner!==null || m.isDeadSlot);
+    round.forEach(m => { if(m.loser!==null && m.loser!==undefined) wbLosersFlat.push(m.loser); });
+    if(!complete) break;
+    const nextRound = [];
+    for(let i=0;i<round.length;i+=2){
+      const a = round[i] ? round[i].winner : null;
+      const b = round[i+1] ? round[i+1].winner : null;
+      nextRound.push({ key:`W${r+1}-${i/2}`, teamA:a, teamB:b });
+    }
+    wRounds.push(nextRound);
+  }
+  const lastRound = wRounds[wRounds.length-1];
+  lastRound.forEach(resolveMatch);
+  if(lastRound.length===1 && lastRound[0].loser!==null && lastRound[0].loser!==undefined) wbLosersFlat.push(lastRound[0].loser);
+  const winnersChampion = (lastRound.length===1 && lastRound[0].winner!==null) ? lastRound[0].winner : null;
+
+  // Losers bracket — zjednodušená sériová fronta (kdo prohraje ve Winners, čeká na dalšího soupeře v pořadí).
+  let queue = [...wbLosersFlat];
+  let lMatches = [];
+  let counter = 0;
+  let i = 0;
+  while(i+1 < queue.length){
+    const a = queue[i], b = queue[i+1];
+    const key = `L${counter}`;
+    const m = { key, teamA:a, teamB:b };
+    resolveMatch(m);
+    lMatches.push(m);
+    if(m.winner!==null){
+      queue.splice(i, 2, m.winner);
+      counter++;
+    }else{
+      counter++;
+      break;
+    }
+  }
+  const losersChampion = (winnersChampion!==null && queue.length===1) ? queue[0] : null;
+
+  let grandFinal = null;
+  if(winnersChampion!==null && losersChampion!==null){
+    const m = { key:'GF', teamA:winnersChampion, teamB:losersChampion };
+    resolveMatch(m);
+    grandFinal = m;
+  }
+  const champion = grandFinal ? grandFinal.winner : null;
+
+  return { wRounds, lMatches, winnersChampion, losersChampion, grandFinal, champion, teamLabel };
 }
 
 function renderTabTurnaj(ev){
   const box = document.getElementById('tab-turnaj');
-  const bracket = ev.bracket;
+  const tournaments = ev.tournaments || [];
+  if(currentTournamentIndex >= tournaments.length) currentTournamentIndex = Math.max(0, tournaments.length-1);
 
-  let adminSetupHtml = '';
-  if(currentIsAdmin){
-    const goingNicks = Object.values(currentRegistrationsMap).filter(r=>r.status!=='maybe').sort((a,b)=>(a.ts||'').localeCompare(b.ts||'')).map(r=>r.nick);
-    adminSetupHtml = `
-      <div class="bracket-setup">
-        <div class="field" style="max-width:160px;">
-          <label>Počet účastníků / týmů</label>
-          <select id="bracket-size-select">
-            ${[2,4,8,16,32].map(n => `<option value="${n}" ${bracket && bracket.size===n ? 'selected':''}>${n}</option>`).join('')}
-          </select>
-        </div>
-        <button type="button" id="btn-generate-bracket" class="btn-sm">Vygenerovat pavouka z přihlášených</button>
-        ${bracket ? '<button type="button" id="btn-save-bracket" class="btn-sm">Uložit úpravy jmen</button><button type="button" id="btn-clear-bracket" class="btn-ghost btn-sm" style="color:var(--crimson); border-color:var(--crimson);">Smazat turnaj</button>' : ''}
-      </div>
-    `;
-    box.innerHTML = `<div class="section-title" style="font-size:16px;">Turnaj</div>${adminSetupHtml}<div id="bracket-render"></div>`;
-
-    document.getElementById('btn-generate-bracket').addEventListener('click', async () => {
-      const size = parseInt(document.getElementById('bracket-size-select').value, 10);
-      const slots = [];
-      for(let i=0;i<size;i++) slots.push(goingNicks[i] || '');
-      try{ await updateDoc(doc(db,'events',ev.id), { bracket: { size, slots } }); }
-      catch(err){ alert('Uložení pavouka se nepovedlo.'); console.error(err); }
-    });
-    const saveBtn = document.getElementById('btn-save-bracket');
-    if(saveBtn) saveBtn.addEventListener('click', async () => {
-      const inputs = box.querySelectorAll('[data-bracket-slot]');
-      const slots = [...bracket.slots];
-      inputs.forEach(inp => { slots[parseInt(inp.dataset.bracketSlot,10)] = inp.value.trim(); });
-      try{ await updateDoc(doc(db,'events',ev.id), { bracket: { size: bracket.size, slots } }); }
-      catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
-    });
-    const clearBtn = document.getElementById('btn-clear-bracket');
-    if(clearBtn) clearBtn.addEventListener('click', async () => {
-      if(!confirm('Opravdu smazat celý turnajový pavouk?')) return;
-      try{ await updateDoc(doc(db,'events',ev.id), { bracket: null }); }
-      catch(err){ console.error(err); }
-    });
-  }else{
-    box.innerHTML = `<div class="section-title" style="font-size:16px;">Turnaj</div><div id="bracket-render"></div>`;
+  let html = `<div class="section-title" style="font-size:16px;">Turnaj</div><div class="tourney-select-row">`;
+  if(tournaments.length > 0){
+    html += `<div class="field" style="max-width:240px;"><label>Turnaj</label><select id="tourney-select">${tournaments.map((t,i)=>`<option value="${i}" ${i===currentTournamentIndex?'selected':''}>${escapeHtml(t.name||('Turnaj '+(i+1)))}</option>`).join('')}</select></div>`;
   }
+  if(currentIsAdmin) html += `<button type="button" id="btn-new-tourney" class="btn-sm">+ Nový turnaj</button>`;
+  html += `</div>`;
+  box.innerHTML = html;
 
-  const renderBox = document.getElementById('bracket-render');
-  if(!bracket || !bracket.slots || bracket.slots.length === 0){
-    renderBox.innerHTML = '<div class="empty">Turnaj zatím nebyl vypsán.</div>';
+  const selectEl = document.getElementById('tourney-select');
+  if(selectEl) selectEl.addEventListener('change', () => { currentTournamentIndex = parseInt(selectEl.value,10); teamEditorOpen=false; renderTabTurnaj(ev); });
+  const newBtn = document.getElementById('btn-new-tourney');
+  if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm(ev));
+
+  if(tournaments.length === 0){
+    box.insertAdjacentHTML('beforeend', '<div class="empty">Zatím žádný turnaj nebyl založen.</div>');
     return;
   }
 
-  const roundCounts = buildBracketRoundCounts(bracket.size);
-  let html = '<div class="bracket-wrap">';
-  roundCounts.forEach((count, roundIdx) => {
-    html += `<div class="bracket-round"><div class="bracket-round-title">${roundIdx===0 ? '1. kolo' : (count===1 ? 'Finále' : roundIdx+1+'. kolo')}</div>`;
-    if(roundIdx === 0){
-      for(let i=0; i<bracket.slots.length; i+=2){
-        html += `<div class="bracket-match">
-          <div class="bracket-slot">${currentIsAdmin ? `<input type="text" data-bracket-slot="${i}" value="${escapeHtml(bracket.slots[i]||'')}" placeholder="volný slot">` : (escapeHtml(bracket.slots[i]) || '<span class="placeholder">volný slot</span>')}</div>
-          <div class="bracket-slot">${currentIsAdmin ? `<input type="text" data-bracket-slot="${i+1}" value="${escapeHtml(bracket.slots[i+1]||'')}" placeholder="volný slot">` : (escapeHtml(bracket.slots[i+1]) || '<span class="placeholder">volný slot</span>')}</div>
-        </div>`;
-      }
-    }else{
-      const matchCount = Math.max(1, count);
-      for(let i=0; i<matchCount; i++){
-        html += `<div class="bracket-match">
-          <div class="bracket-slot placeholder">Vítěz zápasu ${i*2+1}</div>
-          <div class="bracket-slot placeholder">Vítěz zápasu ${i*2+2}</div>
-        </div>`;
-      }
-    }
-    html += `</div>`;
+  const t = tournaments[currentTournamentIndex];
+  const bodyWrap = document.createElement('div');
+  bodyWrap.id = 'tourney-body';
+  box.appendChild(bodyWrap);
+
+  if(currentIsAdmin){
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'btn-ghost btn-sm';
+    toggleBtn.style.marginBottom = '14px';
+    toggleBtn.textContent = teamEditorOpen ? 'Skrýt úpravu týmů' : 'Upravit týmy';
+    toggleBtn.addEventListener('click', () => { teamEditorOpen = !teamEditorOpen; renderTabTurnaj(ev); });
+    bodyWrap.appendChild(toggleBtn);
+    if(teamEditorOpen) renderTeamEditor(ev, t, currentTournamentIndex, bodyWrap);
+  }
+
+  const bracket = computeDoubleElim(t);
+  renderBracketVisual(ev, t, currentTournamentIndex, bracket, bodyWrap);
+}
+
+function openNewTournamentForm(ev){
+  const box = document.getElementById('tab-turnaj');
+  const panel = document.createElement('div');
+  panel.className = 'tourney-setup-panel';
+  panel.innerHTML = `
+    <div class="field" style="max-width:300px;"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj"></div>
+    <div class="field" style="max-width:160px;"><label>Počet týmů</label><input type="number" id="new-tourney-count" min="2" value="4"></div>
+    <button type="button" id="btn-create-tourney" class="btn-sm">Vytvořit</button>
+  `;
+  box.appendChild(panel);
+  document.getElementById('btn-create-tourney').addEventListener('click', async () => {
+    const name = document.getElementById('new-tourney-name').value.trim() || `Turnaj ${(ev.tournaments||[]).length+1}`;
+    const count = Math.max(2, parseInt(document.getElementById('new-tourney-count').value,10)||2);
+    const teams = [];
+    for(let i=0;i<count;i++) teams.push({ name:`Tým ${i+1}`, members:[] });
+    const tournaments = [...(ev.tournaments||[]), { name, teams, results:{} }];
+    try{
+      await updateDoc(doc(db,'events',ev.id), { tournaments });
+      currentTournamentIndex = tournaments.length-1;
+    }catch(err){ alert('Vytvoření turnaje se nepovedlo.'); console.error(err); }
   });
-  html += '</div>';
-  renderBox.innerHTML = html;
+}
+
+function isMemberElsewhere(teams, currentIdx, nick){
+  return teams.some((tm,i) => i!==currentIdx && tm.members.includes(nick));
+}
+
+function renderTeamEditor(ev, t, tIndex, container){
+  const goingRegs = Object.values(currentRegistrationsMap).filter(r=>r.status!=='maybe').sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+  const editorWrap = document.createElement('div');
+  editorWrap.className = 'tourney-setup-panel';
+  editorWrap.innerHTML = `
+    <div class="team-editor" id="team-editor-grid"></div>
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button type="button" id="btn-add-team" class="btn-sm">+ Přidat tým</button>
+      <button type="button" id="btn-save-teams">Uložit týmy</button>
+    </div>
+  `;
+  container.appendChild(editorWrap);
+
+  let workingTeams = JSON.parse(JSON.stringify(t.teams || []));
+
+  function renderGrid(){
+    const grid = document.getElementById('team-editor-grid');
+    grid.innerHTML = workingTeams.map((team, ti) => `
+      <div class="team-editor-card">
+        <input type="text" class="team-name" data-team-name="${ti}" value="${escapeHtml(team.name)}">
+        <div class="team-roster-list">
+          ${goingRegs.map(r => `
+            <label class="team-roster-item">
+              <input type="checkbox" data-team-member="${ti}" value="${escapeHtml(r.nick)}" ${team.members.includes(r.nick)?'checked':''}>
+              <span>${escapeHtml(r.nick)}${isMemberElsewhere(workingTeams, ti, r.nick) ? ' (hostuje)' : ''}</span>
+            </label>
+          `).join('')}
+          ${team.members.filter(m => !goingRegs.some(r=>r.nick===m)).map(guest => `
+            <label class="team-roster-item">
+              <input type="checkbox" data-team-guest-remove="${ti}" value="${escapeHtml(guest)}" checked>
+              <span>${escapeHtml(guest)} (host)</span>
+            </label>
+          `).join('')}
+        </div>
+        <div class="team-guest-row">
+          <input type="text" placeholder="Přidat hráče mimo seznam" data-guest-input="${ti}">
+          <button type="button" class="btn-ghost btn-sm" data-guest-add="${ti}">+</button>
+        </div>
+        ${workingTeams.length > 2 ? `<button type="button" class="btn-ghost btn-sm" data-remove-team="${ti}" style="margin-top:8px; color:var(--crimson); border-color:var(--crimson);">Odebrat tým</button>` : ''}
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('[data-team-name]').forEach(inp => {
+      inp.addEventListener('input', () => { workingTeams[parseInt(inp.dataset.teamName,10)].name = inp.value; });
+    });
+    grid.querySelectorAll('[data-team-member]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const ti = parseInt(cb.dataset.teamMember,10);
+        const nick = cb.value;
+        if(cb.checked){ if(!workingTeams[ti].members.includes(nick)) workingTeams[ti].members.push(nick); }
+        else{ workingTeams[ti].members = workingTeams[ti].members.filter(m=>m!==nick); }
+        renderGrid();
+      });
+    });
+    grid.querySelectorAll('[data-team-guest-remove]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if(!cb.checked){
+          const ti = parseInt(cb.dataset.teamGuestRemove,10);
+          workingTeams[ti].members = workingTeams[ti].members.filter(m=>m!==cb.value);
+          renderGrid();
+        }
+      });
+    });
+    grid.querySelectorAll('[data-guest-add]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ti = parseInt(btn.dataset.guestAdd,10);
+        const input = grid.querySelector(`[data-guest-input="${ti}"]`);
+        const val = input.value.trim();
+        if(!val) return;
+        if(!workingTeams[ti].members.includes(val)) workingTeams[ti].members.push(val);
+        renderGrid();
+      });
+    });
+    grid.querySelectorAll('[data-remove-team]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        workingTeams.splice(parseInt(btn.dataset.removeTeam,10),1);
+        renderGrid();
+      });
+    });
+  }
+  renderGrid();
+
+  document.getElementById('btn-add-team').addEventListener('click', () => {
+    workingTeams.push({ name:`Tým ${workingTeams.length+1}`, members:[] });
+    renderGrid();
+  });
+
+  document.getElementById('btn-save-teams').addEventListener('click', async () => {
+    const tournaments = JSON.parse(JSON.stringify(ev.tournaments||[]));
+    tournaments[tIndex].teams = workingTeams;
+    try{ await updateDoc(doc(db,'events',ev.id), { tournaments }); }
+    catch(err){ alert('Uložení týmů se nepovedlo.'); console.error(err); }
+  });
+}
+
+function renderBracketVisual(ev, t, tIndex, bracket, container){
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="bracket-section-title">Winners bracket</div>
+    <div class="bracket-wrap" id="wb-wrap"></div>
+    <div class="bracket-section-title">Losers bracket</div>
+    <div class="bracket-wrap" id="lb-wrap"></div>
+  `;
+  container.appendChild(wrap);
+
+  const wbWrap = wrap.querySelector('#wb-wrap');
+  bracket.wRounds.forEach((round, ri) => {
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+    col.innerHTML = `<div class="bracket-round-title">${ri===0?'1. kolo':(round.length===1?'Finále WB':ri+1+'. kolo')}</div>`;
+    round.forEach(m => col.appendChild(renderMatchBox(ev, tIndex, m, bracket)));
+    wbWrap.appendChild(col);
+  });
+
+  const lbWrap = wrap.querySelector('#lb-wrap');
+  if(bracket.lMatches.length === 0){
+    lbWrap.innerHTML = '<div class="empty" style="padding:8px 0;">Zatím nikdo neprohrál, losers bracket je prázdný.</div>';
+  }else{
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+    col.innerHTML = `<div class="bracket-round-title">Průběžné zápasy</div>`;
+    bracket.lMatches.forEach(m => col.appendChild(renderMatchBox(ev, tIndex, m, bracket)));
+    lbWrap.appendChild(col);
+  }
+
+  if(bracket.winnersChampion !== null || bracket.losersChampion !== null){
+    const gfWrap = document.createElement('div');
+    gfWrap.innerHTML = `<div class="bracket-section-title">Grand Final</div>`;
+    const gfRound = document.createElement('div');
+    gfRound.className = 'bracket-wrap';
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+    if(bracket.grandFinal){
+      col.appendChild(renderMatchBox(ev, tIndex, bracket.grandFinal, bracket));
+    }else{
+      col.innerHTML = `<div class="bracket-match"><div class="bracket-slot placeholder">Čeká na vítěze WB / LB</div></div>`;
+    }
+    gfRound.appendChild(col);
+    gfWrap.appendChild(gfRound);
+    container.appendChild(gfWrap);
+  }
+
+  if(bracket.champion !== null){
+    const banner = document.createElement('div');
+    banner.className = 'bracket-champion-banner';
+    banner.textContent = `🏆 Vítěz turnaje: ${bracket.teamLabel(bracket.champion)}`;
+    container.appendChild(banner);
+  }
+}
+
+function renderMatchBox(ev, tIndex, m, bracket){
+  const div = document.createElement('div');
+  div.className = 'bracket-match';
+  const labelA = (m.teamA===null||m.teamA===undefined) ? null : bracket.teamLabel(m.teamA);
+  const labelB = (m.teamB===null||m.teamB===undefined) ? null : bracket.teamLabel(m.teamB);
+  const scoreTxt = m.result ? ` (${m.result.a}:${m.result.b})` : '';
+  const canScore = currentIsAdmin && labelA!==null && labelB!==null;
+
+  div.innerHTML = `
+    <div class="bracket-slot ${(m.winner!==null && m.winner===m.teamA) ? 'winner-slot':''}">
+      <span>${labelA!==null ? escapeHtml(labelA) : '<span class="placeholder">volný slot</span>'}</span>
+      ${(m.winner!==null && m.winner===m.teamA) ? `<span>${scoreTxt}</span>` : ''}
+    </div>
+    <div class="bracket-slot ${(m.winner!==null && m.winner===m.teamB) ? 'winner-slot':''}">
+      <span>${labelB!==null ? escapeHtml(labelB) : '<span class="placeholder">volný slot</span>'}</span>
+      ${(m.winner!==null && m.winner===m.teamB) ? `<span>${scoreTxt}</span>` : ''}
+    </div>
+    ${canScore ? `<button type="button" class="bracket-score-btn btn-ghost" data-score-match>${m.result?'Upravit skóre':'Zadat výsledek'}</button>` : ''}
+  `;
+
+  const scoreBtn = div.querySelector('[data-score-match]');
+  if(scoreBtn) scoreBtn.addEventListener('click', () => openScoreModal(ev, tIndex, m.key, labelA, labelB, m.result));
+
+  return div;
+}
+
+function openScoreModal(ev, tIndex, matchKey, labelA, labelB, existing){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'score-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="score-modal">
+      <div style="font-size:14px; font-weight:600;">Zadej výsledek (na 2 vítězné sety)</div>
+      <div class="row"><span>${escapeHtml(labelA)}</span><input type="number" id="score-a" min="0" max="2" value="${existing?existing.a:0}"></div>
+      <div class="row"><span>${escapeHtml(labelB)}</span><input type="number" id="score-b" min="0" max="2" value="${existing?existing.b:0}"></div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" id="score-save">Uložit</button>
+        <button type="button" class="btn-ghost" id="score-cancel">Zrušit</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.getElementById('score-cancel').addEventListener('click', () => backdrop.remove());
+  document.getElementById('score-save').addEventListener('click', async () => {
+    const a = parseInt(document.getElementById('score-a').value,10)||0;
+    const b = parseInt(document.getElementById('score-b').value,10)||0;
+    if(a<2 && b<2){ alert('Jeden z týmů musí mít alespoň 2 vítězné sety.'); return; }
+    if(a===b){ alert('Skóre nemůže být nerozhodné.'); return; }
+    const tournaments = JSON.parse(JSON.stringify(ev.tournaments||[]));
+    if(!tournaments[tIndex].results) tournaments[tIndex].results = {};
+    tournaments[tIndex].results[matchKey] = { a, b };
+    try{
+      await updateDoc(doc(db,'events',ev.id), { tournaments });
+      backdrop.remove();
+    }catch(err){ alert('Uložení výsledku se nepovedlo.'); console.error(err); }
+  });
 }
 
 // ---- Foto ----
@@ -907,35 +1289,74 @@ function renderTabFoto(ev){
   const box = document.getElementById('tab-foto');
   box.innerHTML = `
     <div class="section-title" style="font-size:16px;">Foto</div>
-    <p class="lede" style="margin-top:0;">Vlož odkaz na fotku (např. z Google Photos, Imgur nebo jiného hostingu) — přímé nahrávání souborů zatím není zapojené.</p>
+    <p class="lede" style="margin-top:0;">Vlož odkaz na fotku nebo video (např. z Google Photos, Imgur, YouTube...). Adresu ověříme, než se přidá.</p>
     <div class="photo-add-row">
-      <div class="field" style="flex:1;"><label>URL fotky</label><input type="url" id="photo-url-input" placeholder="https://..."></div>
+      <div class="field" style="flex:1;"><label>URL fotky nebo videa</label><input type="url" id="photo-url-input" placeholder="https://..."></div>
       <button type="button" id="btn-add-photo" class="btn-sm">Přidat</button>
     </div>
+    <div class="photo-upload-progress" id="photo-add-msg"></div>
     <div class="photo-grid" id="photo-grid"></div>
   `;
 
   document.getElementById('btn-add-photo').addEventListener('click', async () => {
     if(!currentUser || !currentNick){ showView('ucet'); return; }
     const input = document.getElementById('photo-url-input');
+    const msg = document.getElementById('photo-add-msg');
     const url = input.value.trim();
     if(!url) return;
+    msg.textContent = 'Ověřuju adresu...';
+    const kind = await detectMediaKind(url);
+    if(!kind){
+      msg.textContent = 'Na téhle adrese se nepodařilo najít obrázek ani video. Zkontroluj odkaz.';
+      return;
+    }
     try{
-      await addDoc(collection(db,'events',ev.id,'photos'), { url, author: currentNick, uid: currentUser.uid, ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'photos'), { url, kind, author: currentNick, uid: currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
-    }catch(err){ console.error(err); }
+      msg.textContent = '';
+    }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se přidat.'; }
   });
 
+  renderPhotoGrid(ev);
+}
+
+// Ověří, že URL vede na skutečně načitatelný obrázek nebo video (ne na prázdnou/neplatnou adresu).
+function detectMediaKind(url){
+  return new Promise((resolve) => {
+    const lower = url.toLowerCase();
+    if(/\.(mp4|webm|ogg|mov)(\?.*)?$/.test(lower)){
+      const v = document.createElement('video');
+      let done = false;
+      v.onloadedmetadata = () => { if(!done){ done=true; resolve('video'); } };
+      v.onerror = () => { if(!done){ done=true; resolve(null); } };
+      v.src = url;
+      setTimeout(() => { if(!done){ done=true; resolve(null); } }, 6000);
+      return;
+    }
+    const img = new Image();
+    let done = false;
+    img.onload = () => { if(!done){ done=true; resolve('image'); } };
+    img.onerror = () => { if(!done){ done=true; resolve(null); } };
+    img.src = url;
+    setTimeout(() => { if(!done){ done=true; resolve(null); } }, 6000);
+  });
+}
+
+function renderPhotoGrid(ev){
   const grid = document.getElementById('photo-grid');
+  if(!grid) return;
   if(currentPhotos.length === 0){
     grid.innerHTML = '<div class="empty">Zatím žádné fotky.</div>';
     return;
   }
   grid.innerHTML = currentPhotos.map(p => {
     const canDelete = currentUser && (p.uid === currentUser.uid || currentIsAdmin);
+    const mediaHtml = p.kind === 'video'
+      ? `<video src="${p.url.replace(/"/g,'&quot;')}" muted controls></video>`
+      : `<img src="${p.url.replace(/"/g,'&quot;')}" alt="Foto od ${escapeHtml(p.author)}" loading="lazy">`;
     return `
       <div class="photo-card">
-        <img src="${p.url.replace(/"/g,'&quot;')}" alt="Foto od ${escapeHtml(p.author)}" loading="lazy">
+        ${mediaHtml}
         <div class="photo-meta">
           <span>${escapeHtml(p.author)}</span>
           ${canDelete ? `<span class="photo-del" data-photo-delete="${p.id}">Smazat</span>` : ''}
