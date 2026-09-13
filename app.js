@@ -571,6 +571,20 @@ function renderStatsAndRsvp(){
 }
 
 // ---- Sidebar: statistika nahoře + seznam, vlastní řádek editovatelný ----
+function coinSvg(paid){
+  const base = paid ? '#e0b84a' : '#7a3a3a';
+  const dark = paid ? '#a5781f' : '#4d2020';
+  const rim  = paid ? '#c99a2e' : '#5c2a2a';
+  return `
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="16" cy="24" rx="12" ry="4" fill="${dark}" opacity="0.5"/>
+      <circle cx="16" cy="16" r="13" fill="${base}" stroke="${rim}" stroke-width="2"/>
+      <circle cx="16" cy="16" r="8.5" fill="none" stroke="${rim}" stroke-width="1.2" opacity="0.7"/>
+      <path class="coin-shine" d="M9 11 Q16 4 23 11" stroke="#fff" stroke-width="2" fill="none" opacity="0.5" stroke-linecap="round"/>
+    </svg>
+  `;
+}
+
 function renderAttendees(){
   const box = document.getElementById('ed-attendees');
   const list = Object.values(currentRegistrationsMap).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
@@ -605,7 +619,7 @@ function renderAttendees(){
       statusHtml = `<span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>`;
     }
     const coinHtml = (ev && ev.fee)
-      ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} ${currentIsAdmin ? 'admin-toggle' : ''}" data-toggle-paid="${currentIsAdmin ? r._docId : ''}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}"></span>`
+      ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} ${currentIsAdmin ? 'admin-toggle' : ''}" data-toggle-paid="${currentIsAdmin ? r._docId : ''}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}">${coinSvg(r.paid)}</span>`
       : '';
     return `
       <div class="attendee-row">
@@ -832,7 +846,7 @@ function renderTabJidlo(ev){
 
       const checkboxesHtml = options.map((o,idx) => `
         <label class="food-checkbox-row">
-          <input type="checkbox" data-slot="${slot.key}" value="${escapeHtml(o)}" ${myChoices.includes(o)?'checked':''} ${(!myReg || deadlinePassed) ? 'disabled' : ''}>
+          <span class="food-toggle ${myChoices.includes(o)?'checked':''} ${(!myReg || deadlinePassed) ? 'disabled' : ''}" data-food-toggle data-slot="${slot.key}" data-value="${escapeHtml(o)}">${myChoices.includes(o)?'✓':''}</span>
           <span>${escapeHtml(o)}</span>
           ${currentIsAdmin ? `<span class="portion-count">${portionCounts[o]}×</span>` : ''}
         </label>
@@ -866,11 +880,19 @@ function renderTabJidlo(ev){
     <div id="food-comments-list" style="margin-top:6px;"></div>
   `;
 
+  box.querySelectorAll('[data-food-toggle]').forEach(el => {
+    if(el.classList.contains('disabled')) return;
+    el.addEventListener('click', () => {
+      const isChecked = el.classList.toggle('checked');
+      el.textContent = isChecked ? '✓' : '';
+    });
+  });
+
   const confirmBtn = document.getElementById('btn-confirm-food');
   if(confirmBtn) confirmBtn.addEventListener('click', async () => {
     const newFood = {};
     activeSlots.forEach(slot => {
-      const checked = Array.from(box.querySelectorAll(`input[data-slot="${slot.key}"]:checked`)).map(el => el.value);
+      const checked = Array.from(box.querySelectorAll(`[data-food-toggle][data-slot="${slot.key}"].checked`)).map(el => el.dataset.value);
       newFood[slot.key] = checked;
     });
     confirmBtn.disabled = true;
@@ -917,94 +939,100 @@ function renderTabJidlo(ev){
   });
 }
 
-// ---- Turnaj: double elimination ----
+// ---- Turnaj: round robin (každý s každým) + tiebreaky + play-off o umístění ----
 let currentTournamentIndex = 0;
 let teamEditorOpen = false;
 
-function nextPowerOfTwo(n){ let p=1; while(p<n) p*=2; return Math.max(p,2); }
-
-function computeDoubleElim(t){
+function computeRoundRobin(t){
   const teams = t.teams || [];
+  const n = teams.length;
   const results = t.results || {};
-  const realCount = teams.length;
-  const size = nextPowerOfTwo(Math.max(realCount,2));
-  const isBye = idx => idx===null || idx===undefined;
-  const teamLabel = idx => isBye(idx) ? null : (teams[idx] ? teams[idx].name : `Tým ${idx+1}`);
+  const tbResults = t.tiebreakResults || {};
+  const poResults = t.playoffResults || {};
 
-  function resolveMatch(m){
-    m.isDeadSlot = isBye(m.teamA) && isBye(m.teamB);
-    if(m.isDeadSlot){ m.winner=null; m.loser=null; m.result=null; return; }
-    if(isBye(m.teamB)){ m.winner=m.teamA; m.loser=null; m.result=null; return; }
-    if(isBye(m.teamA)){ m.winner=m.teamB; m.loser=null; m.result=null; return; }
-    const res = results[m.key];
+  function resolvePair(resObj, key){
+    const res = resObj[key];
     if(res && typeof res.a==='number' && typeof res.b==='number' && (res.a>=2||res.b>=2) && res.a!==res.b){
-      m.winner = res.a>res.b ? m.teamA : m.teamB;
-      m.loser = res.a>res.b ? m.teamB : m.teamA;
-      m.result = res;
-    }else{
-      m.winner=null; m.loser=null; m.result=res||null;
+      return { result:res, winnerSide: res.a>res.b ? 'A' : 'B' };
+    }
+    return { result: res||null, winnerSide: null };
+  }
+
+  // základní část: každý s každým
+  let matches = [];
+  let wins = new Array(n).fill(0);
+  for(let i=0;i<n;i++){
+    for(let j=i+1;j<n;j++){
+      const key = `RR-${i}-${j}`;
+      const { result, winnerSide } = resolvePair(results, key);
+      const winnerIdx = winnerSide==='A' ? i : (winnerSide==='B' ? j : null);
+      if(winnerIdx!==null) wins[winnerIdx]++;
+      matches.push({ key, teamA:i, teamB:j, result, winnerIdx });
+    }
+  }
+  const groupComplete = n >= 2 && matches.every(m => m.winnerIdx !== null);
+
+  // seřazení do skupin dle počtu výher
+  let tieMatches = [];
+  let finalRanking = null;
+  if(groupComplete){
+    const indices = teams.map((_,i)=>i);
+    const byWins = {};
+    indices.forEach(i => { (byWins[wins[i]] = byWins[wins[i]] || []).push(i); });
+    const winCounts = Object.keys(byWins).map(Number).sort((a,b)=>b-a);
+
+    let orderedGroups = [];
+    for(const w of winCounts){
+      const group = byWins[w];
+      if(group.length === 1){ orderedGroups.push(group); continue; }
+      let tbWins = {}; group.forEach(i => tbWins[i]=0);
+      let groupTbComplete = true;
+      for(let a=0;a<group.length;a++){
+        for(let b=a+1;b<group.length;b++){
+          const i=group[a], j=group[b];
+          const key = `TB-${i}-${j}`;
+          const { result, winnerSide } = resolvePair(tbResults, key);
+          const winnerIdx = winnerSide==='A' ? i : (winnerSide==='B' ? j : null);
+          tieMatches.push({ key, teamA:i, teamB:j, result, winnerIdx });
+          if(winnerIdx!==null) tbWins[winnerIdx]++;
+          else groupTbComplete = false;
+        }
+      }
+      orderedGroups.push(groupTbComplete ? [...group].sort((x,y)=>tbWins[y]-tbWins[x]) : null);
+    }
+    if(orderedGroups.every(g => g!==null)) finalRanking = orderedGroups.flat();
+  }
+
+  // play-off o umístění (1 vs 2, 3 vs 4, ...)
+  let playoffPairs = [];
+  let placements = null;
+  if(finalRanking){
+    for(let i=0;i<finalRanking.length;i+=2){
+      if(i+1 < finalRanking.length){
+        const a = finalRanking[i], b = finalRanking[i+1];
+        const key = `PO-${a}-${b}`;
+        const { result, winnerSide } = resolvePair(poResults, key);
+        const winnerIdx = winnerSide==='A' ? a : (winnerSide==='B' ? b : null);
+        playoffPairs.push({ key, rankPos:i+1, teamA:a, teamB:b, result, winnerIdx });
+      }else{
+        playoffPairs.push({ key:null, rankPos:i+1, teamA:finalRanking[i], teamB:null, result:null, winnerIdx:finalRanking[i] });
+      }
+    }
+    if(playoffPairs.every(p => p.winnerIdx !== null)){
+      placements = [];
+      playoffPairs.forEach(p => {
+        if(p.teamB===null){ placements.push({ rank:p.rankPos, team:p.teamA }); }
+        else{
+          const loser = p.winnerIdx===p.teamA ? p.teamB : p.teamA;
+          placements.push({ rank:p.rankPos, team:p.winnerIdx });
+          placements.push({ rank:p.rankPos+1, team:loser });
+        }
+      });
+      placements.sort((x,y)=>x.rank-y.rank);
     }
   }
 
-  const slots = [];
-  for(let i=0;i<size;i++) slots.push(i<realCount ? i : null);
-
-  let wRounds = [];
-  let round0 = [];
-  for(let i=0;i<size;i+=2) round0.push({ key:`W0-${i/2}`, teamA:slots[i], teamB:slots[i+1] });
-  wRounds.push(round0);
-
-  const n = Math.log2(size);
-  let wbLosersFlat = [];
-  for(let r=0; r<n-1; r++){
-    const round = wRounds[r];
-    round.forEach(resolveMatch);
-    const complete = round.every(m => m.winner!==null || m.isDeadSlot);
-    round.forEach(m => { if(m.loser!==null && m.loser!==undefined) wbLosersFlat.push(m.loser); });
-    if(!complete) break;
-    const nextRound = [];
-    for(let i=0;i<round.length;i+=2){
-      const a = round[i] ? round[i].winner : null;
-      const b = round[i+1] ? round[i+1].winner : null;
-      nextRound.push({ key:`W${r+1}-${i/2}`, teamA:a, teamB:b });
-    }
-    wRounds.push(nextRound);
-  }
-  const lastRound = wRounds[wRounds.length-1];
-  lastRound.forEach(resolveMatch);
-  if(lastRound.length===1 && lastRound[0].loser!==null && lastRound[0].loser!==undefined) wbLosersFlat.push(lastRound[0].loser);
-  const winnersChampion = (lastRound.length===1 && lastRound[0].winner!==null) ? lastRound[0].winner : null;
-
-  // Losers bracket — zjednodušená sériová fronta (kdo prohraje ve Winners, čeká na dalšího soupeře v pořadí).
-  let queue = [...wbLosersFlat];
-  let lMatches = [];
-  let counter = 0;
-  let i = 0;
-  while(i+1 < queue.length){
-    const a = queue[i], b = queue[i+1];
-    const key = `L${counter}`;
-    const m = { key, teamA:a, teamB:b };
-    resolveMatch(m);
-    lMatches.push(m);
-    if(m.winner!==null){
-      queue.splice(i, 2, m.winner);
-      counter++;
-    }else{
-      counter++;
-      break;
-    }
-  }
-  const losersChampion = (winnersChampion!==null && queue.length===1) ? queue[0] : null;
-
-  let grandFinal = null;
-  if(winnersChampion!==null && losersChampion!==null){
-    const m = { key:'GF', teamA:winnersChampion, teamB:losersChampion };
-    resolveMatch(m);
-    grandFinal = m;
-  }
-  const champion = grandFinal ? grandFinal.winner : null;
-
-  return { wRounds, lMatches, winnersChampion, losersChampion, grandFinal, champion, teamLabel };
+  return { matches, wins, groupComplete, tieMatches, finalRanking, playoffPairs, placements };
 }
 
 function renderTabTurnaj(ev){
@@ -1017,6 +1045,7 @@ function renderTabTurnaj(ev){
     html += `<div class="field" style="max-width:240px;"><label>Turnaj</label><select id="tourney-select">${tournaments.map((t,i)=>`<option value="${i}" ${i===currentTournamentIndex?'selected':''}>${escapeHtml(t.name||('Turnaj '+(i+1)))}</option>`).join('')}</select></div>`;
   }
   if(currentIsAdmin) html += `<button type="button" id="btn-new-tourney" class="btn-sm">+ Nový turnaj</button>`;
+  if(currentIsAdmin && tournaments.length > 0) html += `<button type="button" id="btn-delete-tourney" class="btn-ghost btn-sm" style="color:var(--crimson); border-color:var(--crimson);">Smazat turnaj</button>`;
   html += `</div>`;
   box.innerHTML = html;
 
@@ -1024,6 +1053,16 @@ function renderTabTurnaj(ev){
   if(selectEl) selectEl.addEventListener('change', () => { currentTournamentIndex = parseInt(selectEl.value,10); teamEditorOpen=false; renderTabTurnaj(ev); });
   const newBtn = document.getElementById('btn-new-tourney');
   if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm(ev));
+  const deleteBtn = document.getElementById('btn-delete-tourney');
+  if(deleteBtn) deleteBtn.addEventListener('click', async () => {
+    const tName = tournaments[currentTournamentIndex]?.name || 'tento turnaj';
+    if(!confirm(`Opravdu smazat "${tName}"? Tohle nejde vrátit zpět.`)) return;
+    const newTournaments = tournaments.filter((_, i) => i !== currentTournamentIndex);
+    try{
+      await updateDoc(doc(db,'events',ev.id), { tournaments: newTournaments });
+      currentTournamentIndex = Math.max(0, currentTournamentIndex - 1);
+    }catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
+  });
 
   if(tournaments.length === 0){
     box.insertAdjacentHTML('beforeend', '<div class="empty">Zatím žádný turnaj nebyl založen.</div>');
@@ -1046,8 +1085,8 @@ function renderTabTurnaj(ev){
     if(teamEditorOpen) renderTeamEditor(ev, t, currentTournamentIndex, bodyWrap);
   }
 
-  const bracket = computeDoubleElim(t);
-  renderBracketVisual(ev, t, currentTournamentIndex, bracket, bodyWrap);
+  const rr = computeRoundRobin(t);
+  renderRoundRobinBody(ev, t, currentTournamentIndex, rr, bodyWrap);
 }
 
 function openNewTournamentForm(ev){
@@ -1172,88 +1211,113 @@ function renderTeamEditor(ev, t, tIndex, container){
   });
 }
 
-function renderBracketVisual(ev, t, tIndex, bracket, container){
-  const wrap = document.createElement('div');
-  wrap.innerHTML = `
-    <div class="bracket-section-title">Winners bracket</div>
-    <div class="bracket-wrap" id="wb-wrap"></div>
-    <div class="bracket-section-title">Losers bracket</div>
-    <div class="bracket-wrap" id="lb-wrap"></div>
+function teamName(t, idx){ return t.teams[idx] ? t.teams[idx].name : `Tým ${idx+1}`; }
+
+function renderRoundRobinBody(ev, t, tIndex, rr, container){
+  // --- tabulka ---
+  const table = document.createElement('div');
+  const ranked = t.teams.map((_, i) => i).sort((a,b) => rr.wins[b]-rr.wins[a]);
+  table.innerHTML = `
+    <div class="bracket-section-title">Průběžná tabulka</div>
+    <table style="width:100%; max-width:420px; border-collapse:collapse; font-size:14px;">
+      <thead><tr style="text-align:left; color:var(--text-muted); font-size:12px;"><th style="padding:6px 0;">Tým</th><th style="padding:6px 0;">Výhry</th></tr></thead>
+      <tbody>
+        ${ranked.map(i => `<tr style="border-top:1px solid var(--line);"><td style="padding:6px 0;">${escapeHtml(teamName(t,i))}</td><td style="padding:6px 0; color:var(--gold); font-weight:600;">${rr.wins[i]}</td></tr>`).join('')}
+      </tbody>
+    </table>
   `;
-  container.appendChild(wrap);
+  container.appendChild(table);
 
-  const wbWrap = wrap.querySelector('#wb-wrap');
-  bracket.wRounds.forEach((round, ri) => {
-    const col = document.createElement('div');
-    col.className = 'bracket-round';
-    col.innerHTML = `<div class="bracket-round-title">${ri===0?'1. kolo':(round.length===1?'Finále WB':ri+1+'. kolo')}</div>`;
-    round.forEach(m => col.appendChild(renderMatchBox(ev, tIndex, m, bracket)));
-    wbWrap.appendChild(col);
-  });
+  // --- zápasy základní části ---
+  const matchesWrap = document.createElement('div');
+  matchesWrap.innerHTML = `<div class="bracket-section-title">Zápasy základní části</div>`;
+  const matchList = document.createElement('div');
+  rr.matches.forEach(m => matchList.appendChild(renderRRMatchRow(ev, tIndex, 'results', m, t)));
+  matchesWrap.appendChild(matchList);
+  container.appendChild(matchesWrap);
 
-  const lbWrap = wrap.querySelector('#lb-wrap');
-  if(bracket.lMatches.length === 0){
-    lbWrap.innerHTML = '<div class="empty" style="padding:8px 0;">Zatím nikdo neprohrál, losers bracket je prázdný.</div>';
-  }else{
-    const col = document.createElement('div');
-    col.className = 'bracket-round';
-    col.innerHTML = `<div class="bracket-round-title">Průběžné zápasy</div>`;
-    bracket.lMatches.forEach(m => col.appendChild(renderMatchBox(ev, tIndex, m, bracket)));
-    lbWrap.appendChild(col);
+  // --- tiebreak ---
+  if(rr.tieMatches.length > 0){
+    const tbWrap = document.createElement('div');
+    tbWrap.innerHTML = `<div class="bracket-section-title">Dohrávky při shodě bodů</div>`;
+    const tbList = document.createElement('div');
+    rr.tieMatches.forEach(m => tbList.appendChild(renderRRMatchRow(ev, tIndex, 'tiebreakResults', m, t)));
+    tbWrap.appendChild(tbList);
+    container.appendChild(tbWrap);
+  }else if(!rr.groupComplete){
+    const hint = document.createElement('p');
+    hint.className = 'status-hint';
+    hint.style.marginTop = '14px';
+    hint.textContent = 'Až se odehrají všechny zápasy základní části, zobrazí se tu play-off o umístění.';
+    container.appendChild(hint);
   }
 
-  if(bracket.winnersChampion !== null || bracket.losersChampion !== null){
-    const gfWrap = document.createElement('div');
-    gfWrap.innerHTML = `<div class="bracket-section-title">Grand Final</div>`;
-    const gfRound = document.createElement('div');
-    gfRound.className = 'bracket-wrap';
-    const col = document.createElement('div');
-    col.className = 'bracket-round';
-    if(bracket.grandFinal){
-      col.appendChild(renderMatchBox(ev, tIndex, bracket.grandFinal, bracket));
-    }else{
-      col.innerHTML = `<div class="bracket-match"><div class="bracket-slot placeholder">Čeká na vítěze WB / LB</div></div>`;
-    }
-    gfRound.appendChild(col);
-    gfWrap.appendChild(gfRound);
-    container.appendChild(gfWrap);
+  // --- play-off (zleva doprava, vítěz úplně vpravo) ---
+  if(rr.finalRanking){
+    const poWrap = document.createElement('div');
+    poWrap.innerHTML = `<div class="bracket-section-title">Play-off o umístění</div>`;
+    const poRow = document.createElement('div');
+    poRow.className = 'bracket-wrap';
+    rr.playoffPairs.forEach(p => {
+      const col = document.createElement('div');
+      col.className = 'bracket-round';
+      const label = p.teamB===null ? `${p.rankPos}. místo` : `O ${p.rankPos}.–${p.rankPos+1}. místo`;
+      col.innerHTML = `<div class="bracket-round-title">${label}</div>`;
+      if(p.teamB===null){
+        const div = document.createElement('div');
+        div.className = 'bracket-match';
+        div.innerHTML = `<div class="bracket-slot winner-slot"><span>${escapeHtml(teamName(t,p.teamA))}</span></div>`;
+        col.appendChild(div);
+      }else{
+        col.appendChild(renderPOMatchBox(ev, tIndex, p, t));
+      }
+      poRow.appendChild(col);
+    });
+    poWrap.appendChild(poRow);
+    container.appendChild(poWrap);
   }
 
-  if(bracket.champion !== null){
+  // --- výsledná listina ---
+  if(rr.placements){
     const banner = document.createElement('div');
     banner.className = 'bracket-champion-banner';
-    banner.textContent = `🏆 Vítěz turnaje: ${bracket.teamLabel(bracket.champion)}`;
+    banner.innerHTML = rr.placements.map(p => `${p.rank}. ${escapeHtml(teamName(t,p.team))}`).join(' &nbsp;·&nbsp; ');
     container.appendChild(banner);
   }
 }
 
-function renderMatchBox(ev, tIndex, m, bracket){
+function renderRRMatchRow(ev, tIndex, resultField, m, t){
+  const row = document.createElement('div');
+  row.className = 'suggestion-row';
+  const labelA = teamName(t, m.teamA), labelB = teamName(t, m.teamB);
+  const scoreTxt = m.result ? ` (${m.result.a}:${m.result.b})` : '';
+  const winnerTxt = m.winnerIdx!==null ? ` — vyhrál ${escapeHtml(teamName(t,m.winnerIdx))}${scoreTxt}` : '';
+  row.innerHTML = `
+    <span class="txt">${escapeHtml(labelA)} vs ${escapeHtml(labelB)}${winnerTxt}</span>
+    ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-rr-score>${m.result?'Upravit':'Zadat výsledek'}</button>` : ''}
+  `;
+  const btn = row.querySelector('[data-rr-score]');
+  if(btn) btn.addEventListener('click', () => openScoreModal(ev, tIndex, resultField, m.key, labelA, labelB, m.result));
+  return row;
+}
+
+function renderPOMatchBox(ev, tIndex, p, t){
   const div = document.createElement('div');
   div.className = 'bracket-match';
-  const labelA = (m.teamA===null||m.teamA===undefined) ? null : bracket.teamLabel(m.teamA);
-  const labelB = (m.teamB===null||m.teamB===undefined) ? null : bracket.teamLabel(m.teamB);
-  const scoreTxt = m.result ? ` (${m.result.a}:${m.result.b})` : '';
-  const canScore = currentIsAdmin && labelA!==null && labelB!==null;
-
+  const labelA = teamName(t, p.teamA), labelB = teamName(t, p.teamB);
+  const scoreTxt = p.result ? ` (${p.result.a}:${p.result.b})` : '';
+  const canScore = currentIsAdmin;
   div.innerHTML = `
-    <div class="bracket-slot ${(m.winner!==null && m.winner===m.teamA) ? 'winner-slot':''}">
-      <span>${labelA!==null ? escapeHtml(labelA) : '<span class="placeholder">volný slot</span>'}</span>
-      ${(m.winner!==null && m.winner===m.teamA) ? `<span>${scoreTxt}</span>` : ''}
-    </div>
-    <div class="bracket-slot ${(m.winner!==null && m.winner===m.teamB) ? 'winner-slot':''}">
-      <span>${labelB!==null ? escapeHtml(labelB) : '<span class="placeholder">volný slot</span>'}</span>
-      ${(m.winner!==null && m.winner===m.teamB) ? `<span>${scoreTxt}</span>` : ''}
-    </div>
-    ${canScore ? `<button type="button" class="bracket-score-btn btn-ghost" data-score-match>${m.result?'Upravit skóre':'Zadat výsledek'}</button>` : ''}
+    <div class="bracket-slot ${p.winnerIdx===p.teamA ? 'winner-slot':''}"><span>${escapeHtml(labelA)}</span>${p.winnerIdx===p.teamA?`<span>${scoreTxt}</span>`:''}</div>
+    <div class="bracket-slot ${p.winnerIdx===p.teamB ? 'winner-slot':''}"><span>${escapeHtml(labelB)}</span>${p.winnerIdx===p.teamB?`<span>${scoreTxt}</span>`:''}</div>
+    ${canScore ? `<button type="button" class="bracket-score-btn btn-ghost" data-po-score>${p.result?'Upravit skóre':'Zadat výsledek'}</button>` : ''}
   `;
-
-  const scoreBtn = div.querySelector('[data-score-match]');
-  if(scoreBtn) scoreBtn.addEventListener('click', () => openScoreModal(ev, tIndex, m.key, labelA, labelB, m.result));
-
+  const btn = div.querySelector('[data-po-score]');
+  if(btn) btn.addEventListener('click', () => openScoreModal(ev, tIndex, 'playoffResults', p.key, labelA, labelB, p.result));
   return div;
 }
 
-function openScoreModal(ev, tIndex, matchKey, labelA, labelB, existing){
+function openScoreModal(ev, tIndex, resultField, matchKey, labelA, labelB, existing){
   const backdrop = document.createElement('div');
   backdrop.className = 'score-modal-backdrop';
   backdrop.innerHTML = `
@@ -1275,8 +1339,8 @@ function openScoreModal(ev, tIndex, matchKey, labelA, labelB, existing){
     if(a<2 && b<2){ alert('Jeden z týmů musí mít alespoň 2 vítězné sety.'); return; }
     if(a===b){ alert('Skóre nemůže být nerozhodné.'); return; }
     const tournaments = JSON.parse(JSON.stringify(ev.tournaments||[]));
-    if(!tournaments[tIndex].results) tournaments[tIndex].results = {};
-    tournaments[tIndex].results[matchKey] = { a, b };
+    if(!tournaments[tIndex][resultField]) tournaments[tIndex][resultField] = {};
+    tournaments[tIndex][resultField][matchKey] = { a, b };
     try{
       await updateDoc(doc(db,'events',ev.id), { tournaments });
       backdrop.remove();
