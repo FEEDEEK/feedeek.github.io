@@ -240,13 +240,14 @@ form.panel, .panel{
 .food-toggle{
   width:26px; height:26px; flex-shrink:0; cursor:pointer; position:relative;
   clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
-  background:var(--bg-void); border:1px solid var(--line);
+  background:var(--bg-panel-2); border:1.5px solid var(--gold-dim);
   display:flex; align-items:center; justify-content:center;
   transition:background .15s ease, border-color .15s ease;
   font-size:14px; color:transparent; font-weight:700;
+  box-shadow:0 0 4px rgba(0,0,0,0.4);
 }
-.food-toggle:hover{ border-color:var(--gold-dim); }
-.food-toggle.checked{ background:#2f8f4a; border-color:#3fb85e; color:#fff; }
+.food-toggle:hover{ border-color:var(--gold); }
+.food-toggle.checked{ background:#2f8f4a; border-color:#5fd67f; color:#fff; }
 .food-toggle.disabled{ cursor:not-allowed; opacity:.5; }
 .food-checkbox-row .portion-count{ margin-left:auto; font-size:11px; color:var(--text-muted); }
 .food-confirm-row{ margin-top:14px; display:flex; align-items:center; gap:12px; }
