@@ -27,7 +27,8 @@ const MEAL_SLOTS = [
   { key:'sat-breakfast', label:'Sobota — Snídaně' },
   { key:'sat-lunch',     label:'Sobota — Oběd' },
   { key:'sat-dinner',    label:'Sobota — Večeře' },
-  { key:'sun-breakfast', label:'Neděle — Snídaně' }
+  { key:'sun-breakfast', label:'Neděle — Snídaně' },
+  { key:'pivo',          label:'Pivo' }
 ];
 function emptyFoodSchedule(){
   const o = {};
@@ -44,6 +45,7 @@ let pendingEventId = null;
 
 let currentEventGames = [];
 let currentEventFood = emptyFoodSchedule();
+let currentEventDateOptions = [];
 
 function fmtDate(iso){
   if(!iso) return '';
@@ -190,6 +192,30 @@ document.getElementById('btn-add-food').addEventListener('click', () => {
   renderFormFood();
 });
 
+// ==================== FORMULÁŘ AKCE: termíny k hlasování ====================
+function renderFormDateOptions(){
+  const list = document.getElementById('ev-dateopts-list');
+  list.innerHTML = currentEventDateOptions.map((d, idx) => `
+    <li class="tag-chip"><span>${fmtDateShort(d.start)} – ${fmtDate(d.end)}</span><span class="x" data-remove-dateopt="${idx}">×</span></li>
+  `).join('');
+  list.querySelectorAll('[data-remove-dateopt]').forEach(el => {
+    el.addEventListener('click', () => {
+      currentEventDateOptions.splice(parseInt(el.dataset.removeDateopt,10), 1);
+      renderFormDateOptions();
+    });
+  });
+}
+document.getElementById('btn-add-dateopt').addEventListener('click', () => {
+  const startInput = document.getElementById('ev-dateopt-start');
+  const endInput = document.getElementById('ev-dateopt-end');
+  const start = startInput.value, end = endInput.value || startInput.value;
+  if(!start){ alert('Zadej alespoň počáteční datum.'); return; }
+  if(end < start){ alert('Konec nemůže být dřív než začátek.'); return; }
+  currentEventDateOptions.push({ start, end });
+  startInput.value = ''; endInput.value = '';
+  renderFormDateOptions();
+});
+
 // ---- Akce: založení / editace / mazání ----
 const formEvent = document.getElementById('form-event');
 const btnNewEvent = document.getElementById('btn-new-event');
@@ -199,8 +225,11 @@ let editingEventId = null;
 function resetEventFormHelpers(){
   currentEventGames = [];
   currentEventFood = emptyFoodSchedule();
+  currentEventDateOptions = [];
   renderFormGames();
   renderFormFood();
+  renderFormDateOptions();
+  document.getElementById('ev-dateopt-deadline').value = '';
 }
 
 function openEventForm(){
@@ -243,6 +272,8 @@ formEvent.addEventListener('submit', async (e) => {
     imageUrl: document.getElementById('ev-image').value.trim(),
     fee: parseInt(document.getElementById('ev-fee').value, 10) || 0,
     qrUrl: document.getElementById('ev-qr').value.trim(),
+    dateOptions: [...currentEventDateOptions],
+    dateVoteDeadline: document.getElementById('ev-dateopt-deadline').value || '',
     games: [...currentEventGames],
     foodPlan: document.getElementById('ev-foodplan').value.trim(),
     foodSchedule: JSON.parse(JSON.stringify(currentEventFood)),
@@ -280,6 +311,9 @@ function startEditEvent(ev){
   document.getElementById('ev-image').value = ev.imageUrl || '';
   document.getElementById('ev-fee').value = ev.fee || '';
   document.getElementById('ev-qr').value = ev.qrUrl || '';
+  currentEventDateOptions = Array.isArray(ev.dateOptions) ? [...ev.dateOptions] : [];
+  renderFormDateOptions();
+  document.getElementById('ev-dateopt-deadline').value = ev.dateVoteDeadline || '';
   document.getElementById('ev-foodplan').value = ev.foodPlan || '';
   document.getElementById('ev-deadline').value = ev.changeDeadline || '';
 
@@ -400,9 +434,21 @@ function renderEvents(){
         <div class="info">
           <h4>${ev.number ? escapeHtml(ev.number) + ' — ' : ''}${escapeHtml(ev.name)}</h4>
           <div class="meta">${fmtDateRange(ev)}</div>
+          ${currentIsAdmin ? `
+          <div class="row" style="margin-top:8px; gap:6px;">
+            <button type="button" class="btn-ghost btn-sm" data-edit-history style="flex:1;">Upravit</button>
+            <button type="button" class="btn-ghost btn-sm" data-delete-history style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+          </div>` : ''}
         </div>
       `;
-      card.addEventListener('click', () => openEventDetail(ev.id));
+      card.addEventListener('click', (e) => {
+        if(e.target.closest('[data-edit-history]') || e.target.closest('[data-delete-history]')) return;
+        openEventDetail(ev.id);
+      });
+      const editBtn = card.querySelector('[data-edit-history]');
+      if(editBtn) editBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditEvent(ev); });
+      const delBtn = card.querySelector('[data-delete-history]');
+      if(delBtn) delBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteEvent(ev.id, ev.name); });
       hgrid.appendChild(card);
     });
   }
@@ -478,12 +524,16 @@ function renderEventDetailStatic(ev){
   header.style.backgroundImage = ev.imageUrl ? `url('${ev.imageUrl.replace(/'/g,"")}')` : 'none';
 
   renderEntryFeeBlock(ev);
+  renderDateVoteBlock(ev);
 
   const mapBox = document.getElementById('ed-map');
   const q = encodeURIComponent(ev.place || '');
   mapBox.innerHTML = `<iframe src="https://www.google.com/maps?q=${q}&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
 
   const tabPanels = { prehled:'tab-prehled', jidlo:'tab-jidlo', turnaj:'tab-turnaj', foto:'tab-foto' };
+  Object.entries(tabPanels).forEach(([key, id]) => {
+    document.getElementById(id).style.display = (key === currentTab) ? 'block' : 'none';
+  });
   document.querySelectorAll('#ed-tabs .tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === currentTab);
     btn.onclick = () => {
@@ -521,6 +571,56 @@ function renderEntryFeeBlock(ev){
     ${ev.fee ? `<div><div class="eyebrow" style="margin-bottom:4px;">Vstupné</div><div style="font-size:20px; font-weight:600; color:var(--gold);">${ev.fee} Kč</div></div>` : ''}
     ${ev.qrUrl ? `<div><div class="eyebrow" style="margin-bottom:4px;">QR platba</div><img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu"></div>` : ''}
   `;
+}
+
+function renderDateVoteBlock(ev){
+  let box = document.getElementById('ed-datevote');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'ed-datevote';
+    document.getElementById('ed-entryfee').insertAdjacentElement('afterend', box);
+  }
+  const options = ev.dateOptions || [];
+  if(options.length === 0 || ev.dateVotingClosed){ box.innerHTML = ''; return; }
+
+  const votes = ev.dateVotes || {};
+  const myVote = currentUser ? votes[currentUser.uid] : undefined;
+  const deadlinePassedForVote = ev.dateVoteDeadline && todayIso() > ev.dateVoteDeadline;
+
+  box.className = 'panel';
+  box.style.maxWidth = '520px';
+  box.innerHTML = `
+    <div class="section-title" style="font-size:16px;">🗳️ Hlasování o termínu</div>
+    ${ev.dateVoteDeadline ? `<p class="lede" style="margin-top:0;">Hlasování otevřené do ${fmtDate(ev.dateVoteDeadline)}.</p>` : ''}
+    ${options.map((opt, idx) => {
+      const count = Object.values(votes).filter(v => v === idx).length;
+      const isMine = myVote === idx;
+      return `
+        <div class="row" style="margin-top:8px; align-items:center;">
+          <span style="flex:1;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
+          ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'Tvůj hlas':'Hlasovat'}</button>` : ''}
+          ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat tento termín</button>` : ''}
+        </div>
+      `;
+    }).join('')}
+  `;
+
+  box.querySelectorAll('[data-vote-date]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if(!currentUser){ showView('ucet'); return; }
+      try{ await updateDoc(doc(db,'events',ev.id), { [`dateVotes.${currentUser.uid}`]: parseInt(btn.dataset.voteDate,10) }); }
+      catch(err){ console.error(err); }
+    });
+  });
+  box.querySelectorAll('[data-finalize-date]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.dataset.finalizeDate,10);
+      const opt = options[idx];
+      if(!confirm(`Nastavit termín akce na ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}?`)) return;
+      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true }); }
+      catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
+    });
+  });
 }
 
 function isPastDeadline(ev){
@@ -1213,55 +1313,78 @@ function renderTeamEditor(ev, t, tIndex, container){
 
 function teamName(t, idx){ return t.teams[idx] ? t.teams[idx].name : `Tým ${idx+1}`; }
 
+// Metoda "kruhového" rozvrhu — rozdělí zápasy do kol tak, aby v jednom kole hrál (skoro) každý tým jednou.
+function scheduleRoundRobin(n){
+  const arr = [...Array(n).keys()];
+  if(n % 2 !== 0) arr.push(null);
+  const m = arr.length;
+  const rounds = [];
+  let rot = [...arr];
+  for(let r=0; r<m-1; r++){
+    const pairs = [];
+    for(let i=0;i<m/2;i++){
+      const a = rot[i], b = rot[m-1-i];
+      if(a!==null && b!==null) pairs.push([Math.min(a,b), Math.max(a,b)]);
+    }
+    rounds.push(pairs);
+    const fixed = rot[0];
+    const rest = rot.slice(1);
+    rest.unshift(rest.pop());
+    rot = [fixed, ...rest];
+  }
+  return rounds;
+}
+
 function renderRoundRobinBody(ev, t, tIndex, rr, container){
-  // --- tabulka ---
-  const table = document.createElement('div');
+  const wrap = document.createElement('div');
+  wrap.className = 'bracket-wrap';
+  container.appendChild(wrap);
+
+  // --- sloupec: pořadí / tabulka, zakomponovaná ve stylu pavouka ---
   const ranked = t.teams.map((_, i) => i).sort((a,b) => rr.wins[b]-rr.wins[a]);
-  table.innerHTML = `
-    <div class="bracket-section-title">Průběžná tabulka</div>
-    <table style="width:100%; max-width:420px; border-collapse:collapse; font-size:14px;">
-      <thead><tr style="text-align:left; color:var(--text-muted); font-size:12px;"><th style="padding:6px 0;">Tým</th><th style="padding:6px 0;">Výhry</th></tr></thead>
-      <tbody>
-        ${ranked.map(i => `<tr style="border-top:1px solid var(--line);"><td style="padding:6px 0;">${escapeHtml(teamName(t,i))}</td><td style="padding:6px 0; color:var(--gold); font-weight:600;">${rr.wins[i]}</td></tr>`).join('')}
-      </tbody>
-    </table>
-  `;
-  container.appendChild(table);
+  const standCol = document.createElement('div');
+  standCol.className = 'bracket-round';
+  standCol.innerHTML = `<div class="bracket-round-title">Pořadí</div>` + ranked.map(i => `
+    <div class="bracket-slot"><span>${escapeHtml(teamName(t,i))}</span><span style="color:var(--gold); font-weight:600;">${rr.wins[i]}</span></div>
+  `).join('');
+  wrap.appendChild(standCol);
 
-  // --- zápasy základní části ---
-  const matchesWrap = document.createElement('div');
-  matchesWrap.innerHTML = `<div class="bracket-section-title">Zápasy základní části</div>`;
-  const matchList = document.createElement('div');
-  rr.matches.forEach(m => matchList.appendChild(renderRRMatchRow(ev, tIndex, 'results', m, t)));
-  matchesWrap.appendChild(matchList);
-  container.appendChild(matchesWrap);
+  // --- sloupce: kola základní části (kruhový rozvrh) ---
+  const rounds = scheduleRoundRobin(t.teams.length);
+  const matchByKey = {};
+  rr.matches.forEach(m => matchByKey[m.key] = m);
 
-  // --- tiebreak ---
+  rounds.forEach((pairs, ri) => {
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+    col.innerHTML = `<div class="bracket-round-title">Kolo ${ri+1}</div>`;
+    pairs.forEach(([i,j]) => {
+      const m = matchByKey[`RR-${i}-${j}`];
+      col.appendChild(renderRRMatchBox(ev, tIndex, 'results', m, t));
+    });
+    wrap.appendChild(col);
+  });
+
+  // --- tiebreak sloupec ---
   if(rr.tieMatches.length > 0){
-    const tbWrap = document.createElement('div');
-    tbWrap.innerHTML = `<div class="bracket-section-title">Dohrávky při shodě bodů</div>`;
-    const tbList = document.createElement('div');
-    rr.tieMatches.forEach(m => tbList.appendChild(renderRRMatchRow(ev, tIndex, 'tiebreakResults', m, t)));
-    tbWrap.appendChild(tbList);
-    container.appendChild(tbWrap);
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+    col.innerHTML = `<div class="bracket-round-title">Dohrávky</div>`;
+    rr.tieMatches.forEach(m => col.appendChild(renderRRMatchBox(ev, tIndex, 'tiebreakResults', m, t)));
+    wrap.appendChild(col);
   }else if(!rr.groupComplete){
-    const hint = document.createElement('p');
-    hint.className = 'status-hint';
-    hint.style.marginTop = '14px';
-    hint.textContent = 'Až se odehrají všechny zápasy základní části, zobrazí se tu play-off o umístění.';
-    container.appendChild(hint);
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+    col.innerHTML = `<div class="bracket-round-title">Play-off</div><div class="bracket-slot placeholder">Čeká na dohrání základní části</div>`;
+    wrap.appendChild(col);
   }
 
-  // --- play-off (zleva doprava, vítěz úplně vpravo) ---
+  // --- play-off sloupce ---
   if(rr.finalRanking){
-    const poWrap = document.createElement('div');
-    poWrap.innerHTML = `<div class="bracket-section-title">Play-off o umístění</div>`;
-    const poRow = document.createElement('div');
-    poRow.className = 'bracket-wrap';
     rr.playoffPairs.forEach(p => {
       const col = document.createElement('div');
       col.className = 'bracket-round';
-      const label = p.teamB===null ? `${p.rankPos}. místo` : `O ${p.rankPos}.–${p.rankPos+1}. místo`;
+      const label = p.teamB===null ? `${p.rankPos}. místo` : `O ${p.rankPos}.–${p.rankPos+1}.`;
       col.innerHTML = `<div class="bracket-round-title">${label}</div>`;
       if(p.teamB===null){
         const div = document.createElement('div');
@@ -1271,34 +1394,34 @@ function renderRoundRobinBody(ev, t, tIndex, rr, container){
       }else{
         col.appendChild(renderPOMatchBox(ev, tIndex, p, t));
       }
-      poRow.appendChild(col);
+      wrap.appendChild(col);
     });
-    poWrap.appendChild(poRow);
-    container.appendChild(poWrap);
   }
 
-  // --- výsledná listina ---
+  // --- výsledná listina, jako poslední sloupec úplně vpravo ---
   if(rr.placements){
-    const banner = document.createElement('div');
-    banner.className = 'bracket-champion-banner';
-    banner.innerHTML = rr.placements.map(p => `${p.rank}. ${escapeHtml(teamName(t,p.team))}`).join(' &nbsp;·&nbsp; ');
-    container.appendChild(banner);
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+    col.innerHTML = `<div class="bracket-round-title">Výsledek</div>` + rr.placements.map(p => `
+      <div class="bracket-slot ${p.rank===1?'winner-slot':''}"><span>${p.rank}. ${escapeHtml(teamName(t,p.team))}</span></div>
+    `).join('');
+    wrap.appendChild(col);
   }
 }
 
-function renderRRMatchRow(ev, tIndex, resultField, m, t){
-  const row = document.createElement('div');
-  row.className = 'suggestion-row';
+function renderRRMatchBox(ev, tIndex, resultField, m, t){
+  const div = document.createElement('div');
+  div.className = 'bracket-match';
   const labelA = teamName(t, m.teamA), labelB = teamName(t, m.teamB);
   const scoreTxt = m.result ? ` (${m.result.a}:${m.result.b})` : '';
-  const winnerTxt = m.winnerIdx!==null ? ` — vyhrál ${escapeHtml(teamName(t,m.winnerIdx))}${scoreTxt}` : '';
-  row.innerHTML = `
-    <span class="txt">${escapeHtml(labelA)} vs ${escapeHtml(labelB)}${winnerTxt}</span>
-    ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-rr-score>${m.result?'Upravit':'Zadat výsledek'}</button>` : ''}
+  div.innerHTML = `
+    <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''}"><span>${escapeHtml(labelA)}</span>${m.winnerIdx===m.teamA?`<span>${scoreTxt}</span>`:''}</div>
+    <div class="bracket-slot ${m.winnerIdx===m.teamB ? 'winner-slot':''}"><span>${escapeHtml(labelB)}</span>${m.winnerIdx===m.teamB?`<span>${scoreTxt}</span>`:''}</div>
+    ${currentIsAdmin ? `<button type="button" class="bracket-score-btn btn-ghost" data-rr-score>${m.result?'Upravit':'Zadat výsledek'}</button>` : ''}
   `;
-  const btn = row.querySelector('[data-rr-score]');
+  const btn = div.querySelector('[data-rr-score]');
   if(btn) btn.addEventListener('click', () => openScoreModal(ev, tIndex, resultField, m.key, labelA, labelB, m.result));
-  return row;
+  return div;
 }
 
 function renderPOMatchBox(ev, tIndex, p, t){
