@@ -58,7 +58,7 @@ body::before{
   content:'';
   position:fixed; inset:0; z-index:-1; pointer-events:none;
   opacity:0.2;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420'%3E%3Cg fill='none' stroke='%23c9a24b' stroke-width='1.4'%3E%3Crect x='20' y='40' width='90' height='60' rx='6'/%3E%3Ccircle cx='45' cy='85' r='6'/%3E%3Ccircle cx='85' cy='85' r='6'/%3E%3Cpath d='M60 55h30M75 45v20'/%3E%3Crect x='180' y='30' width='70' height='95' rx='4'/%3E%3Cpath d='M195 45h40M195 60h40M195 75h20'/%3E%3Ccircle cx='340' cy='70' r='34'/%3E%3Cpath d='M340 46v14l16 10'/%3E%3Crect x='30' y='220' width='120' height='75' rx='8'/%3E%3Ccircle cx='55' cy='257' r='9'/%3E%3Ccircle cx='125' cy='257' r='9'/%3E%3Cpath d='M75 257h30'/%3E%3Cpath d='M260 250 300 210 360 210 380 250 360 290 300 290Z'/%3E%3C/g%3E%3C/svg%3E");
+  background-image: url('Theme.png');  
   background-repeat: repeat;
   background-size: 420px 420px;
 }
