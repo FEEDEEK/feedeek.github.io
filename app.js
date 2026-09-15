@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, setDoc,
+  getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, getDocs, setDoc,
   updateDoc, deleteDoc, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
@@ -106,7 +106,7 @@ function showView(name){
   views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
 }
 navItems.forEach(n => n.addEventListener('click', () => {
-  if(n.dataset.view !== 'akce') closeEventForm();
+  closeEventForm();
   showView(n.dataset.view);
 }));
 document.getElementById('brand-home-link').addEventListener('click', () => {
@@ -672,15 +672,19 @@ function renderStatsAndRsvp(){
 
 // ---- Sidebar: statistika nahoře + seznam, vlastní řádek editovatelný ----
 function coinSvg(paid){
-  const base = paid ? '#e0b84a' : '#7a3a3a';
-  const dark = paid ? '#a5781f' : '#4d2020';
-  const rim  = paid ? '#c99a2e' : '#5c2a2a';
+  const base = paid ? '#f0c94e' : '#8a4a4a';
+  const baseDark = paid ? '#c99a2e' : '#5c2a2a';
+  const rim  = paid ? '#a5781f' : '#4d2020';
+  const coin = (cx, cy, r) => `
+    <ellipse cx="${cx}" cy="${cy+1.5}" rx="${r}" ry="${r*0.42}" fill="${rim}" opacity="0.55"/>
+    <ellipse cx="${cx}" cy="${cy}" rx="${r}" ry="${r*0.42}" fill="${base}" stroke="${baseDark}" stroke-width="1"/>
+    <ellipse cx="${cx-r*0.3}" cy="${cy-r*0.1}" rx="${r*0.35}" ry="${r*0.14}" fill="#fff" opacity="0.5" class="coin-shine"/>
+  `;
   return `
     <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-      <ellipse cx="16" cy="24" rx="12" ry="4" fill="${dark}" opacity="0.5"/>
-      <circle cx="16" cy="16" r="13" fill="${base}" stroke="${rim}" stroke-width="2"/>
-      <circle cx="16" cy="16" r="8.5" fill="none" stroke="${rim}" stroke-width="1.2" opacity="0.7"/>
-      <path class="coin-shine" d="M9 11 Q16 4 23 11" stroke="#fff" stroke-width="2" fill="none" opacity="0.5" stroke-linecap="round"/>
+      ${coin(20, 21, 10)}
+      ${coin(12, 17, 10)}
+      ${coin(17, 12, 10)}
     </svg>
   `;
 }
@@ -703,36 +707,49 @@ function renderAttendees(){
 
   if(list.length === 0){
     html += '<div class="empty">Zatím se nikdo nepřihlásil.</div>';
-    box.innerHTML = html;
-    return;
+  }else{
+    html += list.map(r => {
+      const isSelf = currentUser && r._docId === currentUser.uid;
+      let statusHtml;
+      if(isSelf){
+        statusHtml = `
+          <button type="button" class="status-pill clickable ${r.status !== 'maybe' ? 'going' : ''}" data-self-status="going">Určitě</button>
+          <button type="button" class="status-pill clickable ${r.status === 'maybe' ? 'maybe' : ''}" data-self-status="maybe">Možná</button>
+        `;
+      }else{
+        statusHtml = `<span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>`;
+      }
+      const coinHtml = (ev && ev.fee)
+        ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} ${currentIsAdmin ? 'admin-toggle' : ''}" data-toggle-paid="${currentIsAdmin ? r._docId : ''}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}">${coinSvg(r.paid)}</span>`
+        : '';
+      return `
+        <div class="attendee-row">
+          <span style="display:flex; align-items:center; gap:6px;">${coinHtml}${escapeHtml(r.nick || '(bez jména)')}</span>
+          <span style="display:flex; align-items:center; gap:6px;">
+            ${statusHtml}
+            ${(currentIsAdmin && !isSelf) ? `<button type="button" class="btn-ghost btn-sm" data-remove-attendee="${r._docId}" title="Odebrat" style="padding:2px 7px; color:var(--crimson); border-color:var(--crimson);">×</button>` : ''}
+          </span>
+        </div>
+      `;
+    }).join('');
   }
 
-  html += list.map(r => {
-    const isSelf = currentUser && r._docId === currentUser.uid;
-    let statusHtml;
-    if(isSelf){
-      statusHtml = `
-        <button type="button" class="status-pill clickable ${r.status !== 'maybe' ? 'going' : ''}" data-self-status="going">Určitě</button>
-        <button type="button" class="status-pill clickable ${r.status === 'maybe' ? 'maybe' : ''}" data-self-status="maybe">Možná</button>
-      `;
-    }else{
-      statusHtml = `<span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>`;
-    }
-    const coinHtml = (ev && ev.fee)
-      ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} ${currentIsAdmin ? 'admin-toggle' : ''}" data-toggle-paid="${currentIsAdmin ? r._docId : ''}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}">${coinSvg(r.paid)}</span>`
-      : '';
-    return `
-      <div class="attendee-row">
-        <span style="display:flex; align-items:center; gap:6px;">${coinHtml}${escapeHtml(r.nick || '(bez jména)')}</span>
-        <span style="display:flex; align-items:center; gap:6px;">
-          ${statusHtml}
-          ${(currentIsAdmin && !isSelf) ? `<button type="button" class="btn-ghost btn-sm" data-remove-attendee="${r._docId}" title="Odebrat" style="padding:2px 7px; color:var(--crimson); border-color:var(--crimson);">×</button>` : ''}
-        </span>
-      </div>
-    `;
-  }).join('');
+  if(currentIsAdmin){
+    html += `<div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--line);"><button type="button" id="btn-add-manual-attendee" class="btn-ghost btn-sm" style="width:100%;">+ Přidat účastníka</button></div>`;
+  }
 
   box.innerHTML = html;
+
+  const addManualBtn = document.getElementById('btn-add-manual-attendee');
+  if(addManualBtn) addManualBtn.addEventListener('click', async () => {
+    const nick = prompt('Přezdívka účastníka:');
+    if(!nick || !nick.trim()) return;
+    try{
+      await addDoc(collection(db, 'events', currentDetailEventId, 'registrations'), {
+        nick: nick.trim(), status: 'going', food: {}, ts: new Date().toISOString(), manual: true
+      });
+    }catch(err){ alert('Přidání se nepovedlo.'); console.error(err); }
+  });
 
   box.querySelectorAll('[data-toggle-paid]').forEach(el => {
     if(!el.dataset.togglePaid) return;
@@ -742,7 +759,6 @@ function renderAttendees(){
       catch(err){ console.error(err); }
     });
   });
-
   box.querySelectorAll('[data-self-status]').forEach(btn => {
     btn.addEventListener('click', async () => {
       try{
@@ -762,17 +778,22 @@ function renderAttendees(){
 // ---- Přehled: hry + návrhy (editovatelné vlastníkem/adminem) + Diskuze (editovatelná vlastníkem/adminem) ----
 function renderTabPrehled(ev){
   const box = document.getElementById('tab-prehled');
-  const games = ev.games || [];
+  const games = [...(ev.games || [])].sort((a,b) => a.localeCompare(b, 'cs'));
   box.innerHTML = `
-    <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
-    <div class="chip-row">${games.length ? games.map(g=>`<span class="chip">${escapeHtml(g)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
-
-    <div class="section-title" style="font-size:16px; margin-top:28px;">Chtěl by sis zahrát ještě něco jiného?</div>
-    <div class="field" style="max-width:360px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
-      <div style="flex:1;"><input type="text" id="suggestion-input" placeholder="Např. HALO"></div>
-      <button type="button" id="btn-add-suggestion" class="btn-sm">Přidat</button>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:28px;">
+      <div>
+        <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
+        <div class="chip-row" style="flex-direction:column; align-items:flex-start;">${games.length ? games.map(g=>`<span class="chip">${escapeHtml(g)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
+      </div>
+      <div>
+        <div class="section-title" style="font-size:16px;">Chtěl by sis zahrát ještě něco jiného?</div>
+        <div class="field" style="display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+          <div style="flex:1;"><input type="text" id="suggestion-input" placeholder="Např. HALO"></div>
+          <button type="button" id="btn-add-suggestion" class="btn-sm">Přidat</button>
+        </div>
+        <div id="suggestions-list" style="margin-top:6px;"></div>
+      </div>
     </div>
-    <div id="suggestions-list" style="margin-top:6px;"></div>
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze</div>
     <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
@@ -946,7 +967,12 @@ function renderTabJidlo(ev){
 
       const checkboxesHtml = options.map((o,idx) => `
         <label class="food-checkbox-row">
-          <span class="food-toggle ${myChoices.includes(o)?'checked':''} ${(!myReg || deadlinePassed) ? 'disabled' : ''}" data-food-toggle data-slot="${slot.key}" data-value="${escapeHtml(o)}">${myChoices.includes(o)?'✓':''}</span>
+          <span class="food-toggle ${myChoices.includes(o)?'checked':''} ${(!myReg || deadlinePassed) ? 'disabled' : ''}" data-food-toggle data-slot="${slot.key}" data-value="${escapeHtml(o)}">
+            <svg viewBox="0 0 26 26" class="food-toggle-svg">
+              <polygon points="6.5,1.5 19.5,1.5 25,13 19.5,24.5 6.5,24.5 1,13"/>
+              <path class="food-check" d="M7.5 13.5l3.3 3.3 7.7-7.7"/>
+            </svg>
+          </span>
           <span>${escapeHtml(o)}</span>
           ${currentIsAdmin ? `<span class="portion-count">${portionCounts[o]}×</span>` : ''}
         </label>
@@ -983,8 +1009,7 @@ function renderTabJidlo(ev){
   box.querySelectorAll('[data-food-toggle]').forEach(el => {
     if(el.classList.contains('disabled')) return;
     el.addEventListener('click', () => {
-      const isChecked = el.classList.toggle('checked');
-      el.textContent = isChecked ? '✓' : '';
+      el.classList.toggle('checked');
     });
   });
 
@@ -1043,97 +1068,11 @@ function renderTabJidlo(ev){
 let currentTournamentIndex = 0;
 let teamEditorOpen = false;
 
-function computeRoundRobin(t){
-  const teams = t.teams || [];
-  const n = teams.length;
-  const results = t.results || {};
-  const tbResults = t.tiebreakResults || {};
-  const poResults = t.playoffResults || {};
-
-  function resolvePair(resObj, key){
-    const res = resObj[key];
-    if(res && typeof res.a==='number' && typeof res.b==='number' && (res.a>=2||res.b>=2) && res.a!==res.b){
-      return { result:res, winnerSide: res.a>res.b ? 'A' : 'B' };
-    }
-    return { result: res||null, winnerSide: null };
-  }
-
-  // základní část: každý s každým
-  let matches = [];
-  let wins = new Array(n).fill(0);
-  for(let i=0;i<n;i++){
-    for(let j=i+1;j<n;j++){
-      const key = `RR-${i}-${j}`;
-      const { result, winnerSide } = resolvePair(results, key);
-      const winnerIdx = winnerSide==='A' ? i : (winnerSide==='B' ? j : null);
-      if(winnerIdx!==null) wins[winnerIdx]++;
-      matches.push({ key, teamA:i, teamB:j, result, winnerIdx });
-    }
-  }
-  const groupComplete = n >= 2 && matches.every(m => m.winnerIdx !== null);
-
-  // seřazení do skupin dle počtu výher
-  let tieMatches = [];
-  let finalRanking = null;
-  if(groupComplete){
-    const indices = teams.map((_,i)=>i);
-    const byWins = {};
-    indices.forEach(i => { (byWins[wins[i]] = byWins[wins[i]] || []).push(i); });
-    const winCounts = Object.keys(byWins).map(Number).sort((a,b)=>b-a);
-
-    let orderedGroups = [];
-    for(const w of winCounts){
-      const group = byWins[w];
-      if(group.length === 1){ orderedGroups.push(group); continue; }
-      let tbWins = {}; group.forEach(i => tbWins[i]=0);
-      let groupTbComplete = true;
-      for(let a=0;a<group.length;a++){
-        for(let b=a+1;b<group.length;b++){
-          const i=group[a], j=group[b];
-          const key = `TB-${i}-${j}`;
-          const { result, winnerSide } = resolvePair(tbResults, key);
-          const winnerIdx = winnerSide==='A' ? i : (winnerSide==='B' ? j : null);
-          tieMatches.push({ key, teamA:i, teamB:j, result, winnerIdx });
-          if(winnerIdx!==null) tbWins[winnerIdx]++;
-          else groupTbComplete = false;
-        }
-      }
-      orderedGroups.push(groupTbComplete ? [...group].sort((x,y)=>tbWins[y]-tbWins[x]) : null);
-    }
-    if(orderedGroups.every(g => g!==null)) finalRanking = orderedGroups.flat();
-  }
-
-  // play-off o umístění (1 vs 2, 3 vs 4, ...)
-  let playoffPairs = [];
-  let placements = null;
-  if(finalRanking){
-    for(let i=0;i<finalRanking.length;i+=2){
-      if(i+1 < finalRanking.length){
-        const a = finalRanking[i], b = finalRanking[i+1];
-        const key = `PO-${a}-${b}`;
-        const { result, winnerSide } = resolvePair(poResults, key);
-        const winnerIdx = winnerSide==='A' ? a : (winnerSide==='B' ? b : null);
-        playoffPairs.push({ key, rankPos:i+1, teamA:a, teamB:b, result, winnerIdx });
-      }else{
-        playoffPairs.push({ key:null, rankPos:i+1, teamA:finalRanking[i], teamB:null, result:null, winnerIdx:finalRanking[i] });
-      }
-    }
-    if(playoffPairs.every(p => p.winnerIdx !== null)){
-      placements = [];
-      playoffPairs.forEach(p => {
-        if(p.teamB===null){ placements.push({ rank:p.rankPos, team:p.teamA }); }
-        else{
-          const loser = p.winnerIdx===p.teamA ? p.teamB : p.teamA;
-          placements.push({ rank:p.rankPos, team:p.winnerIdx });
-          placements.push({ rank:p.rankPos+1, team:loser });
-        }
-      });
-      placements.sort((x,y)=>x.rank-y.rank);
-    }
-  }
-
-  return { matches, wins, groupComplete, tieMatches, finalRanking, playoffPairs, placements };
-}
+// ---- Turnaj: iterativní systém podle pořadí ----
+// Kolo 1 = základní část (každý s každým). Další kola: aktuálně nejlepší dva hrají spolu,
+// další dva podle pořadí spolu atd. Jakmile lídr porazí svého nejbližšího soupeře a nikdo
+// ho už nemůže bodově dohnat, je určeno umístění a pokračuje se s dalšími týmy o zbylá místa.
+function teamName(t, idx){ return t.teams[idx] ? t.teams[idx].name : `Tým ${idx+1}`; }
 
 function renderTabTurnaj(ev){
   const box = document.getElementById('tab-turnaj');
@@ -1185,8 +1124,8 @@ function renderTabTurnaj(ev){
     if(teamEditorOpen) renderTeamEditor(ev, t, currentTournamentIndex, bodyWrap);
   }
 
-  const rr = computeRoundRobin(t);
-  renderRoundRobinBody(ev, t, currentTournamentIndex, rr, bodyWrap);
+  const swiss = computeSwissTournament(t);
+  renderSwissBody(ev, t, currentTournamentIndex, swiss, bodyWrap);
 }
 
 function openNewTournamentForm(ev){
@@ -1311,132 +1250,142 @@ function renderTeamEditor(ev, t, tIndex, container){
   });
 }
 
-function teamName(t, idx){ return t.teams[idx] ? t.teams[idx].name : `Tým ${idx+1}`; }
+function computeSwissTournament(t){
+  const teams = t.teams || [];
+  const n = teams.length;
+  const results = t.results || {};
+  const swissResults = t.swissResults || {};
 
-// Metoda "kruhového" rozvrhu — rozdělí zápasy do kol tak, aby v jednom kole hrál (skoro) každý tým jednou.
-function scheduleRoundRobin(n){
-  const arr = [...Array(n).keys()];
-  if(n % 2 !== 0) arr.push(null);
-  const m = arr.length;
-  const rounds = [];
-  let rot = [...arr];
-  for(let r=0; r<m-1; r++){
-    const pairs = [];
-    for(let i=0;i<m/2;i++){
-      const a = rot[i], b = rot[m-1-i];
-      if(a!==null && b!==null) pairs.push([Math.min(a,b), Math.max(a,b)]);
+  function resolvePair(resObj, key){
+    const res = resObj[key];
+    if(res && typeof res.a==='number' && typeof res.b==='number' && (res.a>=2||res.b>=2) && res.a!==res.b){
+      return { result:res, winnerSide: res.a>res.b ? 'A' : 'B' };
     }
-    rounds.push(pairs);
-    const fixed = rot[0];
-    const rest = rot.slice(1);
-    rest.unshift(rest.pop());
-    rot = [fixed, ...rest];
+    return { result: res||null, winnerSide: null };
   }
-  return rounds;
+
+  // Kolo 1 — základní část, každý s každým
+  let round0 = [];
+  let wins = new Array(n).fill(0);
+  for(let i=0;i<n;i++){
+    for(let j=i+1;j<n;j++){
+      const key = `RR-${i}-${j}`;
+      const { result, winnerSide } = resolvePair(results, key);
+      const winnerIdx = winnerSide==='A' ? i : (winnerSide==='B' ? j : null);
+      if(winnerIdx!==null) wins[winnerIdx]++;
+      round0.push({ key, teamA:i, teamB:j, result, winnerIdx });
+    }
+  }
+  const round0Complete = n >= 2 && round0.every(m => m.winnerIdx !== null);
+
+  let rounds = [round0];
+  let placements = [];
+
+  if(round0Complete){
+    let currentWins = [...wins];
+    let currentActive = teams.map((_,i)=>i);
+    let roundIndex = 1;
+    let safety = 0;
+
+    while(currentActive.length > 1 && safety < 25){
+      safety++;
+      const sorted = [...currentActive].sort((a,b) => currentWins[b]-currentWins[a] || a-b);
+      const pairs = [];
+      for(let i=0;i<sorted.length;i+=2){
+        if(i+1 < sorted.length) pairs.push([sorted[i], sorted[i+1]]);
+      }
+      const leftover = sorted.length % 2 === 1 ? sorted[sorted.length-1] : null;
+
+      const roundMatches = pairs.map(([a,b], idx) => {
+        const key = `SR${roundIndex}-${idx}`;
+        const { result, winnerSide } = resolvePair(swissResults, key);
+        const winnerIdx = winnerSide==='A' ? a : (winnerSide==='B' ? b : null);
+        return { key, teamA:a, teamB:b, result, winnerIdx };
+      });
+
+      let exhibition = null;
+      if(leftover !== null && placements.length > 0){
+        const lastLocked = placements[placements.length-1].team;
+        const key = `SR${roundIndex}-ex`;
+        const { result, winnerSide } = resolvePair(swissResults, key);
+        const winnerIdx = winnerSide==='A' ? leftover : (winnerSide==='B' ? lastLocked : null);
+        exhibition = { key, teamA:leftover, teamB:lastLocked, result, winnerIdx, exhibition:true };
+      }
+
+      rounds.push(exhibition ? [...roundMatches, exhibition] : roundMatches);
+
+      const roundComplete = roundMatches.every(m => m.winnerIdx !== null);
+      if(!roundComplete) break;
+
+      roundMatches.forEach(m => { currentWins[m.winnerIdx]++; });
+
+      const resorted = [...currentActive].sort((a,b) => currentWins[b]-currentWins[a] || a-b);
+      const leaderIdx = resorted[0];
+      const runnerUpIdx = resorted.length > 1 ? resorted[1] : null;
+
+      if(runnerUpIdx !== null && currentWins[leaderIdx] > currentWins[runnerUpIdx]){
+        const headToHead = roundMatches.find(m =>
+          (m.teamA===leaderIdx && m.teamB===runnerUpIdx) || (m.teamA===runnerUpIdx && m.teamB===leaderIdx)
+        );
+        if(headToHead && headToHead.winnerIdx === leaderIdx){
+          placements.push({ rank: placements.length+1, team: leaderIdx });
+          currentActive = currentActive.filter(i => i !== leaderIdx);
+        }
+      }
+      if(currentActive.length === 1){
+        placements.push({ rank: placements.length+1, team: currentActive[0] });
+        currentActive = [];
+      }
+      roundIndex++;
+    }
+  }
+
+  return { round0, round0Complete, rounds, placements, wins };
 }
 
-function renderRoundRobinBody(ev, t, tIndex, rr, container){
+function renderSwissBody(ev, t, tIndex, swiss, container){
   const wrap = document.createElement('div');
   wrap.className = 'bracket-wrap';
   container.appendChild(wrap);
 
-  // --- sloupec: pořadí / tabulka, zakomponovaná ve stylu pavouka ---
-  const ranked = t.teams.map((_, i) => i).sort((a,b) => rr.wins[b]-rr.wins[a]);
-  const standCol = document.createElement('div');
-  standCol.className = 'bracket-round';
-  standCol.innerHTML = `<div class="bracket-round-title">Pořadí</div>` + ranked.map(i => `
-    <div class="bracket-slot"><span>${escapeHtml(teamName(t,i))}</span><span style="color:var(--gold); font-weight:600;">${rr.wins[i]}</span></div>
-  `).join('');
-  wrap.appendChild(standCol);
-
-  // --- sloupce: kola základní části (kruhový rozvrh) ---
-  const rounds = scheduleRoundRobin(t.teams.length);
-  const matchByKey = {};
-  rr.matches.forEach(m => matchByKey[m.key] = m);
-
-  rounds.forEach((pairs, ri) => {
+  swiss.rounds.forEach((roundMatches, ri) => {
     const col = document.createElement('div');
     col.className = 'bracket-round';
     col.innerHTML = `<div class="bracket-round-title">Kolo ${ri+1}</div>`;
-    pairs.forEach(([i,j]) => {
-      const m = matchByKey[`RR-${i}-${j}`];
-      col.appendChild(renderRRMatchBox(ev, tIndex, 'results', m, t));
-    });
+    roundMatches.forEach(m => col.appendChild(renderSwissMatchBox(ev, tIndex, ri===0?'results':'swissResults', m, t)));
     wrap.appendChild(col);
   });
 
-  // --- tiebreak sloupec ---
-  if(rr.tieMatches.length > 0){
+  if(!swiss.round0Complete){
     const col = document.createElement('div');
     col.className = 'bracket-round';
-    col.innerHTML = `<div class="bracket-round-title">Dohrávky</div>`;
-    rr.tieMatches.forEach(m => col.appendChild(renderRRMatchBox(ev, tIndex, 'tiebreakResults', m, t)));
-    wrap.appendChild(col);
-  }else if(!rr.groupComplete){
-    const col = document.createElement('div');
-    col.className = 'bracket-round';
-    col.innerHTML = `<div class="bracket-round-title">Play-off</div><div class="bracket-slot placeholder">Čeká na dohrání základní části</div>`;
+    col.innerHTML = `<div class="bracket-round-title">Další kola</div><div class="bracket-slot placeholder">Čeká na dohrání kola 1</div>`;
     wrap.appendChild(col);
   }
 
-  // --- play-off sloupce ---
-  if(rr.finalRanking){
-    rr.playoffPairs.forEach(p => {
-      const col = document.createElement('div');
-      col.className = 'bracket-round';
-      const label = p.teamB===null ? `${p.rankPos}. místo` : `O ${p.rankPos}.–${p.rankPos+1}.`;
-      col.innerHTML = `<div class="bracket-round-title">${label}</div>`;
-      if(p.teamB===null){
-        const div = document.createElement('div');
-        div.className = 'bracket-match';
-        div.innerHTML = `<div class="bracket-slot winner-slot"><span>${escapeHtml(teamName(t,p.teamA))}</span></div>`;
-        col.appendChild(div);
-      }else{
-        col.appendChild(renderPOMatchBox(ev, tIndex, p, t));
-      }
-      wrap.appendChild(col);
-    });
-  }
-
-  // --- výsledná listina, jako poslední sloupec úplně vpravo ---
-  if(rr.placements){
+  if(swiss.placements.length > 0){
     const col = document.createElement('div');
     col.className = 'bracket-round';
-    col.innerHTML = `<div class="bracket-round-title">Výsledek</div>` + rr.placements.map(p => `
+    col.innerHTML = `<div class="bracket-round-title">Výsledek</div>` + swiss.placements.map(p => `
       <div class="bracket-slot ${p.rank===1?'winner-slot':''}"><span>${p.rank}. ${escapeHtml(teamName(t,p.team))}</span></div>
     `).join('');
     wrap.appendChild(col);
   }
 }
 
-function renderRRMatchBox(ev, tIndex, resultField, m, t){
+function renderSwissMatchBox(ev, tIndex, resultField, m, t){
   const div = document.createElement('div');
   div.className = 'bracket-match';
   const labelA = teamName(t, m.teamA), labelB = teamName(t, m.teamB);
   const scoreTxt = m.result ? ` (${m.result.a}:${m.result.b})` : '';
   div.innerHTML = `
+    ${m.exhibition ? `<div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">jen pro zábavu</div>` : ''}
     <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''}"><span>${escapeHtml(labelA)}</span>${m.winnerIdx===m.teamA?`<span>${scoreTxt}</span>`:''}</div>
     <div class="bracket-slot ${m.winnerIdx===m.teamB ? 'winner-slot':''}"><span>${escapeHtml(labelB)}</span>${m.winnerIdx===m.teamB?`<span>${scoreTxt}</span>`:''}</div>
-    ${currentIsAdmin ? `<button type="button" class="bracket-score-btn btn-ghost" data-rr-score>${m.result?'Upravit':'Zadat výsledek'}</button>` : ''}
+    ${currentIsAdmin ? `<button type="button" class="bracket-score-btn btn-ghost" data-sw-score>${m.result?'Upravit':'Zadat výsledek'}</button>` : ''}
   `;
-  const btn = div.querySelector('[data-rr-score]');
+  const btn = div.querySelector('[data-sw-score]');
   if(btn) btn.addEventListener('click', () => openScoreModal(ev, tIndex, resultField, m.key, labelA, labelB, m.result));
-  return div;
-}
-
-function renderPOMatchBox(ev, tIndex, p, t){
-  const div = document.createElement('div');
-  div.className = 'bracket-match';
-  const labelA = teamName(t, p.teamA), labelB = teamName(t, p.teamB);
-  const scoreTxt = p.result ? ` (${p.result.a}:${p.result.b})` : '';
-  const canScore = currentIsAdmin;
-  div.innerHTML = `
-    <div class="bracket-slot ${p.winnerIdx===p.teamA ? 'winner-slot':''}"><span>${escapeHtml(labelA)}</span>${p.winnerIdx===p.teamA?`<span>${scoreTxt}</span>`:''}</div>
-    <div class="bracket-slot ${p.winnerIdx===p.teamB ? 'winner-slot':''}"><span>${escapeHtml(labelB)}</span>${p.winnerIdx===p.teamB?`<span>${scoreTxt}</span>`:''}</div>
-    ${canScore ? `<button type="button" class="bracket-score-btn btn-ghost" data-po-score>${p.result?'Upravit skóre':'Zadat výsledek'}</button>` : ''}
-  `;
-  const btn = div.querySelector('[data-po-score]');
-  if(btn) btn.addEventListener('click', () => openScoreModal(ev, tIndex, 'playoffResults', p.key, labelA, labelB, p.result));
   return div;
 }
 
@@ -1590,14 +1539,16 @@ formAuth.addEventListener('submit', async (e) => {
         authEmailField.style.display = 'block';
         document.getElementById('auth-nick').readOnly = true;
         authSubmitBtn.textContent = 'Dokončit registraci';
+        document.getElementById('auth-phone-field').style.display = 'block';
         setAuthMessage(`Přezdívka "${nick}" je volná — doplň e-mail a založíme ti účet.`);
       }
     }else{
       const email = document.getElementById('auth-email').value.trim();
+      const phone = document.getElementById('auth-phone').value.trim();
       if(!email){ setAuthMessage('Doplň prosím e-mail.'); authSubmitBtn.disabled = false; return; }
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await setDoc(usernameDocRef(pendingNickForRegistration), { uid: cred.user.uid, email });
-      await setDoc(doc(db, 'users', cred.user.uid), { nick: pendingNickForRegistration, email });
+      await setDoc(doc(db, 'users', cred.user.uid), { nick: pendingNickForRegistration, email, phone, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() });
     }
   }catch(err){
     console.error(err);
@@ -1615,6 +1566,7 @@ function resetAuthForm(){
   pendingNickForRegistration = null;
   formAuth.reset();
   authEmailField.style.display = 'none';
+  document.getElementById('auth-phone-field').style.display = 'none';
   document.getElementById('auth-nick').readOnly = false;
   authSubmitBtn.textContent = 'Pokračovat';
   setAuthMessage('');
@@ -1627,6 +1579,7 @@ document.getElementById('btn-google').addEventListener('click', async () => {
 
 document.getElementById('btn-google-nick-submit').addEventListener('click', async () => {
   const nick = document.getElementById('google-nick-input').value.trim();
+  const phone = document.getElementById('google-phone-input').value.trim();
   if(!nick || !currentUser) return;
   const btn = document.getElementById('btn-google-nick-submit');
   btn.disabled = true;
@@ -1634,7 +1587,7 @@ document.getElementById('btn-google-nick-submit').addEventListener('click', asyn
     const existing = await getDoc(usernameDocRef(nick));
     if(existing.exists()){ alert('Tahle přezdívka je už obsazená, zkus jinou.'); btn.disabled = false; return; }
     await setDoc(usernameDocRef(nick), { uid: currentUser.uid, email: currentUser.email });
-    await setDoc(doc(db, 'users', currentUser.uid), { nick, email: currentUser.email });
+    await setDoc(doc(db, 'users', currentUser.uid), { nick, email: currentUser.email, phone, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() });
     currentNick = nick;
     updateAuthUI();
   }catch(err){ console.error(err); alert('Uložení přezdívky se nepovedlo. Zkus to znovu.'); }
@@ -1747,6 +1700,41 @@ function closeAllAccountPanels(){
   document.getElementById('pw-reset-panel').style.display = 'none';
 }
 
+async function renderUsersList(){
+  const box = document.getElementById('users-list');
+  if(!box) return;
+  box.innerHTML = '<div class="empty">Načítám...</div>';
+  try{
+    const snap = await getDocs(collection(db, 'users'));
+    const users = snap.docs.map(d => d.data()).sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    if(users.length === 0){ box.innerHTML = '<div class="empty">Zatím žádní uživatelé.</div>'; return; }
+    box.innerHTML = `
+      <table style="width:100%; max-width:720px; border-collapse:collapse; font-size:14px;">
+        <thead><tr style="text-align:left; color:var(--text-muted); font-size:12px;">
+          <th style="padding:8px 10px 8px 0;">Přezdívka</th><th style="padding:8px 10px;">E-mail</th><th style="padding:8px 10px;">Telefon</th><th style="padding:8px 10px;">Registrace</th><th style="padding:8px 10px;">Poslední přihlášení</th>
+        </tr></thead>
+        <tbody>
+          ${users.map(u => `
+            <tr style="border-top:1px solid var(--line);">
+              <td style="padding:8px 10px 8px 0;">${escapeHtml(u.nick||'')}${u.isAdmin?' <span style="color:var(--gold); font-size:11px;">(admin)</span>':''}</td>
+              <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.email||'')}</td>
+              <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.phone||'—')}</td>
+              <td style="padding:8px 10px; color:var(--text-muted);">${u.createdAt ? fmtDate(u.createdAt.slice(0,10)) : '—'}</td>
+              <td style="padding:8px 10px; color:var(--text-muted);">${u.lastLogin ? fmtDate(u.lastLogin.slice(0,10)) : '—'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      ${users.some(u=>u.phone) ? `<button type="button" id="btn-copy-phones" class="btn-sm" style="margin-top:16px;">Kopírovat telefony (pro ruční SMS)</button>` : ''}
+    `;
+    const copyBtn = document.getElementById('btn-copy-phones');
+    if(copyBtn) copyBtn.addEventListener('click', () => {
+      const phones = users.filter(u=>u.phone).map(u=>u.phone).join(', ');
+      navigator.clipboard.writeText(phones).then(() => { copyBtn.textContent = 'Zkopírováno!'; setTimeout(()=>copyBtn.textContent='Kopírovat telefony (pro ruční SMS)', 1500); });
+    });
+  }catch(err){ console.error(err); box.innerHTML = '<div class="empty">Nepovedlo se načíst uživatele.</div>'; }
+}
+
 function updateAuthUI(){
   const loggedOutBox = document.getElementById('auth-logged-out');
   const loggedInBox = document.getElementById('auth-logged-in');
@@ -1761,7 +1749,7 @@ function updateAuthUI(){
     document.getElementById('account-email-display').textContent = currentUser.email || '';
     document.getElementById('reauth-password-field').style.display = hasPasswordProvider(currentUser) ? 'block' : 'none';
     document.getElementById('password-row').style.display = hasPasswordProvider(currentUser) ? 'flex' : 'none';
-    navLabel.textContent = currentNick;
+    navLabel.textContent = 'Účet';
   }else if(currentUser && !currentNick){
     loggedOutBox.style.display = 'block';
     loggedInBox.style.display = 'none';
@@ -1782,6 +1770,19 @@ function updateAuthUI(){
   }
   renderEvents();
   if(currentDetailEventId){ renderStatsAndRsvp(); renderAttendees(); }
+
+  document.getElementById('nav-item-uzivatele').style.display = currentIsAdmin ? 'flex' : 'none';
+  document.getElementById('nav-sep-admin').style.display = currentIsAdmin ? 'block' : 'none';
+  if(currentIsAdmin) renderUsersList();
+
+  const accWidget = document.getElementById('topbar-account-widget');
+  if(currentUser && currentNick){
+    accWidget.innerHTML = `<span class="acc-nick">${escapeHtml(currentNick)}</span><button type="button" class="btn-ghost btn-sm" id="topbar-logout-btn">Odhlásit</button>`;
+    document.getElementById('topbar-logout-btn').addEventListener('click', async () => { await signOut(auth); });
+  }else{
+    accWidget.innerHTML = `<button type="button" class="btn-sm" id="topbar-login-btn">Přihlásit / Registrovat</button>`;
+    document.getElementById('topbar-login-btn').addEventListener('click', () => showView('ucet'));
+  }
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -1800,6 +1801,7 @@ onAuthStateChanged(auth, async (user) => {
             await updateDoc(usernameDocRef(currentNick), { email: user.email });
           }catch(e){ /* tichý fail, není kritické */ }
         }
+        try{ await updateDoc(doc(db,'users',user.uid), { lastLogin: new Date().toISOString() }); }catch(e){}
       }
     }catch(err){ console.error(err); }
     updateAuthUI();
