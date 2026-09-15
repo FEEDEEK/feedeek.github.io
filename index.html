@@ -25,8 +25,13 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19c1.2-4.2 4.3-6.4 8-6.4s6.8 2.2 8 6.4"/><circle cx="12" cy="7.2" r="3.7"/></svg>
         <span id="nav-ucet-label">Účet</span>
       </a>
+      <div class="nav-sep" id="nav-sep-admin" style="display:none;"></div>
+      <a class="nav-item" data-view="uzivatele" id="nav-item-uzivatele" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3 19c.8-3.4 3-5.2 6-5.2s5.2 1.8 6 5.2"/><circle cx="17" cy="8" r="2.5"/><path d="M16 13.2c2.2.4 3.6 1.9 4.2 4.6"/></svg>
+        <span>Uživatelé</span>
+      </a>
     </nav>
-    <div class="topbar-meta"></div>
+    <div class="topbar-meta" id="topbar-account-widget"></div>
   </header>
 
   <main class="main">
@@ -36,7 +41,7 @@
       <div class="eyebrow">Komunitní LAN-PARTY</div>
       <h1 class="headline">Posbírejte ty svý kalkulačky a doražte na klasický feedek!</h1>
       <p style="font-size: 1.1em; line-height: 1.5; margin-bottom: 24px; max-width:640px; color:var(--text-muted);">
-        Tady je hlavní mid or feed. Organizujeme zde naše lanky tak, aby z nikoho nebyla jenom warda.
+        Tady je hlavní mid or feed. Tady organizujeme naše lanky, aby z nikoho nebyla jenom warda.
       </p>
 
       <div class="lan-info-grid" style="margin-bottom: 34px;">
@@ -210,6 +215,7 @@
           <div class="field"><label>Přezdívka</label><input type="text" id="auth-nick" placeholder="Tvoje přezdívka" required></div>
           <div class="field"><label>Heslo</label><input type="password" id="auth-password" placeholder="Aspoň 6 znaků" required minlength="6"></div>
           <div class="field" id="auth-email-field" style="display:none;"><label>E-mail</label><input type="email" id="auth-email" placeholder="Potřebujeme ho pro založení účtu"></div>
+          <div class="field" id="auth-phone-field" style="display:none;"><label>Telefon (nepovinné)</label><input type="tel" id="auth-phone" placeholder="+420 ..."><small>Nikde se veřejně nezobrazuje, vidí ho jen admin.</small></div>
           <button type="submit" id="auth-submit-btn">Pokračovat</button>
           <div id="auth-message" class="small-msg"></div>
         </form>
@@ -224,6 +230,7 @@
         <div id="auth-google-nick-prompt" class="panel" style="display:none; max-width:480px; margin-top:18px;">
           <p style="font-size:14px; color:var(--text-muted);">Ještě potřebujeme přezdívku, pod kterou tě uvidí ostatní.</p>
           <div class="field"><label>Přezdívka</label><input type="text" id="google-nick-input" placeholder="Tvoje přezdívka" required></div>
+          <div class="field"><label>Telefon (nepovinné)</label><input type="tel" id="google-phone-input" placeholder="+420 ..."><small>Nikde se veřejně nezobrazuje, vidí ho jen admin.</small></div>
           <button type="button" id="btn-google-nick-submit">Uložit přezdívku</button>
         </div>
       </div>
@@ -278,6 +285,13 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- UŽIVATELÉ (jen admin) -->
+    <section class="view" id="view-uzivatele">
+      <div class="eyebrow">Admin</div>
+      <h1 class="headline" style="font-size:28px;">Registrovaní uživatelé</h1>
+      <div id="users-list" style="margin-top:20px;"></div>
     </section>
 
   </main>
