@@ -52,6 +52,8 @@ body{
 .nav-item.active svg{ opacity:1; filter:drop-shadow(0 0 3px rgba(201,162,75,0.6)); }
 .nav-item.active::after{ content:''; position:absolute; left:10px; right:10px; bottom:-1px; height:2px; background:linear-gradient(90deg, transparent, var(--gold), transparent); box-shadow:0 0 8px rgba(201,162,75,0.7); }
 .topbar-meta{ font-size:12px; color:var(--text-muted); flex-shrink:0; }
+#topbar-account-widget{ display:flex; align-items:center; gap:10px; }
+#topbar-account-widget .acc-nick{ color:var(--gold); font-size:13px; font-weight:600; }
 
 /* ---- Background theme ---- */
 body::before{
@@ -239,17 +241,13 @@ form.panel, .panel{
 
 /* ---- Jídlo: checkboxy ---- */
 .food-checkbox-row{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:14px; }
-.food-toggle{
-  width:26px; height:26px; flex-shrink:0; cursor:pointer; position:relative;
-  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
-  background:var(--bg-panel-2); border:1.5px solid var(--gold-dim);
-  display:flex; align-items:center; justify-content:center;
-  transition:background .15s ease, border-color .15s ease;
-  font-size:14px; color:transparent; font-weight:700;
-  box-shadow:0 0 4px rgba(0,0,0,0.4);
-}
-.food-toggle:hover{ border-color:var(--gold); }
-.food-toggle.checked{ background:#2f8f4a; border-color:#5fd67f; color:#fff; }
+.food-toggle{ width:26px; height:26px; flex-shrink:0; cursor:pointer; display:block; }
+.food-toggle-svg{ width:100%; height:100%; display:block; }
+.food-toggle-svg polygon{ fill:var(--bg-panel-2); stroke:var(--gold-dim); stroke-width:1.5; transition:fill .15s ease, stroke .15s ease; }
+.food-toggle:hover .food-toggle-svg polygon{ stroke:var(--gold); }
+.food-toggle.checked .food-toggle-svg polygon{ fill:#2f8f4a; stroke:#5fd67f; }
+.food-toggle-svg .food-check{ fill:none; stroke:#fff; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; opacity:0; transition:opacity .1s ease; }
+.food-toggle.checked .food-toggle-svg .food-check{ opacity:1; }
 .food-toggle.disabled{ cursor:not-allowed; opacity:.5; }
 .food-checkbox-row .portion-count{ margin-left:auto; font-size:11px; color:var(--text-muted); }
 .food-confirm-row{ margin-top:14px; display:flex; align-items:center; gap:12px; }
@@ -260,7 +258,7 @@ textarea.discussion-input{ min-height:90px; width:100%; }
 /* ---- Vstupné / platba ---- */
 .entry-fee-box{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-top:16px; }
 .qr-code-img{ width:140px; height:140px; object-fit:contain; background:#fff; padding:6px; border:1px solid var(--line); }
-.coin-icon{ width:18px; height:18px; flex-shrink:0; position:relative; display:inline-block; }
+.coin-icon{ width:24px; height:24px; flex-shrink:0; position:relative; display:inline-block; }
 .coin-icon svg{ width:100%; height:100%; display:block; }
 .coin-icon.admin-toggle{ cursor:pointer; }
 .coin-icon.admin-toggle:hover svg{ filter:brightness(1.25); }
