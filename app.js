@@ -41,6 +41,8 @@ let regCounts = {};
 let currentUser = null;
 let currentNick = null;
 let currentIsAdmin = false;
+let currentPhone = '';
+let currentEmoji = '';
 let pendingEventId = null;
 
 let currentEventGames = [];
@@ -58,14 +60,32 @@ function fmtDateShort(iso){
   return d.toLocaleDateString('cs-CZ', { day:'numeric', month:'numeric' });
 }
 function fmtDateRange(ev){
+  if(ev.dateUnconfirmed) return 'Termín se vybírá hlasováním';
   if(!ev.dateStart) return '';
-  if(ev.dateEnd && ev.dateEnd !== ev.dateStart) return `${fmtDateShort(ev.dateStart)} – ${fmtDate(ev.dateEnd)}`;
-  return fmtDate(ev.dateStart);
+  let range = (ev.dateEnd && ev.dateEnd !== ev.dateStart) ? `${fmtDateShort(ev.dateStart)} – ${fmtDate(ev.dateEnd)}` : fmtDate(ev.dateStart);
+  if(ev.timeStart) range += `, ${ev.timeStart}${ev.timeEnd ? '–'+ev.timeEnd : ''}`;
+  return range;
 }
 function escapeHtml(str){
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
+}
+function authorLabel(author, emoji){
+  return `${emoji ? escapeHtml(emoji)+' ' : ''}${escapeHtml(author)}`;
+}
+const CHAT_EMOJIS = ['😀','😂','😎','👍','👎','🔥','🎉','❤️','😢','🤔','🎮','🕹️','👾','💻','🖱️','⌨️','🍕','🍺','🌙','⚡','💀','👑','🐉','🚗'];
+function setupChatEmojiRow(rowId, inputId){
+  const row = document.getElementById(rowId);
+  if(!row) return;
+  row.innerHTML = CHAT_EMOJIS.map(e => `<span class="chip" data-chat-emoji="${e}" style="cursor:pointer; font-size:15px;">${e}</span>`).join('');
+  row.querySelectorAll('[data-chat-emoji]').forEach(el => {
+    el.addEventListener('click', () => {
+      const input = document.getElementById(inputId);
+      input.value += el.dataset.chatEmoji;
+      input.focus();
+    });
+  });
 }
 function todayIso(){ return new Date().toISOString().slice(0,10); }
 
@@ -114,6 +134,92 @@ document.getElementById('brand-home-link').addEventListener('click', () => {
   showView('home');
 });
 document.getElementById('btn-back-to-akce').addEventListener('click', () => { showView('akce'); });
+
+// ---- Kontakty / Tablo ----
+let contacts = [];
+let editingContactId = null;
+onSnapshot(collection(db, 'contacts'), (snap) => {
+  contacts = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  renderContacts();
+});
+
+function renderContacts(){
+  const grid = document.getElementById('contacts-grid');
+  if(!grid) return;
+  document.getElementById('btn-new-contact').style.display = currentIsAdmin ? 'inline-flex' : 'none';
+  if(contacts.length === 0){ grid.innerHTML = '<div class="empty">Zatím žádné kontakty.</div>'; return; }
+  grid.innerHTML = contacts.map(c => `
+    <div class="contact-card">
+      <div class="contact-avatar" style="${c.photo ? `background-image:url('${c.photo.replace(/'/g,"")}')` : ''}">${c.photo ? '' : (c.emoji || '👤')}</div>
+      <h3>${escapeHtml(c.name)}</h3>
+      ${c.role ? `<div class="role">${escapeHtml(c.role)}</div>` : ''}
+      ${c.contact ? `<div class="info">${escapeHtml(c.contact)}</div>` : ''}
+      ${currentIsAdmin ? `
+      <div class="row" style="margin-top:14px; gap:6px;">
+        <button type="button" class="btn-ghost btn-sm" data-edit-contact="${c.id}" style="flex:1;">Upravit</button>
+        <button type="button" class="btn-ghost btn-sm" data-delete-contact="${c.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+      </div>` : ''}
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('[data-edit-contact]').forEach(btn => {
+    btn.addEventListener('click', () => startEditContact(contacts.find(c=>c.id===btn.dataset.editContact)));
+  });
+  grid.querySelectorAll('[data-delete-contact]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if(!confirm('Smazat tento kontakt?')) return;
+      try{ await deleteDoc(doc(db,'contacts',btn.dataset.deleteContact)); }
+      catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
+    });
+  });
+}
+
+const formContact = document.getElementById('form-contact');
+document.getElementById('btn-new-contact').addEventListener('click', () => {
+  if(formContact.style.display === 'none' || !formContact.style.display){
+    editingContactId = null;
+    formContact.reset();
+    document.getElementById('btn-save-contact').textContent = 'Uložit';
+    formContact.style.display = 'flex';
+  }else{
+    formContact.style.display = 'none';
+  }
+});
+document.getElementById('btn-cancel-contact').addEventListener('click', () => {
+  formContact.style.display = 'none';
+  formContact.reset();
+  editingContactId = null;
+});
+function startEditContact(c){
+  if(!c) return;
+  editingContactId = c.id;
+  document.getElementById('ct-name').value = c.name || '';
+  document.getElementById('ct-role').value = c.role || '';
+  document.getElementById('ct-contact').value = c.contact || '';
+  document.getElementById('ct-emoji').value = c.emoji || '';
+  document.getElementById('ct-photo').value = c.photo || '';
+  document.getElementById('btn-save-contact').textContent = 'Uložit změny';
+  formContact.style.display = 'flex';
+  formContact.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+formContact.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    name: document.getElementById('ct-name').value.trim(),
+    role: document.getElementById('ct-role').value.trim(),
+    contact: document.getElementById('ct-contact').value.trim(),
+    emoji: document.getElementById('ct-emoji').value.trim(),
+    photo: document.getElementById('ct-photo').value.trim()
+  };
+  if(!payload.name) return;
+  try{
+    if(editingContactId) await updateDoc(doc(db,'contacts',editingContactId), payload);
+    else await addDoc(collection(db,'contacts'), payload);
+    formContact.reset();
+    formContact.style.display = 'none';
+    editingContactId = null;
+  }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
+});
 
 // ---- Home ----
 function renderHome(){
@@ -261,29 +367,50 @@ formEvent.addEventListener('submit', async (e) => {
   e.preventDefault();
   const submitBtn = document.getElementById('btn-save-event');
   submitBtn.disabled = true;
+
+  const enteredStart = document.getElementById('ev-date-start').value;
+  const enteredEnd = document.getElementById('ev-date-end').value;
+  const dateOptions = [...currentEventDateOptions];
+
+  if(!enteredStart && dateOptions.length === 0){
+    alert('Zadej datum akce, nebo přidej alespoň jeden termín k hlasování.');
+    submitBtn.disabled = false;
+    return;
+  }
+
+  let dateStart = enteredStart;
+  let dateEnd = enteredEnd || enteredStart;
+  let dateUnconfirmed = false;
+  if(!enteredStart && dateOptions.length > 0){
+    dateStart = dateOptions[0].start;
+    dateEnd = dateOptions[0].end;
+    dateUnconfirmed = true;
+  }
+  if(dateEnd < dateStart){
+    alert('Datum "do" nemůže být dřív než datum "od".');
+    submitBtn.disabled = false;
+    return;
+  }
+
   const payload = {
     number: document.getElementById('ev-number').value.trim(),
     name: document.getElementById('ev-name').value.trim(),
-    dateStart: document.getElementById('ev-date-start').value,
-    dateEnd: document.getElementById('ev-date-end').value,
+    dateStart, dateEnd, dateUnconfirmed,
+    timeStart: document.getElementById('ev-time-start').value || '',
+    timeEnd: document.getElementById('ev-time-end').value || '',
     place: document.getElementById('ev-place').value.trim(),
     cap: parseInt(document.getElementById('ev-cap').value, 10) || 1,
     desc: document.getElementById('ev-desc').value.trim(),
     imageUrl: document.getElementById('ev-image').value.trim(),
     fee: parseInt(document.getElementById('ev-fee').value, 10) || 0,
     qrUrl: document.getElementById('ev-qr').value.trim(),
-    dateOptions: [...currentEventDateOptions],
+    dateOptions,
     dateVoteDeadline: document.getElementById('ev-dateopt-deadline').value || '',
     games: [...currentEventGames],
     foodPlan: document.getElementById('ev-foodplan').value.trim(),
     foodSchedule: JSON.parse(JSON.stringify(currentEventFood)),
     changeDeadline: document.getElementById('ev-deadline').value || ''
   };
-  if(payload.dateEnd < payload.dateStart){
-    alert('Datum "do" nemůže být dřív než datum "od".');
-    submitBtn.disabled = false;
-    return;
-  }
   try{
     if(editingEventId){
       await updateDoc(doc(db, 'events', editingEventId), payload);
@@ -303,8 +430,10 @@ function startEditEvent(ev){
   editingEventId = ev.id;
   document.getElementById('ev-number').value = ev.number || '';
   document.getElementById('ev-name').value = ev.name || '';
-  document.getElementById('ev-date-start').value = ev.dateStart || '';
-  document.getElementById('ev-date-end').value = ev.dateEnd || ev.dateStart || '';
+  document.getElementById('ev-date-start').value = ev.dateUnconfirmed ? '' : (ev.dateStart || '');
+  document.getElementById('ev-date-end').value = ev.dateUnconfirmed ? '' : (ev.dateEnd || ev.dateStart || '');
+  document.getElementById('ev-time-start').value = ev.timeStart || '';
+  document.getElementById('ev-time-end').value = ev.timeEnd || '';
   document.getElementById('ev-place').value = ev.place || '';
   document.getElementById('ev-cap').value = ev.cap || 1;
   document.getElementById('ev-desc').value = ev.desc || '';
@@ -530,7 +659,7 @@ function renderEventDetailStatic(ev){
   const q = encodeURIComponent(ev.place || '');
   mapBox.innerHTML = `<iframe src="https://www.google.com/maps?q=${q}&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
 
-  const tabPanels = { prehled:'tab-prehled', jidlo:'tab-jidlo', turnaj:'tab-turnaj', foto:'tab-foto' };
+  const tabPanels = { prehled:'tab-prehled', rozvrh:'tab-rozvrh', jidlo:'tab-jidlo', turnaj:'tab-turnaj', foto:'tab-foto' };
   Object.entries(tabPanels).forEach(([key, id]) => {
     document.getElementById(id).style.display = (key === currentTab) ? 'block' : 'none';
   });
@@ -553,6 +682,7 @@ function renderEventDetailStatic(ev){
 
 function renderActiveTab(ev){
   if(currentTab === 'prehled') renderTabPrehled(ev);
+  else if(currentTab === 'rozvrh') renderTabRozvrh(ev);
   else if(currentTab === 'jidlo') renderTabJidlo(ev);
   else if(currentTab === 'turnaj') renderTabTurnaj(ev);
   else renderTabFoto(ev);
@@ -617,7 +747,7 @@ function renderDateVoteBlock(ev){
       const idx = parseInt(btn.dataset.finalizeDate,10);
       const opt = options[idx];
       if(!confirm(`Nastavit termín akce na ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}?`)) return;
-      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true }); }
+      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true, dateUnconfirmed: false }); }
       catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
     });
   });
@@ -650,7 +780,7 @@ function renderStatsAndRsvp(){
     if(btn) btn.addEventListener('click', async () => {
       try{
         await setDoc(doc(db, 'events', ev.id, 'registrations', currentUser.uid), {
-          nick: currentNick, uid: currentUser.uid, status: 'going', food: {}, ts: new Date().toISOString()
+          nick: currentNick, emoji: currentEmoji, uid: currentUser.uid, status: 'going', food: {}, ts: new Date().toISOString()
         });
       }catch(err){ alert('Přihlášení se nepovedlo.'); console.error(err); }
     });
@@ -724,7 +854,7 @@ function renderAttendees(){
         : '';
       return `
         <div class="attendee-row">
-          <span style="display:flex; align-items:center; gap:6px;">${coinHtml}${escapeHtml(r.nick || '(bez jména)')}</span>
+          <span style="display:flex; align-items:center; gap:6px;">${coinHtml}${r.emoji ? escapeHtml(r.emoji)+' ' : ''}${escapeHtml(r.nick || '(bez jména)')}</span>
           <span style="display:flex; align-items:center; gap:6px;">
             ${statusHtml}
             ${(currentIsAdmin && !isSelf) ? `<button type="button" class="btn-ghost btn-sm" data-remove-attendee="${r._docId}" title="Odebrat" style="padding:2px 7px; color:var(--crimson); border-color:var(--crimson);">×</button>` : ''}
@@ -796,12 +926,14 @@ function renderTabPrehled(ev){
     </div>
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze</div>
+    <div class="chip-row" id="chat-emoji-row-comment" style="margin-top:0;"></div>
     <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
       <div style="flex:1;"><textarea class="discussion-input" id="comment-input" placeholder="Napiš příspěvek do diskuze..."></textarea></div>
       <button type="button" id="btn-add-comment" class="btn-sm">Odeslat</button>
     </div>
     <div id="comments-list" style="margin-top:6px;"></div>
   `;
+  setupChatEmojiRow('chat-emoji-row-comment', 'comment-input');
 
   renderSuggestions(ev);
   renderComments(ev);
@@ -812,7 +944,7 @@ function renderTabPrehled(ev){
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'suggestions'), { text, author: currentNick, uid: currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'suggestions'), { text, author: currentNick, authorEmoji: currentEmoji, uid: currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
       input.value = '';
     }catch(err){ console.error(err); }
   });
@@ -823,7 +955,7 @@ function renderTabPrehled(ev){
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'comments'), { text, author: currentNick, uid: currentUser.uid, ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'comments'), { text, author: currentNick, authorEmoji: currentEmoji, uid: currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
     }catch(err){ console.error(err); }
   });
@@ -842,7 +974,7 @@ function renderSuggestions(ev){
     const canEdit = currentUser && (s.uid === currentUser.uid || currentIsAdmin);
     return `
     <div class="suggestion-row" data-sug-row="${s.id}">
-      <span class="txt" data-sug-display="${s.id}">Hráč: ${escapeHtml(s.author)} — ${escapeHtml(s.text)}</span>
+      <span class="txt" data-sug-display="${s.id}">Hráč: ${authorLabel(s.author, s.authorEmoji)} — ${escapeHtml(s.text)}</span>
       <span class="sug-actions">
         <button type="button" class="like-btn ${liked?'liked':''}" data-sug-like="${s.id}" title="${escapeHtml(likers)}">♥ ${ (s.likes||[]).length }</button>
         ${canEdit ? `<button type="button" class="btn-ghost btn-sm" data-sug-edit="${s.id}">Upravit</button><button type="button" class="btn-ghost btn-sm" data-sug-delete="${s.id}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>` : ''}
@@ -905,7 +1037,7 @@ function renderComments(ev){
     const canEdit = currentUser && (c.uid === currentUser.uid || currentIsAdmin);
     return `
     <div class="comment-row" data-comment-row="${c.id}">
-      <span class="who">${escapeHtml(c.author)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
+      <span class="who">${authorLabel(c.author, c.authorEmoji)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
       <div class="txt" data-comment-display="${c.id}">${escapeHtml(c.text)}</div>
       ${canEdit ? `<div class="row-actions"><button type="button" class="btn-ghost btn-sm" data-comment-edit="${c.id}">Upravit</button><button type="button" class="btn-ghost btn-sm" data-comment-delete="${c.id}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button></div>` : ''}
     </div>`;
@@ -999,12 +1131,14 @@ function renderTabJidlo(ev){
       </div>` : ''}
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze k jídlu</div>
+    <div class="chip-row" id="chat-emoji-row-food" style="margin-top:0;"></div>
     <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
       <div style="flex:1;"><textarea class="discussion-input" id="food-comment-input" placeholder="Kdo co doveze, návrhy..."></textarea></div>
       <button type="button" id="btn-add-food-comment" class="btn-sm">Odeslat</button>
     </div>
     <div id="food-comments-list" style="margin-top:6px;"></div>
   `;
+  setupChatEmojiRow('chat-emoji-row-food', 'food-comment-input');
 
   box.querySelectorAll('[data-food-toggle]').forEach(el => {
     if(el.classList.contains('disabled')) return;
@@ -1038,7 +1172,7 @@ function renderTabJidlo(ev){
         const canEdit = currentUser && (c.uid === currentUser.uid || currentIsAdmin);
         return `
         <div class="comment-row" data-food-comment-row="${c.id}">
-          <span class="who">${escapeHtml(c.author)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
+          <span class="who">${authorLabel(c.author, c.authorEmoji)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
           <div class="txt">${escapeHtml(c.text)}</div>
           ${canEdit ? `<div class="row-actions"><button type="button" class="btn-ghost btn-sm" data-food-comment-delete="${c.id}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button></div>` : ''}
         </div>`;
@@ -1058,7 +1192,7 @@ function renderTabJidlo(ev){
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'foodComments'), { text, author: currentNick, uid: currentUser.uid, ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'foodComments'), { text, author: currentNick, authorEmoji: currentEmoji, uid: currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
     }catch(err){ console.error(err); }
   });
@@ -1420,6 +1554,92 @@ function openScoreModal(ev, tIndex, resultField, matchKey, labelA, labelB, exist
   });
 }
 
+// ---- Rozvrh ----
+function eventDayList(ev){
+  const days = [];
+  if(!ev.dateStart || ev.dateUnconfirmed) return days;
+  let d = new Date(ev.dateStart+'T00:00:00');
+  const end = new Date((ev.dateEnd||ev.dateStart)+'T00:00:00');
+  while(d <= end){
+    days.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate()+1);
+  }
+  return days;
+}
+
+function renderTabRozvrh(ev){
+  const box = document.getElementById('tab-rozvrh');
+  const days = eventDayList(ev);
+  const schedule = ev.schedule || [];
+
+  if(days.length === 0){
+    box.innerHTML = '<div class="empty">Rozvrh půjde vyplnit, až bude mít akce potvrzené konkrétní datum.</div>';
+    return;
+  }
+
+  let html = `<div class="section-title" style="font-size:16px;">Rozvrh</div>`;
+  if(currentIsAdmin){
+    html += `
+      <form class="panel" id="form-schedule-item" style="max-width:480px;">
+        <div class="field"><label>Den</label><select id="sch-day">${days.map(d=>`<option value="${d}">${fmtDate(d)}</option>`).join('')}</select></div>
+        <div style="display:flex; gap:12px;">
+          <div class="field" style="flex:1;"><label>Od</label><input type="time" id="sch-start" required></div>
+          <div class="field" style="flex:1;"><label>Do (nepovinné)</label><input type="time" id="sch-end"></div>
+        </div>
+        <div class="field"><label>Co se bude dít</label><input type="text" id="sch-title" placeholder="Turnaj, oběd, příjezd..." required></div>
+        <button type="submit">Přidat do rozvrhu</button>
+      </form>
+    `;
+  }
+  html += `<div id="schedule-days"></div>`;
+  box.innerHTML = html;
+
+  const formSch = document.getElementById('form-schedule-item');
+  if(formSch) formSch.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const entry = {
+      day: document.getElementById('sch-day').value,
+      timeStart: document.getElementById('sch-start').value,
+      timeEnd: document.getElementById('sch-end').value || '',
+      title: document.getElementById('sch-title').value.trim()
+    };
+    if(!entry.title || !entry.timeStart) return;
+    const newSchedule = [...schedule, entry];
+    try{
+      await updateDoc(doc(db,'events',ev.id), { schedule: newSchedule });
+      formSch.reset();
+    }catch(err){ alert('Nepovedlo se přidat.'); console.error(err); }
+  });
+
+  const daysBox = document.getElementById('schedule-days');
+  daysBox.innerHTML = days.map(d => {
+    const items = schedule
+      .map((s, idx) => ({ ...s, idx }))
+      .filter(s => s.day === d)
+      .sort((a,b) => a.timeStart.localeCompare(b.timeStart));
+    return `
+      <div style="margin-top:20px;">
+        <div class="bracket-section-title">${fmtDate(d)}</div>
+        ${items.length === 0 ? '<div class="empty">Zatím nic naplánováno.</div>' : items.map(it => `
+          <div class="suggestion-row">
+            <span class="txt"><b style="color:var(--gold);">${it.timeStart}${it.timeEnd?'–'+it.timeEnd:''}</b> — ${escapeHtml(it.title)}</span>
+            ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-remove-sch="${it.idx}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }).join('');
+
+  daysBox.querySelectorAll('[data-remove-sch]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.dataset.removeSch, 10);
+      const newSchedule = schedule.filter((_,i) => i !== idx);
+      try{ await updateDoc(doc(db,'events',ev.id), { schedule: newSchedule }); }
+      catch(err){ console.error(err); }
+    });
+  });
+}
+
 // ---- Foto ----
 function renderTabFoto(ev){
   const box = document.getElementById('tab-foto');
@@ -1447,7 +1667,7 @@ function renderTabFoto(ev){
       return;
     }
     try{
-      await addDoc(collection(db,'events',ev.id,'photos'), { url, kind, author: currentNick, uid: currentUser.uid, ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'photos'), { url, kind, author: currentNick, authorEmoji: currentEmoji, uid: currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
       msg.textContent = '';
     }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se přidat.'; }
@@ -1494,7 +1714,7 @@ function renderPhotoGrid(ev){
       <div class="photo-card">
         ${mediaHtml}
         <div class="photo-meta">
-          <span>${escapeHtml(p.author)}</span>
+          <span>${authorLabel(p.author, p.authorEmoji)}</span>
           ${canDelete ? `<span class="photo-del" data-photo-delete="${p.id}">Smazat</span>` : ''}
         </div>
       </div>
@@ -1636,6 +1856,66 @@ document.getElementById('form-change-nick').addEventListener('submit', async (e)
   }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se — zkus to prosím znovu.'; }
 });
 
+// ---- Emotikon: změna ----
+const EMOJI_PRESETS = ['🎮','🕹️','👾','💻','🖱️','🔥','💀','👑','😎','🍺','🍕','⚡','🌙','🐉','👻','🎲'];
+document.getElementById('emoji-preset-row').innerHTML = EMOJI_PRESETS.map(e => `<span class="chip" data-emoji-pick="${e}" style="cursor:pointer; font-size:16px;">${e}</span>`).join('');
+document.getElementById('emoji-preset-row').addEventListener('click', (e) => {
+  const target = e.target.closest('[data-emoji-pick]');
+  if(target) document.getElementById('new-emoji-input').value = target.dataset.emojiPick;
+});
+document.getElementById('btn-toggle-emoji').addEventListener('click', () => {
+  const form = document.getElementById('form-change-emoji');
+  const opening = form.style.display === 'none';
+  closeAllAccountPanels();
+  if(opening){
+    document.getElementById('new-emoji-input').value = currentEmoji || '';
+    form.style.display = 'flex';
+  }
+});
+document.getElementById('btn-cancel-emoji').addEventListener('click', () => {
+  document.getElementById('form-change-emoji').style.display = 'none';
+});
+document.getElementById('form-change-emoji').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('emoji-change-msg');
+  const newEmoji = document.getElementById('new-emoji-input').value.trim();
+  if(!currentUser) return;
+  msg.textContent = '';
+  try{
+    await updateDoc(doc(db,'users',currentUser.uid), { emoji: newEmoji });
+    currentEmoji = newEmoji;
+    document.getElementById('form-change-emoji').style.display = 'none';
+    updateAuthUI();
+  }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se — zkus to prosím znovu.'; }
+});
+
+// ---- Telefon: změna ----
+document.getElementById('btn-toggle-phone').addEventListener('click', () => {
+  const form = document.getElementById('form-change-phone');
+  const opening = form.style.display === 'none';
+  closeAllAccountPanels();
+  if(opening){
+    document.getElementById('new-phone-input').value = currentPhone || '';
+    form.style.display = 'flex';
+  }
+});
+document.getElementById('btn-cancel-phone').addEventListener('click', () => {
+  document.getElementById('form-change-phone').style.display = 'none';
+});
+document.getElementById('form-change-phone').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('phone-change-msg');
+  const newPhone = document.getElementById('new-phone-input').value.trim();
+  if(!currentUser) return;
+  msg.textContent = '';
+  try{
+    await updateDoc(doc(db,'users',currentUser.uid), { phone: newPhone });
+    currentPhone = newPhone;
+    document.getElementById('form-change-phone').style.display = 'none';
+    updateAuthUI();
+  }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se — zkus to prosím znovu.'; }
+});
+
 // ---- E-mail: změna ----
 document.getElementById('btn-toggle-email').addEventListener('click', () => {
   const form = document.getElementById('form-change-email');
@@ -1697,6 +1977,8 @@ document.getElementById('btn-change-password').addEventListener('click', async (
 function closeAllAccountPanels(){
   document.getElementById('form-change-nick').style.display = 'none';
   document.getElementById('form-change-email').style.display = 'none';
+  document.getElementById('form-change-phone').style.display = 'none';
+  document.getElementById('form-change-emoji').style.display = 'none';
   document.getElementById('pw-reset-panel').style.display = 'none';
 }
 
@@ -1706,27 +1988,42 @@ async function renderUsersList(){
   box.innerHTML = '<div class="empty">Načítám...</div>';
   try{
     const snap = await getDocs(collection(db, 'users'));
-    const users = snap.docs.map(d => d.data()).sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    const users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
     if(users.length === 0){ box.innerHTML = '<div class="empty">Zatím žádní uživatelé.</div>'; return; }
     box.innerHTML = `
-      <table style="width:100%; max-width:720px; border-collapse:collapse; font-size:14px;">
+      <table style="width:100%; max-width:820px; border-collapse:collapse; font-size:14px;">
         <thead><tr style="text-align:left; color:var(--text-muted); font-size:12px;">
-          <th style="padding:8px 10px 8px 0;">Přezdívka</th><th style="padding:8px 10px;">E-mail</th><th style="padding:8px 10px;">Telefon</th><th style="padding:8px 10px;">Registrace</th><th style="padding:8px 10px;">Poslední přihlášení</th>
+          <th style="padding:8px 10px 8px 0;">Přezdívka</th><th style="padding:8px 10px;">E-mail</th><th style="padding:8px 10px;">Telefon</th><th style="padding:8px 10px;">Registrace</th><th style="padding:8px 10px;">Poslední přihlášení</th><th></th>
         </tr></thead>
         <tbody>
           ${users.map(u => `
-            <tr style="border-top:1px solid var(--line);">
+            <tr style="border-top:1px solid var(--line);" data-user-row="${u.uid}">
               <td style="padding:8px 10px 8px 0;">${escapeHtml(u.nick||'')}${u.isAdmin?' <span style="color:var(--gold); font-size:11px;">(admin)</span>':''}</td>
               <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.email||'')}</td>
-              <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.phone||'—')}</td>
-              <td style="padding:8px 10px; color:var(--text-muted);">${u.createdAt ? fmtDate(u.createdAt.slice(0,10)) : '—'}</td>
+              <td style="padding:8px 10px;"><input type="tel" data-edit-phone="${u.uid}" value="${escapeHtml(u.phone||'')}" placeholder="—" style="width:120px; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
+              <td style="padding:8px 10px;"><input type="date" data-edit-created="${u.uid}" value="${u.createdAt ? u.createdAt.slice(0,10) : ''}" style="background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px; color:var(--text-muted);">${u.lastLogin ? fmtDate(u.lastLogin.slice(0,10)) : '—'}</td>
+              <td style="padding:8px 10px;"><button type="button" class="btn-ghost btn-sm" data-save-user="${u.uid}">Uložit</button></td>
             </tr>
           `).join('')}
         </tbody>
       </table>
       ${users.some(u=>u.phone) ? `<button type="button" id="btn-copy-phones" class="btn-sm" style="margin-top:16px;">Kopírovat telefony (pro ruční SMS)</button>` : ''}
     `;
+    box.querySelectorAll('[data-save-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const uid = btn.dataset.saveUser;
+        const phone = box.querySelector(`[data-edit-phone="${uid}"]`).value.trim();
+        const createdDate = box.querySelector(`[data-edit-created="${uid}"]`).value;
+        const payload = { phone };
+        if(createdDate) payload.createdAt = createdDate + 'T12:00:00.000Z';
+        try{
+          await updateDoc(doc(db,'users',uid), payload);
+          btn.textContent = 'Uloženo!';
+          setTimeout(() => { btn.textContent = 'Uložit'; }, 1200);
+        }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
+      });
+    });
     const copyBtn = document.getElementById('btn-copy-phones');
     if(copyBtn) copyBtn.addEventListener('click', () => {
       const phones = users.filter(u=>u.phone).map(u=>u.phone).join(', ');
@@ -1747,6 +2044,8 @@ function updateAuthUI(){
     googleNickPrompt.style.display = 'none';
     document.getElementById('account-nick-display').textContent = currentNick + (currentIsAdmin ? ' (admin)' : '');
     document.getElementById('account-email-display').textContent = currentUser.email || '';
+    document.getElementById('account-phone-display').textContent = currentPhone || '—';
+    document.getElementById('account-emoji-display').textContent = currentEmoji || '—';
     document.getElementById('reauth-password-field').style.display = hasPasswordProvider(currentUser) ? 'block' : 'none';
     document.getElementById('password-row').style.display = hasPasswordProvider(currentUser) ? 'flex' : 'none';
     navLabel.textContent = 'Účet';
@@ -1769,6 +2068,7 @@ function updateAuthUI(){
     navLabel.textContent = 'Účet';
   }
   renderEvents();
+  renderContacts();
   if(currentDetailEventId){ renderStatsAndRsvp(); renderAttendees(); }
 
   document.getElementById('nav-item-uzivatele').style.display = currentIsAdmin ? 'flex' : 'none';
@@ -1789,12 +2089,16 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   currentNick = null;
   currentIsAdmin = false;
+  currentPhone = '';
+  currentEmoji = '';
   if(user){
     try{
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if(userDoc.exists()){
         currentNick = userDoc.data().nick;
         currentIsAdmin = userDoc.data().isAdmin === true;
+        currentPhone = userDoc.data().phone || '';
+        currentEmoji = userDoc.data().emoji || '';
         if(userDoc.data().email !== user.email){
           try{
             await updateDoc(doc(db,'users',user.uid), { email: user.email });
