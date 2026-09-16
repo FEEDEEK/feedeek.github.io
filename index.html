@@ -21,6 +21,11 @@
         <span>Akce</span>
       </a>
       <div class="nav-sep"></div>
+      <a class="nav-item" data-view="kontakty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="4" width="17" height="16" rx="1.5"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16c.7-2 2.1-3 3.5-3s2.8 1 3.5 3"/><path d="M15 9h4M15 13h4"/></svg>
+        <span>Kontakty</span>
+      </a>
+      <div class="nav-sep"></div>
       <a class="nav-item" data-view="ucet">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19c1.2-4.2 4.3-6.4 8-6.4s6.8 2.2 8 6.4"/><circle cx="12" cy="7.2" r="3.7"/></svg>
         <span id="nav-ucet-label">Účet</span>
@@ -93,10 +98,14 @@
         </div>
 
         <div style="display:flex; gap:15px;">
-          <div class="field" style="flex:1;"><label>Datum od</label><input type="date" id="ev-date-start" required></div>
-          <div class="field" style="flex:1;"><label>Datum do</label><input type="date" id="ev-date-end" required></div>
+          <div class="field" style="flex:1;"><label>Datum od</label><input type="date" id="ev-date-start"></div>
+          <div class="field" style="flex:1;"><label>Datum do</label><input type="date" id="ev-date-end"></div>
         </div>
-        <small style="display:block; margin-top:-10px; margin-bottom:10px; color:var(--text-muted);">Pokud zatím termín nevíš jistě, můžeš místo toho níže vypsat víc možností k hlasování — datum od/do výše pak slouží jen jako předběžný odhad pro řazení, dokud nevybereš vítězný termín.</small>
+        <div style="display:flex; gap:15px;">
+          <div class="field" style="flex:1;"><label>Čas zahájení (nepovinné)</label><input type="time" id="ev-time-start"></div>
+          <div class="field" style="flex:1;"><label>Čas ukončení (nepovinné)</label><input type="time" id="ev-time-end"></div>
+        </div>
+        <small style="display:block; margin-top:-10px; margin-bottom:10px; color:var(--text-muted);">Datum můžeš nechat prázdné, pokud zatím termín nevíš jistě a chceš místo toho níže vypsat víc možností k hlasování.</small>
 
         <div class="field tag-input-box">
           <label>🗳️ Hlasování o termínu (nepovinné)</label>
@@ -187,6 +196,7 @@
           <div class="map-embed" id="ed-map"></div>
           <div class="tab-switch" id="ed-tabs">
             <button type="button" class="tab-btn active" data-tab="prehled">Přehled</button>
+            <button type="button" class="tab-btn" data-tab="rozvrh">Rozvrh</button>
             <button type="button" class="tab-btn" data-tab="jidlo">Jídlo</button>
             <button type="button" class="tab-btn" data-tab="turnaj">Turnaj</button>
             <button type="button" class="tab-btn" data-tab="foto">Foto</button>
@@ -194,6 +204,7 @@
         </div>
         <div class="detail-col-center">
           <div class="tab-panel" id="tab-prehled"></div>
+          <div class="tab-panel" id="tab-rozvrh" style="display:none;"></div>
           <div class="tab-panel" id="tab-jidlo" style="display:none;"></div>
           <div class="tab-panel" id="tab-turnaj" style="display:none;"></div>
           <div class="tab-panel" id="tab-foto" style="display:none;"></div>
@@ -270,6 +281,35 @@
             <div id="email-change-msg" class="small-msg"></div>
           </form>
 
+          <div class="account-row">
+            <div class="account-row-label">Telefon</div>
+            <div class="account-row-value" id="account-phone-display">—</div>
+            <button type="button" class="btn-ghost btn-sm" id="btn-toggle-phone">Změnit</button>
+          </div>
+          <form class="panel" id="form-change-phone" style="display:none;">
+            <div class="field"><label>Telefon</label><input type="tel" id="new-phone-input" placeholder="+420 ..."><small>Nikde se veřejně nezobrazuje, vidí ho jen admin.</small></div>
+            <div style="display:flex; gap:8px;">
+              <button type="submit">Uložit</button>
+              <button type="button" class="btn-ghost" id="btn-cancel-phone">Zrušit</button>
+            </div>
+            <div id="phone-change-msg" class="small-msg"></div>
+          </form>
+
+          <div class="account-row">
+            <div class="account-row-label">Emotikon</div>
+            <div class="account-row-value" id="account-emoji-display">—</div>
+            <button type="button" class="btn-ghost btn-sm" id="btn-toggle-emoji">Změnit</button>
+          </div>
+          <form class="panel" id="form-change-emoji" style="display:none;">
+            <div class="chip-row" id="emoji-preset-row"></div>
+            <div class="field"><label>Nebo vlastní emotikon</label><input type="text" id="new-emoji-input" maxlength="4" style="max-width:80px; font-size:20px; text-align:center;"></div>
+            <div style="display:flex; gap:8px;">
+              <button type="submit">Uložit</button>
+              <button type="button" class="btn-ghost" id="btn-cancel-emoji">Zrušit</button>
+            </div>
+            <div id="emoji-change-msg" class="small-msg"></div>
+          </form>
+
           <div class="account-row" id="password-row">
             <div class="account-row-label">Heslo</div>
             <div class="account-row-value">••••••••</div>
@@ -285,6 +325,31 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- KONTAKTY / TABLO -->
+    <section class="view" id="view-kontakty">
+      <div class="toolbar">
+        <div>
+          <div class="eyebrow">Kdo je kdo</div>
+          <h1 class="headline" style="font-size:28px;">Kontakty</h1>
+        </div>
+        <button id="btn-new-contact" style="display:none;">+ Přidat kontakt</button>
+      </div>
+
+      <form class="panel" id="form-contact" style="display:none;">
+        <div class="field"><label>Přezdívka / jméno</label><input type="text" id="ct-name" required></div>
+        <div class="field"><label>Role / popisek</label><input type="text" id="ct-role" placeholder="Hlavní organizátor, Vrchní kuchař, Hlavní hulič..."></div>
+        <div class="field"><label>Kontakt (e-mail / telefon)</label><input type="text" id="ct-contact" placeholder="jmeno@email.cz nebo +420..."></div>
+        <div class="field"><label>Emotikon nebo krátký popisek (nepovinné)</label><input type="text" id="ct-emoji" placeholder="🎮" maxlength="4" style="max-width:80px;"></div>
+        <div class="field"><label>URL fotky (nepovinné)</label><input type="url" id="ct-photo" placeholder="https://..."></div>
+        <div style="display:flex; gap:10px;">
+          <button type="submit" id="btn-save-contact">Uložit</button>
+          <button type="button" class="btn-ghost" id="btn-cancel-contact">Zrušit</button>
+        </div>
+      </form>
+
+      <div class="grid" id="contacts-grid" style="margin-top:24px;"></div>
     </section>
 
     <!-- UŽIVATELÉ (jen admin) -->
