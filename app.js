@@ -62,9 +62,15 @@ function fmtDateShort(iso){
 function fmtDateRange(ev){
   if(ev.dateUnconfirmed) return 'Termín se vybírá hlasováním';
   if(!ev.dateStart) return '';
-  let range = (ev.dateEnd && ev.dateEnd !== ev.dateStart) ? `${fmtDateShort(ev.dateStart)} – ${fmtDate(ev.dateEnd)}` : fmtDate(ev.dateStart);
-  if(ev.timeStart) range += `, ${ev.timeStart}${ev.timeEnd ? '–'+ev.timeEnd : ''}`;
-  return range;
+  const multiDay = ev.dateEnd && ev.dateEnd !== ev.dateStart;
+  if(!multiDay){
+    let s = fmtDate(ev.dateStart);
+    if(ev.timeStart) s += `, ${ev.timeStart}${ev.timeEnd ? '–'+ev.timeEnd : ''}`;
+    return s;
+  }
+  const startPart = fmtDateShort(ev.dateStart) + (ev.timeStart ? ` ${ev.timeStart}` : '');
+  const endPart = fmtDate(ev.dateEnd) + (ev.timeEnd ? ` ${ev.timeEnd}` : '');
+  return `${startPart} – ${endPart}`;
 }
 function escapeHtml(str){
   const div = document.createElement('div');
@@ -75,16 +81,25 @@ function authorLabel(author, emoji){
   return `${emoji ? escapeHtml(emoji)+' ' : ''}${escapeHtml(author)}`;
 }
 const CHAT_EMOJIS = ['😀','😂','😎','👍','👎','🔥','🎉','❤️','😢','🤔','🎮','🕹️','👾','💻','🖱️','⌨️','🍕','🍺','🌙','⚡','💀','👑','🐉','🚗'];
-function setupChatEmojiRow(rowId, inputId){
-  const row = document.getElementById(rowId);
-  if(!row) return;
-  row.innerHTML = CHAT_EMOJIS.map(e => `<span class="chip" data-chat-emoji="${e}" style="cursor:pointer; font-size:15px;">${e}</span>`).join('');
-  row.querySelectorAll('[data-chat-emoji]').forEach(el => {
+function setupChatEmojiRow(btnId, panelId, inputId){
+  const btn = document.getElementById(btnId);
+  const panel = document.getElementById(panelId);
+  if(!btn || !panel) return;
+  panel.innerHTML = CHAT_EMOJIS.map(e => `<span data-chat-emoji="${e}">${e}</span>`).join('');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.style.display = panel.style.display === 'none' ? 'grid' : 'none';
+  });
+  panel.querySelectorAll('[data-chat-emoji]').forEach(el => {
     el.addEventListener('click', () => {
       const input = document.getElementById(inputId);
       input.value += el.dataset.chatEmoji;
       input.focus();
+      panel.style.display = 'none';
     });
+  });
+  document.addEventListener('click', (e) => {
+    if(!panel.contains(e.target) && e.target !== btn) panel.style.display = 'none';
   });
 }
 function todayIso(){ return new Date().toISOString().slice(0,10); }
@@ -127,10 +142,12 @@ function showView(name){
 }
 navItems.forEach(n => n.addEventListener('click', () => {
   closeEventForm();
+  closeContactForm();
   showView(n.dataset.view);
 }));
 document.getElementById('brand-home-link').addEventListener('click', () => {
   closeEventForm();
+  closeContactForm();
   showView('home');
 });
 document.getElementById('btn-back-to-akce').addEventListener('click', () => { showView('akce'); });
@@ -175,6 +192,11 @@ function renderContacts(){
 }
 
 const formContact = document.getElementById('form-contact');
+function closeContactForm(){
+  formContact.style.display = 'none';
+  formContact.reset();
+  editingContactId = null;
+}
 document.getElementById('btn-new-contact').addEventListener('click', () => {
   if(formContact.style.display === 'none' || !formContact.style.display){
     editingContactId = null;
@@ -689,47 +711,37 @@ function renderActiveTab(ev){
 }
 
 function renderEntryFeeBlock(ev){
-  let box = document.getElementById('ed-entryfee');
-  if(!box){
-    box = document.createElement('div');
-    box.id = 'ed-entryfee';
-    document.getElementById('ed-rsvp').insertAdjacentElement('afterend', box);
-  }
+  const box = document.getElementById('ed-entryfee');
   if(!ev.fee && !ev.qrUrl){ box.innerHTML = ''; return; }
-  box.className = 'entry-fee-box';
   box.innerHTML = `
-    ${ev.fee ? `<div><div class="eyebrow" style="margin-bottom:4px;">Vstupné</div><div style="font-size:20px; font-weight:600; color:var(--gold);">${ev.fee} Kč</div></div>` : ''}
-    ${ev.qrUrl ? `<div><div class="eyebrow" style="margin-bottom:4px;">QR platba</div><img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu"></div>` : ''}
+    ${ev.qrUrl ? `<img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu" style="margin-bottom:8px;">` : ''}
+    ${ev.fee ? `<div style="font-size:28px; font-weight:700; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,0.8);">${ev.fee} Kč</div><div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Vstupné</div>` : ''}
   `;
 }
 
 function renderDateVoteBlock(ev){
-  let box = document.getElementById('ed-datevote');
-  if(!box){
-    box = document.createElement('div');
-    box.id = 'ed-datevote';
-    document.getElementById('ed-entryfee').insertAdjacentElement('afterend', box);
-  }
+  const box = document.getElementById('ed-datevote');
   const options = ev.dateOptions || [];
-  if(options.length === 0 || ev.dateVotingClosed){ box.innerHTML = ''; return; }
+  if(options.length === 0 || ev.dateVotingClosed){ box.innerHTML = ''; box.style.display = 'none'; return; }
+  box.style.display = 'block';
 
   const votes = ev.dateVotes || {};
   const myVote = currentUser ? votes[currentUser.uid] : undefined;
   const deadlinePassedForVote = ev.dateVoteDeadline && todayIso() > ev.dateVoteDeadline;
 
   box.className = 'panel';
-  box.style.maxWidth = '520px';
+  box.style.cssText = 'flex:0 0 300px; margin-top:0;';
   box.innerHTML = `
-    <div class="section-title" style="font-size:16px;">🗳️ Hlasování o termínu</div>
-    ${ev.dateVoteDeadline ? `<p class="lede" style="margin-top:0;">Hlasování otevřené do ${fmtDate(ev.dateVoteDeadline)}.</p>` : ''}
+    <div class="section-title" style="font-size:15px;">🗳️ Hlasování o termínu</div>
+    ${ev.dateVoteDeadline ? `<p class="lede" style="margin-top:0; font-size:13px;">Hlasování otevřené do ${fmtDate(ev.dateVoteDeadline)}.</p>` : ''}
     ${options.map((opt, idx) => {
       const count = Object.values(votes).filter(v => v === idx).length;
       const isMine = myVote === idx;
       return `
-        <div class="row" style="margin-top:8px; align-items:center;">
-          <span style="flex:1;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
+        <div class="row" style="margin-top:8px; align-items:center; flex-wrap:wrap;">
+          <span style="flex:1; font-size:13px;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
           ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'Tvůj hlas':'Hlasovat'}</button>` : ''}
-          ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat tento termín</button>` : ''}
+          ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
         </div>
       `;
     }).join('')}
@@ -819,6 +831,65 @@ function coinSvg(paid){
   `;
 }
 
+async function openAddAttendeeModal(){
+  const eventId = currentDetailEventId;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'score-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="score-modal" style="width:320px;">
+      <div style="font-size:14px; font-weight:600;">Přidat účastníka</div>
+      <div class="field" style="margin:0;">
+        <label>Z registrovaných</label>
+        <select id="add-att-select"><option value="">— načítám... —</option></select>
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Nebo napiš jméno ručně</label>
+        <input type="text" id="add-att-custom" placeholder="Jméno / přezdívka">
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" id="add-att-save">Přidat</button>
+        <button type="button" class="btn-ghost" id="add-att-cancel">Zrušit</button>
+      </div>
+      <div class="small-msg" id="add-att-msg"></div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.getElementById('add-att-cancel').addEventListener('click', () => backdrop.remove());
+
+  const select = document.getElementById('add-att-select');
+  try{
+    const snap = await getDocs(collection(db,'users'));
+    const already = new Set(Object.values(currentRegistrationsMap).map(r=>r._docId));
+    const options = snap.docs
+      .map(d => ({ uid:d.id, ...d.data() }))
+      .filter(u => !already.has(u.uid))
+      .sort((a,b) => (a.nick||'').localeCompare(b.nick||''));
+    select.innerHTML = `<option value="">— vyber, nebo napiš vlastní níže —</option>` + options.map(u => `<option value="${u.uid}" data-nick="${escapeHtml(u.nick||'')}" data-emoji="${escapeHtml(u.emoji||'')}">${escapeHtml(u.nick||'')}</option>`).join('');
+  }catch(err){ select.innerHTML = `<option value="">(nepovedlo se načíst)</option>`; console.error(err); }
+
+  document.getElementById('add-att-save').addEventListener('click', async () => {
+    const msg = document.getElementById('add-att-msg');
+    const uid = select.value;
+    const customName = document.getElementById('add-att-custom').value.trim();
+    try{
+      if(uid){
+        const opt = select.querySelector(`option[value="${uid}"]`);
+        await setDoc(doc(db,'events',eventId,'registrations',uid), {
+          nick: opt.dataset.nick, emoji: opt.dataset.emoji || '', uid, status:'going', food:{}, ts:new Date().toISOString()
+        }, { merge:true });
+      }else if(customName){
+        await addDoc(collection(db,'events',eventId,'registrations'), {
+          nick: customName, status:'going', food:{}, ts:new Date().toISOString(), manual:true
+        });
+      }else{
+        msg.textContent = 'Vyber ze seznamu, nebo napiš jméno.';
+        return;
+      }
+      backdrop.remove();
+    }catch(err){ msg.textContent = 'Přidání se nepovedlo.'; console.error(err); }
+  });
+}
+
 function renderAttendees(){
   const box = document.getElementById('ed-attendees');
   const list = Object.values(currentRegistrationsMap).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
@@ -871,15 +942,7 @@ function renderAttendees(){
   box.innerHTML = html;
 
   const addManualBtn = document.getElementById('btn-add-manual-attendee');
-  if(addManualBtn) addManualBtn.addEventListener('click', async () => {
-    const nick = prompt('Přezdívka účastníka:');
-    if(!nick || !nick.trim()) return;
-    try{
-      await addDoc(collection(db, 'events', currentDetailEventId, 'registrations'), {
-        nick: nick.trim(), status: 'going', food: {}, ts: new Date().toISOString(), manual: true
-      });
-    }catch(err){ alert('Přidání se nepovedlo.'); console.error(err); }
-  });
+  if(addManualBtn) addManualBtn.addEventListener('click', openAddAttendeeModal);
 
   box.querySelectorAll('[data-toggle-paid]').forEach(el => {
     if(!el.dataset.togglePaid) return;
@@ -926,14 +989,15 @@ function renderTabPrehled(ev){
     </div>
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze</div>
-    <div class="chip-row" id="chat-emoji-row-comment" style="margin-top:0;"></div>
-    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end; position:relative;">
       <div style="flex:1;"><textarea class="discussion-input" id="comment-input" placeholder="Napiš příspěvek do diskuze..."></textarea></div>
+      <button type="button" class="emoji-picker-btn" id="emoji-btn-comment" title="Vložit emotikon">🙂</button>
+      <div class="emoji-picker-panel" id="emoji-panel-comment" style="display:none;"></div>
       <button type="button" id="btn-add-comment" class="btn-sm">Odeslat</button>
     </div>
     <div id="comments-list" style="margin-top:6px;"></div>
   `;
-  setupChatEmojiRow('chat-emoji-row-comment', 'comment-input');
+  setupChatEmojiRow('emoji-btn-comment', 'emoji-panel-comment', 'comment-input');
 
   renderSuggestions(ev);
   renderComments(ev);
@@ -1131,14 +1195,15 @@ function renderTabJidlo(ev){
       </div>` : ''}
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze k jídlu</div>
-    <div class="chip-row" id="chat-emoji-row-food" style="margin-top:0;"></div>
-    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end; position:relative;">
       <div style="flex:1;"><textarea class="discussion-input" id="food-comment-input" placeholder="Kdo co doveze, návrhy..."></textarea></div>
+      <button type="button" class="emoji-picker-btn" id="emoji-btn-food" title="Vložit emotikon">🙂</button>
+      <div class="emoji-picker-panel" id="emoji-panel-food" style="display:none;"></div>
       <button type="button" id="btn-add-food-comment" class="btn-sm">Odeslat</button>
     </div>
     <div id="food-comments-list" style="margin-top:6px;"></div>
   `;
-  setupChatEmojiRow('chat-emoji-row-food', 'food-comment-input');
+  setupChatEmojiRow('emoji-btn-food', 'emoji-panel-food', 'food-comment-input');
 
   box.querySelectorAll('[data-food-toggle]').forEach(el => {
     if(el.classList.contains('disabled')) return;
@@ -1814,7 +1879,7 @@ document.getElementById('btn-google-nick-submit').addEventListener('click', asyn
   finally{ btn.disabled = false; }
 });
 
-document.getElementById('btn-logout').addEventListener('click', async () => { await signOut(auth); });
+document.getElementById('btn-logout').addEventListener('click', async () => { closeContactForm(); closeEventForm(); await signOut(auth); });
 
 function hasPasswordProvider(user){
   return user.providerData.some(p => p.providerId === 'password');
@@ -2078,7 +2143,7 @@ function updateAuthUI(){
   const accWidget = document.getElementById('topbar-account-widget');
   if(currentUser && currentNick){
     accWidget.innerHTML = `<span class="acc-nick">${escapeHtml(currentNick)}</span><button type="button" class="btn-ghost btn-sm" id="topbar-logout-btn">Odhlásit</button>`;
-    document.getElementById('topbar-logout-btn').addEventListener('click', async () => { await signOut(auth); });
+    document.getElementById('topbar-logout-btn').addEventListener('click', async () => { closeContactForm(); closeEventForm(); await signOut(auth); });
   }else{
     accWidget.innerHTML = `<button type="button" class="btn-sm" id="topbar-login-btn">Přihlásit / Registrovat</button>`;
     document.getElementById('topbar-login-btn').addEventListener('click', () => showView('ucet'));
