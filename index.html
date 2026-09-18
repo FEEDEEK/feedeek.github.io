@@ -43,19 +43,20 @@
 
     <!-- HOME -->
     <section class="view active" id="view-home">
+      <div class="eyebrow">Komunitní LAN-PARTY</div>
       <h1 class="headline">Posbírejte ty svý kalkulačky a doražte na klasický feedek!</h1>
       <p style="font-size: 1.1em; line-height: 1.5; margin-bottom: 24px; max-width:640px; color:var(--text-muted);">
         Tady je hlavní mid or feed. Tady organizujeme naše lanky, aby z nikoho nebyla jenom warda.
       </p>
 
-      <div class="lan-info-grid" style="margin-bottom: 30px;">
+      <div class="lan-info-grid" style="margin-bottom: 34px;">
         <div class="info-block" style="margin-bottom: 20px;">
           <h3 style="margin-bottom: 8px;">🎮 Co se u nás točí nejvíc?</h3>
           <ul style="list-style-type: none; padding-left: 0; line-height: 1.6;">
-            <li style="margin-bottom: 10px;"><strong>Dota 2:</strong> Naše srdcovka. Připrav si nervy, protože wardy support nekupuje, je to přece carry a hlavně chcankopták.</li>
-            <li style="margin-bottom: 10px;"><strong>Warcraft 3:</strong> Oblíbená klasika, kde rádi hrajeme různé mapky jako Legion TD; Castli fight a jiné.</li>
-            <li style="margin-bottom: 10px;"><strong>Další klasiky:</strong> Když už chceme na 5 minut změnu, dáme si klasiky jako Call of Duty, FlatOut a další.</li>
-            <li style="margin-bottom: 10px;"><strong>Cokoliv, co rozjede každej střep:</strong> Hrajeme věci, u kterých nemusíš kvůli grafice upgradovat kompa. Hlavní je hratelnost a to, že u stolu sedíme spolu.</li>
+            <li style="margin-bottom: 12px;"><strong>Dota 2:</strong> Naše srdcovka. Připrav si nervy, protože wardy support nekupuje, je to přece carry a hlavně chcankopták.</li>
+            <li style="margin-bottom: 12px;"><strong>Warcraft 3:</strong> Oblíbená klasika, kde rádi hrajeme různé mapky jako Legion TD; Castli fight a jiné.</li>
+            <li style="margin-bottom: 12px;"><strong>Další klasiky:</strong> Když už chceme na 5 minut změnu, dáme si klasiky jako Call of Duty, FlatOut a další.</li>
+            <li style="margin-bottom: 12px;"><strong>Cokoliv, co rozjede každej střep:</strong> Hrajeme věci, u kterých nemusíš kvůli grafice upgradovat kompa. Hlavní je hratelnost a to, že u stolu sedíme spolu.</li>
           </ul>
         </div>
 
@@ -69,6 +70,7 @@
         </div>
       </div>
 
+      <div class="eyebrow" style="margin-top:10px;">Nejbližší akce</div>
       <div class="hero-big" id="next-event-card">
         <div class="hero-big-inner">
           <span class="tag">Nejbližší akce</span>
@@ -83,6 +85,7 @@
     <section class="view" id="view-akce">
       <div class="toolbar">
         <div>
+          <div class="eyebrow">Přehled</div>
           <h1 class="headline" style="font-size:32px;">Akce</h1>
         </div>
         <button id="btn-new-event" style="display:none;">+ Nová akce</button>
@@ -176,14 +179,18 @@
     <!-- DETAIL AKCE -->
     <section class="view" id="view-event">
       <button type="button" class="btn-ghost back-link" id="btn-back-to-akce">← Zpět na akce</button>
- 
+
       <div class="ed-header" id="ed-header">
         <div class="ed-header-inner">
-          <div class="eyebrow" id="ed-eyebrow">Akce</div>
-          <h1 class="headline" id="ed-title" style="font-size:32px;">—</h1>
-          <p class="lede" id="ed-meta"></p>
-          <p class="lede" id="ed-desc"></p>
+          <div class="ed-header-main" id="ed-header-main">
+            <div class="eyebrow" id="ed-eyebrow">Akce</div>
+            <h1 class="headline" id="ed-title" style="font-size:32px;">—</h1>
+            <p class="lede" id="ed-meta"></p>
+            <p class="lede" id="ed-desc"></p>
+          </div>
+          <div id="ed-datevote"></div>
         </div>
+        <div class="ed-fee-corner" id="ed-entryfee"></div>
       </div>
 
       <div class="rsvp-box" id="ed-rsvp"></div>
@@ -214,6 +221,7 @@
 
     <!-- ÚČET -->
     <section class="view" id="view-ucet">
+      <div class="eyebrow">Účet</div>
       <h1 class="headline" style="font-size:28px;">Přihlášení / registrace</h1>
       <p class="lede">Zadej přezdívku a heslo. Pokud pod tou přezdívkou účet ještě nemáš, rovnou tě necháme jeden založit.</p>
 
@@ -327,6 +335,7 @@
     <section class="view" id="view-kontakty">
       <div class="toolbar">
         <div>
+          <div class="eyebrow">Kdo je kdo</div>
           <h1 class="headline" style="font-size:28px;">Kontakty</h1>
         </div>
         <button id="btn-new-contact" style="display:none;">+ Přidat kontakt</button>
