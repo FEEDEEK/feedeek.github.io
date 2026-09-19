@@ -685,6 +685,7 @@ function renderEventDetailStatic(ev){
   Object.entries(tabPanels).forEach(([key, id]) => {
     document.getElementById(id).style.display = (key === currentTab) ? 'block' : 'none';
   });
+  updateHeaderVisibility();
   document.querySelectorAll('#ed-tabs .tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === currentTab);
     btn.onclick = () => {
@@ -693,6 +694,7 @@ function renderEventDetailStatic(ev){
       Object.entries(tabPanels).forEach(([key, id]) => {
         document.getElementById(id).style.display = (key === currentTab) ? 'block' : 'none';
       });
+      updateHeaderVisibility();
       renderActiveTab(ev);
     };
   });
@@ -700,6 +702,15 @@ function renderEventDetailStatic(ev){
   renderStatsAndRsvp();
   renderAttendees();
   renderActiveTab(ev);
+}
+
+function updateHeaderVisibility(){
+  const onPrehled = currentTab === 'prehled';
+  document.getElementById('ed-header').style.display = onPrehled ? 'flex' : 'none';
+  const grid = document.querySelector('.detail-grid');
+  const rightCol = document.querySelector('.detail-col-right');
+  if(rightCol) rightCol.style.display = onPrehled ? 'block' : 'none';
+  if(grid) grid.style.gridTemplateColumns = onPrehled ? '240px 1fr 260px' : '240px 1fr';
 }
 
 function renderActiveTab(ev){
@@ -715,7 +726,7 @@ function renderEntryFeeBlock(ev){
   if(!ev.fee && !ev.qrUrl){ box.innerHTML = ''; return; }
   box.innerHTML = `
     ${ev.qrUrl ? `<img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu" style="margin-bottom:8px;">` : ''}
-    ${ev.fee ? `<div style="font-size:28px; font-weight:700; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,0.8);">${ev.fee} Kč</div><div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Vstupné</div>` : ''}
+    ${ev.fee ? `<div style="font-size:28px; font-weight:700; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,0.8);">${ev.fee} Kč</div><div style="font-size:13px; font-weight:600; color:var(--gold); text-transform:uppercase; letter-spacing:.08em; text-shadow:0 1px 4px rgba(0,0,0,0.8);">Vstupné</div>` : ''}
   `;
 }
 
@@ -776,7 +787,7 @@ function renderStatsAndRsvp(){
 
   const rsvpBox = document.getElementById('ed-rsvp');
   if(!currentUser || !currentNick){
-    rsvpBox.innerHTML = `<span class="status-hint">Pro účast na akci se nejdřív přihlas.</span> <button type="button" id="rsvp-login-btn" class="btn-sm">Přihlásit se</button>`;
+    rsvpBox.innerHTML = `<button type="button" id="rsvp-login-btn">Přihlásit se na akci</button>`;
     document.getElementById('rsvp-login-btn').addEventListener('click', () => { pendingEventId = ev.id; showView('ucet'); });
     return;
   }
@@ -797,12 +808,7 @@ function renderStatsAndRsvp(){
       }catch(err){ alert('Přihlášení se nepovedlo.'); console.error(err); }
     });
   }else{
-    const statusLabel = myReg.status === 'maybe' ? 'Možná pojedeš' : 'Určitě jedeš';
-    rsvpBox.innerHTML = `
-      <span class="status-hint">Jsi přihlášen/a — <b style="color:var(--gold);">${statusLabel}</b>. Stav můžeš změnit vedle svého jména v seznamu vpravo.</span>
-      <button type="button" id="rsvp-cancel" class="btn-ghost" ${deadlinePassed ? 'disabled title="Uzávěrka změn už proběhla"' : ''}>Odhlásit se</button>
-      ${deadlinePassed ? `<span class="status-hint">Uzávěrka změn: ${fmtDate(ev.changeDeadline)}</span>` : ''}
-    `;
+    rsvpBox.innerHTML = `<button type="button" class="btn-ghost" id="rsvp-cancel" ${deadlinePassed ? 'disabled title="Uzávěrka změn už proběhla"' : ''}>Odhlásit se z akce</button>`;
     const cancelBtn = document.getElementById('rsvp-cancel');
     if(cancelBtn) cancelBtn.addEventListener('click', async () => {
       if(!confirm('Opravdu se chceš z akce odhlásit?')) return;
@@ -989,10 +995,12 @@ function renderTabPrehled(ev){
     </div>
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze</div>
-    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end; position:relative;">
-      <div style="flex:1;"><textarea class="discussion-input" id="comment-input" placeholder="Napiš příspěvek do diskuze..."></textarea></div>
-      <button type="button" class="emoji-picker-btn" id="emoji-btn-comment" title="Vložit emotikon">🙂</button>
-      <div class="emoji-picker-panel" id="emoji-panel-comment" style="display:none;"></div>
+    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+      <div class="discussion-input-wrap">
+        <textarea class="discussion-input" id="comment-input" placeholder="Napiš příspěvek do diskuze..."></textarea>
+        <button type="button" class="emoji-picker-btn" id="emoji-btn-comment" title="Vložit emotikon">🙂</button>
+        <div class="emoji-picker-panel" id="emoji-panel-comment" style="display:none;"></div>
+      </div>
       <button type="button" id="btn-add-comment" class="btn-sm">Odeslat</button>
     </div>
     <div id="comments-list" style="margin-top:6px;"></div>
@@ -1195,10 +1203,12 @@ function renderTabJidlo(ev){
       </div>` : ''}
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze k jídlu</div>
-    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end; position:relative;">
-      <div style="flex:1;"><textarea class="discussion-input" id="food-comment-input" placeholder="Kdo co doveze, návrhy..."></textarea></div>
-      <button type="button" class="emoji-picker-btn" id="emoji-btn-food" title="Vložit emotikon">🙂</button>
-      <div class="emoji-picker-panel" id="emoji-panel-food" style="display:none;"></div>
+    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
+      <div class="discussion-input-wrap">
+        <textarea class="discussion-input" id="food-comment-input" placeholder="Kdo co doveze, návrhy..."></textarea>
+        <button type="button" class="emoji-picker-btn" id="emoji-btn-food" title="Vložit emotikon">🙂</button>
+        <div class="emoji-picker-panel" id="emoji-panel-food" style="display:none;"></div>
+      </div>
       <button type="button" id="btn-add-food-comment" class="btn-sm">Odeslat</button>
     </div>
     <div id="food-comments-list" style="margin-top:6px;"></div>
