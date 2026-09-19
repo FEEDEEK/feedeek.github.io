@@ -267,15 +267,23 @@ form.panel, .panel{
 /* ---- Diskuze: větší textarea ---- */
 textarea.discussion-input{ min-height:90px; width:100%; }
 
-.emoji-picker-btn{ padding:8px 10px; font-size:16px; line-height:1; border-color:var(--line); background:var(--bg-panel-2); }
+.emoji-picker-btn{
+  position:absolute; right:6px; bottom:6px; z-index:2;
+  padding:3px 5px; font-size:16px; line-height:1; border:none; background:transparent;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif;
+}
+.emoji-picker-btn:hover{ background:rgba(255,255,255,0.08); }
 .emoji-picker-panel{
   position:absolute; bottom:100%; right:0; margin-bottom:6px; z-index:20;
   background:var(--bg-panel); border:1px solid var(--gold-dim); padding:8px;
   display:grid; grid-template-columns:repeat(8, 1fr); gap:4px; width:220px;
   box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif;
 }
-.emoji-picker-panel span{ cursor:pointer; font-size:16px; text-align:center; padding:3px; border-radius:3px; }
+.emoji-picker-panel span{ cursor:pointer; font-size:17px; text-align:center; padding:3px; border-radius:3px; }
 .emoji-picker-panel span:hover{ background:var(--bg-panel-2); }
+textarea.discussion-input{ padding-right:34px; }
+.discussion-input-wrap{ position:relative; flex:1; }
 
 /* ---- Vstupné / platba ---- */
 .entry-fee-box{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-top:16px; }
