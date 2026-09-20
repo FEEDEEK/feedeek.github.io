@@ -1,3 +1,6 @@
+html{
+  overflow-y:scroll;
+}
 :root{
   --bg-void:#0b0d12;
   --bg-panel:#14171f;
@@ -166,6 +169,7 @@ form.panel, .panel{
   background:linear-gradient(180deg, rgba(11,13,18,0.55) 0%, rgba(11,13,18,0.92) 100%);
 }
 .ed-header-main{ flex:1; min-width:240px; }
+.ed-header-map{ flex:0 0 220px; width:220px; height:180px; order:-1; }
 .ed-header .headline{ font-size:32px; }
 .ed-header .lede{ color:#dcd7ca; }
 .ed-fee-corner{ position:absolute; right:20px; bottom:14px; text-align:right; }
@@ -364,7 +368,7 @@ textarea.discussion-input{ padding-right:34px; }
 
   .detail-grid{ grid-template-columns:1fr; gap:18px; margin-top:20px; }
   .detail-col-left{ flex-direction:row; flex-wrap:wrap; gap:10px; }
-  .map-embed{ flex:1 1 100%; height:140px; }
+  .ed-header-map{ flex:1 1 100%; width:100%; height:140px; }
   .tab-switch{ flex-direction:row; flex-wrap:wrap; flex:1 1 100%; }
   .tab-btn{ flex:1 1 auto; text-align:center; font-size:12px; padding:8px 6px; }
   .attendee-sidebar{ position:static; }
