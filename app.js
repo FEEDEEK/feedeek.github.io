@@ -737,21 +737,28 @@ function renderDateVoteBlock(ev){
   box.style.display = 'block';
 
   const votes = ev.dateVotes || {};
-  const myVote = currentUser ? votes[currentUser.uid] : undefined;
+  function votesOf(uid){
+    const v = votes[uid];
+    if(Array.isArray(v)) return v;
+    if(typeof v === 'number') return [v];
+    return [];
+  }
+  const myVotes = currentUser ? votesOf(currentUser.uid) : [];
   const deadlinePassedForVote = ev.dateVoteDeadline && todayIso() > ev.dateVoteDeadline;
 
   box.className = 'panel';
   box.style.cssText = 'flex:0 0 300px; margin-top:0;';
   box.innerHTML = `
     <div class="section-title" style="font-size:15px;">🗳️ Hlasování o termínu</div>
+    <p class="lede" style="margin-top:0; font-size:12px;">Můžeš hlasovat pro víc termínů, které ti vyhovují.</p>
     ${ev.dateVoteDeadline ? `<p class="lede" style="margin-top:0; font-size:13px;">Hlasování otevřené do ${fmtDate(ev.dateVoteDeadline)}.</p>` : ''}
     ${options.map((opt, idx) => {
-      const count = Object.values(votes).filter(v => v === idx).length;
-      const isMine = myVote === idx;
+      const count = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).length;
+      const isMine = myVotes.includes(idx);
       return `
         <div class="row" style="margin-top:8px; align-items:center; flex-wrap:wrap;">
           <span style="flex:1; font-size:13px;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
-          ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'Tvůj hlas':'Hlasovat'}</button>` : ''}
+          ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'✓ Hlasováno':'Hlasovat'}</button>` : ''}
           ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
         </div>
       `;
@@ -761,7 +768,10 @@ function renderDateVoteBlock(ev){
   box.querySelectorAll('[data-vote-date]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if(!currentUser){ showView('ucet'); return; }
-      try{ await updateDoc(doc(db,'events',ev.id), { [`dateVotes.${currentUser.uid}`]: parseInt(btn.dataset.voteDate,10) }); }
+      const idx = parseInt(btn.dataset.voteDate,10);
+      const mine = votesOf(currentUser.uid);
+      const newVotes = mine.includes(idx) ? mine.filter(i=>i!==idx) : [...mine, idx];
+      try{ await updateDoc(doc(db,'events',ev.id), { [`dateVotes.${currentUser.uid}`]: newVotes }); }
       catch(err){ console.error(err); }
     });
   });
@@ -1575,9 +1585,12 @@ function renderSwissBody(ev, t, tIndex, swiss, container){
   if(swiss.placements.length > 0){
     const col = document.createElement('div');
     col.className = 'bracket-round';
-    col.innerHTML = `<div class="bracket-round-title">Výsledek</div>` + swiss.placements.map(p => `
-      <div class="bracket-slot ${p.rank===1?'winner-slot':''}"><span>${p.rank}. ${escapeHtml(teamName(t,p.team))}</span></div>
-    `).join('');
+    const medalColor = r => r===1 ? '#f0c94e' : r===2 ? '#c9c9d4' : r===3 ? '#c9834a' : null;
+    col.innerHTML = `<div class="bracket-round-title">Výsledek</div>` + swiss.placements.map(p => {
+      const mc = medalColor(p.rank);
+      const medal = mc ? `<span style="display:inline-block; width:14px; height:14px; border-radius:50%; background:${mc}; box-shadow:0 0 5px ${mc}88; margin-right:6px; vertical-align:middle;"></span>` : '';
+      return `<div class="bracket-slot ${p.rank===1?'winner-slot':''}" style="${mc ? `border-color:${mc};` : ''}"><span>${medal}${p.rank}. ${escapeHtml(teamName(t,p.team))}</span></div>`;
+    }).join('');
     wrap.appendChild(col);
   }
 }
