@@ -71,7 +71,7 @@ body::before{
 }
 
 /* ---- Main ---- */
-.main{ flex:1; padding:48px 5vw; max-width:1600px; margin:0 auto; width:100%; }
+.main{ flex:1; padding:48px 5vw; max-width:100%; margin:0 auto; width:100%; }
 .view{ display:none; }
 .view.active{ display:block; animation:fadein .35s ease; }
 @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
