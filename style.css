@@ -34,6 +34,11 @@ body{
   display:flex; align-items:center; justify-content:space-between;
   padding:0 32px; height:84px; flex-shrink:0; position:sticky; top:0; z-index:10;
 }
+.dev-banner{
+  width:100%; text-align:center; background:#2a0f12; color:#ff5c5c;
+  font-size:12px; font-weight:700; letter-spacing:.04em; padding:6px 10px;
+  border-bottom:1px solid #5a1c20;
+}
 .brand{ display:flex; align-items:center; gap:12px; flex-shrink:0; cursor:pointer; height:100%; }
 .brand-logo{ width:52px; height:52px; border-radius:50%; object-fit:cover; box-shadow:0 0 12px rgba(80,160,255,0.35); flex-shrink:0; }
 .brand-mark{ width:52px; height:52px; border:1.5px solid var(--gold); border-radius:50%; position:relative; flex-shrink:0; box-shadow:0 0 8px rgba(201,162,75,0.35); }
