@@ -23,12 +23,12 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 const MEAL_SLOTS = [
-  { key:'fri-dinner',    label:'Pátek — Večeře' },
-  { key:'sat-breakfast', label:'Sobota — Snídaně' },
-  { key:'sat-lunch',     label:'Sobota — Oběd' },
-  { key:'sat-dinner',    label:'Sobota — Večeře' },
-  { key:'sun-breakfast', label:'Neděle — Snídaně' },
-  { key:'pivo',          label:'Pivo' }
+  { key:'fri-dinner',    label:'Pátek — Večeře', day:'Pátek' },
+  { key:'sat-breakfast', label:'Sobota — Snídaně', day:'Sobota' },
+  { key:'sat-lunch',     label:'Sobota — Oběd', day:'Sobota' },
+  { key:'sat-dinner',    label:'Sobota — Večeře', day:'Sobota' },
+  { key:'sun-breakfast', label:'Neděle — Snídaně', day:'Neděle' },
+  { key:'pivo',          label:'Pivo', day:'Ostatní' }
 ];
 function emptyFoodSchedule(){
   const o = {};
@@ -1181,38 +1181,50 @@ function renderTabJidlo(ev){
   if(activeSlots.length === 0){
     slotsHtml = '<div class="empty">Zatím nejsou vypsané žádné jídelní bloky.</div>';
   }else{
-    slotsHtml = activeSlots.map(slot => {
-      const options = schedule[slot.key];
-      const myChoices = (myReg && myReg.food && Array.isArray(myReg.food[slot.key])) ? myReg.food[slot.key] : [];
+    const dayGroups = [];
+    activeSlots.forEach(slot => {
+      let grp = dayGroups.find(g => g.day === slot.day);
+      if(!grp){ grp = { day: slot.day, slots: [] }; dayGroups.push(grp); }
+      grp.slots.push(slot);
+    });
 
-      const portionCounts = {};
-      options.forEach(o => portionCounts[o] = 0);
-      Object.values(currentRegistrationsMap).forEach(r => {
-        if(r.food && Array.isArray(r.food[slot.key])){
-          r.food[slot.key].forEach(o => { if(portionCounts[o] !== undefined) portionCounts[o]++; });
-        }
-      });
+    slotsHtml = '<div class="food-day-columns">' + dayGroups.map(grp => `
+      <div class="food-day-column">
+        <div class="food-day-heading">${escapeHtml(grp.day)}</div>
+        ${grp.slots.map(slot => {
+          const options = schedule[slot.key];
+          const myChoices = (myReg && myReg.food && Array.isArray(myReg.food[slot.key])) ? myReg.food[slot.key] : [];
 
-      const checkboxesHtml = options.map((o,idx) => `
-        <label class="food-checkbox-row">
-          <span class="food-toggle ${myChoices.includes(o)?'checked':''} ${(!myReg || deadlinePassed) ? 'disabled' : ''}" data-food-toggle data-slot="${slot.key}" data-value="${escapeHtml(o)}">
-            <svg viewBox="0 0 26 26" class="food-toggle-svg">
-              <polygon points="6.5,1.5 19.5,1.5 25,13 19.5,24.5 6.5,24.5 1,13"/>
-              <path class="food-check" d="M7.5 13.5l3.3 3.3 7.7-7.7"/>
-            </svg>
-          </span>
-          <span>${escapeHtml(o)}</span>
-          ${hasPerm('jidlo') ? `<span class="portion-count">${portionCounts[o]}×</span>` : ''}
-        </label>
-      `).join('');
+          const portionCounts = {};
+          options.forEach(o => portionCounts[o] = 0);
+          Object.values(currentRegistrationsMap).forEach(r => {
+            if(r.food && Array.isArray(r.food[slot.key])){
+              r.food[slot.key].forEach(o => { if(portionCounts[o] !== undefined) portionCounts[o]++; });
+            }
+          });
 
-      return `
-        <div class="meal-slot-block" style="margin-bottom:24px;">
-          <b style="font-size:14px;">${slot.label}</b>
-          <div style="margin-top:6px;">${myReg ? checkboxesHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš vybrat.</span>'}</div>
-        </div>
-      `;
-    }).join('');
+          const checkboxesHtml = options.map((o,idx) => `
+            <label class="food-checkbox-row">
+              <span class="food-toggle ${myChoices.includes(o)?'checked':''} ${(!myReg || deadlinePassed) ? 'disabled' : ''}" data-food-toggle data-slot="${slot.key}" data-value="${escapeHtml(o)}">
+                <svg viewBox="0 0 26 26" class="food-toggle-svg">
+                  <polygon points="6.5,1.5 19.5,1.5 25,13 19.5,24.5 6.5,24.5 1,13"/>
+                  <path class="food-check" d="M7.5 13.5l3.3 3.3 7.7-7.7"/>
+                </svg>
+              </span>
+              <span>${escapeHtml(o)}</span>
+              ${hasPerm('jidlo') ? `<span class="portion-count">${portionCounts[o]}×</span>` : ''}
+            </label>
+          `).join('');
+
+          return `
+            <div class="meal-slot-block" style="margin-bottom:18px;">
+              <b style="font-size:13px;">${slot.label.includes('—') ? slot.label.split('—')[1].trim() : slot.label}</b>
+              <div style="margin-top:6px;">${myReg ? checkboxesHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš vybrat.</span>'}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `).join('') + '</div>';
   }
 
   box.innerHTML = `
@@ -1612,6 +1624,7 @@ function computeSwissTournament(t){
   const round0Complete = n >= 2 && round0.every(m => m.winnerIdx !== null);
 
   let rounds = [round0];
+  let exhibitionMatches = [];
   let placements = [];
 
   if(round0Complete){
@@ -1636,16 +1649,15 @@ function computeSwissTournament(t){
         return { key, teamA:a, teamB:b, result, winnerIdx };
       });
 
-      let exhibition = null;
       if(leftover !== null && placements.length > 0){
         const lastLocked = placements[placements.length-1].team;
         const key = `SR${roundIndex}-ex`;
         const { result, winnerSide } = resolvePair(swissResults, key);
         const winnerIdx = winnerSide==='A' ? leftover : (winnerSide==='B' ? lastLocked : null);
-        exhibition = { key, teamA:leftover, teamB:lastLocked, result, winnerIdx, exhibition:true };
+        exhibitionMatches.push({ key, teamA:leftover, teamB:lastLocked, result, winnerIdx, exhibition:true, roundLabel: roundIndex+1 });
       }
 
-      rounds.push(exhibition ? [...roundMatches, exhibition] : roundMatches);
+      rounds.push(roundMatches);
 
       const roundComplete = roundMatches.every(m => m.winnerIdx !== null);
       if(!roundComplete) break;
@@ -1673,7 +1685,7 @@ function computeSwissTournament(t){
     }
   }
 
-  return { round0, round0Complete, rounds, placements, wins };
+  return { round0, round0Complete, rounds, exhibitionMatches, placements, wins };
 }
 
 function renderSwissBody(t, swiss, container, compact){
@@ -1711,6 +1723,17 @@ function renderSwissBody(t, swiss, container, compact){
   }
 
   if(!compact) requestAnimationFrame(() => drawBracketConnectors(wrap));
+
+  if(!compact && swiss.exhibitionMatches.length > 0){
+    const exWrap = document.createElement('div');
+    exWrap.className = 'bracket-exhibition-wrap';
+    exWrap.innerHTML = `<div class="bracket-round-title">Zápasy jen pro zábavu (nezapočítávají se)</div>`;
+    const row = document.createElement('div');
+    row.className = 'bracket-exhibition-row';
+    swiss.exhibitionMatches.forEach(m => row.appendChild(renderSwissMatchBox(t, 'swissResults', m, compact)));
+    exWrap.appendChild(row);
+    container.appendChild(exWrap);
+  }
 }
 
 function drawBracketConnectors(wrap){
@@ -1764,16 +1787,17 @@ function renderSwissMatchBox(t, resultField, m, compact){
   const labelA = teamName(t, m.teamA), labelB = teamName(t, m.teamB);
   const emblemA = teamAObj?.emblem ? teamAObj.emblem+' ' : '';
   const emblemB = teamBObj?.emblem ? teamBObj.emblem+' ' : '';
+  const membersA = (teamAObj?.members||[]).join(' · ');
+  const membersB = (teamBObj?.members||[]).join(' · ');
   const curA = m.result ? m.result.a : 0;
   const curB = m.result ? m.result.b : 0;
   const clickable = hasPerm('turnaj') && !compact;
   div.innerHTML = `
-    ${m.exhibition ? `<div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">jen pro zábavu</div>` : ''}
     <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''} ${clickable?'bracket-slot-clickable':''}" ${clickable?'data-sw-slot="A"':''} title="${clickable?'Levé tlačítko = přidat výhru, pravé = ubrat':''}">
-      <span>${emblemA}${escapeHtml(labelA)}</span><span>${curA}</span>
+      <span class="bracket-slot-main"><span class="bracket-team-name">${emblemA}${escapeHtml(labelA)}</span>${membersA?`<span class="bracket-team-members">${escapeHtml(membersA)}</span>`:''}</span><span class="bracket-slot-score">${curA}</span>
     </div>
     <div class="bracket-slot ${m.winnerIdx===m.teamB ? 'winner-slot':''} ${clickable?'bracket-slot-clickable':''}" ${clickable?'data-sw-slot="B"':''} title="${clickable?'Levé tlačítko = přidat výhru, pravé = ubrat':''}">
-      <span>${emblemB}${escapeHtml(labelB)}</span><span>${curB}</span>
+      <span class="bracket-slot-main"><span class="bracket-team-name">${emblemB}${escapeHtml(labelB)}</span>${membersB?`<span class="bracket-team-members">${escapeHtml(membersB)}</span>`:''}</span><span class="bracket-slot-score">${curB}</span>
     </div>
   `;
 
@@ -2281,10 +2305,19 @@ async function renderUsersList(){
     const snap = await getDocs(collection(db, 'users'));
     const users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
     if(users.length === 0){ box.innerHTML = '<div class="empty">Zatím žádní uživatelé.</div>'; return; }
+
+    const showPerms = currentIsSuperAdmin;
     box.innerHTML = `
-      <table style="width:100%; max-width:900px; border-collapse:collapse; font-size:14px;">
+      <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
         <thead><tr style="text-align:left; color:var(--text-muted); font-size:12px;">
-          <th style="padding:8px 10px 8px 0;">Přezdívka</th><th style="padding:8px 10px;">E-mail</th><th style="padding:8px 10px;">Telefon</th><th style="padding:8px 10px;">Registrace</th><th style="padding:8px 10px;">Poslední přihlášení</th><th></th><th></th>
+          <th style="padding:8px 10px 8px 0;">Přezdívka</th>
+          <th style="padding:8px 10px;">E-mail</th>
+          <th style="padding:8px 10px;">Telefon</th>
+          <th style="padding:8px 10px;">Registrace</th>
+          <th style="padding:8px 10px;">Poslední přihlášení</th>
+          <th></th><th></th>
+          ${showPerms ? `<th style="padding:8px 10px; width:20px; border-left:1px solid var(--line);"></th><th style="padding:8px 10px;">Admin</th>${PERMISSION_AREAS.map(p=>`<th style="padding:8px 10px;" title="${escapeHtml(p.label)}">${escapeHtml(p.label.split(' ')[0])}</th>`).join('')}` : ''}
         </tr></thead>
         <tbody>
           ${users.map(u => `
@@ -2296,58 +2329,22 @@ async function renderUsersList(){
               <td style="padding:8px 10px; color:var(--text-muted);">${u.lastLogin ? fmtDate(u.lastLogin.slice(0,10)) : '—'}</td>
               <td style="padding:8px 10px;"><button type="button" class="btn-ghost btn-sm" data-save-user="${u.uid}">Uložit</button></td>
               <td style="padding:8px 10px;">${(u.isSuperAdmin || (u.isAdmin && !currentIsSuperAdmin)) ? '' : `<button type="button" class="btn-ghost btn-sm" data-delete-user="${u.uid}" data-delete-nick="${escapeHtml(u.nick||'')}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>`}</td>
+              ${showPerms ? (u.isSuperAdmin ? `<td style="border-left:1px solid var(--line);"></td><td colspan="${1+PERMISSION_AREAS.length}" style="padding:8px 10px; color:var(--text-muted); font-style:italic;">má vše automaticky</td>` : `
+              <td style="border-left:1px solid var(--line);"></td>
+              <td style="padding:8px 10px; text-align:center;"><input type="checkbox" data-perm-admin="${u.uid}" ${u.isAdmin?'checked':''}></td>
+              ${PERMISSION_AREAS.map(p=>`<td style="padding:8px 10px; text-align:center;"><input type="checkbox" data-perm-area="${u.uid}" data-area-key="${p.key}" ${(u.permissions&&u.permissions[p.key])?'checked':''}></td>`).join('')}
+              `) : ''}
             </tr>
           `).join('')}
         </tbody>
       </table>
-
-      ${currentIsSuperAdmin ? `
-      <div class="section-title" style="font-size:16px; margin-top:36px;">Admin oprávnění</div>
-      <p class="lede" style="margin-top:0;">Jako hlavní admin můžeš ostatním udělit admin práva a zaškrtnout, na co konkrétně mají přístup.</p>
-      <div id="admin-perms-list" style="margin-top:12px; display:flex; flex-direction:column; gap:14px;">
-        ${users.filter(u=>!u.isSuperAdmin).map(u => `
-          <div class="panel" style="max-width:520px; margin-top:0;" data-perm-row="${u.uid}">
-            <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
-              <input type="checkbox" data-perm-admin="${u.uid}" ${u.isAdmin?'checked':''}> ${escapeHtml(u.nick||'')} — admin
-            </label>
-            <div class="chip-row" data-perm-areas="${u.uid}" style="${u.isAdmin?'':'display:none;'}">
-              ${PERMISSION_AREAS.map(p => `
-                <label class="chip" style="cursor:pointer;">
-                  <input type="checkbox" data-perm-area="${u.uid}" data-area-key="${p.key}" ${(u.permissions&&u.permissions[p.key])?'checked':''} style="margin-right:5px;">${p.label}
-                </label>
-              `).join('')}
-            </div>
-            <button type="button" class="btn-sm" data-save-perms="${u.uid}" style="align-self:flex-start; margin-top:4px;">Uložit oprávnění</button>
-          </div>
-        `).join('')}
       </div>
-      ` : ''}
+      ${showPerms ? '<p class="lede" style="margin-top:10px; font-size:12px;">Zaškrtnutí oprávnění se ukládá spolu s ostatními údaji tlačítkem "Uložit" u daného uživatele.</p>' : ''}
 
-      <div class="section-title" style="font-size:16px; margin-top:36px;">Přezdívky (usernames)</div>
-      <p class="lede" style="margin-top:0;">Pokud tu vidíš přezdívku bez odpovídajícího uživatele výše (např. po nepovedené registraci), smaž ji, ať jde znovu použít.</p>
+      <div class="section-title" style="font-size:16px; margin-top:36px;">Přezdívky — duplicity a osamocené záznamy</div>
+      <p class="lede" style="margin-top:0;">Tady se zobrazují jen přezdívky, které buď nemají odpovídající účet (osamocené, třeba po nepovedené registraci), nebo jich je pro stejný účet víc (duplicity). Běžné, správně fungující přezdívky se tu nezobrazují.</p>
       <div id="usernames-list" style="margin-top:12px;"></div>
     `;
-    if(currentIsSuperAdmin){
-      box.querySelectorAll('[data-perm-admin]').forEach(cb => {
-        cb.addEventListener('change', () => {
-          const row = box.querySelector(`[data-perm-areas="${cb.dataset.permAdmin}"]`);
-          if(row) row.style.display = cb.checked ? 'flex' : 'none';
-        });
-      });
-      box.querySelectorAll('[data-save-perms]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const uid = btn.dataset.savePerms;
-          const isAdminChecked = box.querySelector(`[data-perm-admin="${uid}"]`).checked;
-          const permissions = {};
-          box.querySelectorAll(`[data-perm-area="${uid}"]`).forEach(cb => { permissions[cb.dataset.areaKey] = cb.checked; });
-          try{
-            await updateDoc(doc(db,'users',uid), { isAdmin: isAdminChecked, permissions });
-            btn.textContent = 'Uloženo!';
-            setTimeout(() => { btn.textContent = 'Uložit oprávnění'; }, 1200);
-          }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
-        });
-      });
-    }
     box.querySelectorAll('[data-save-user]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const uid = btn.dataset.saveUser;
@@ -2355,6 +2352,15 @@ async function renderUsersList(){
         const createdDate = box.querySelector(`[data-edit-created="${uid}"]`).value;
         const payload = { phone };
         if(createdDate) payload.createdAt = createdDate + 'T12:00:00.000Z';
+        if(showPerms){
+          const adminCb = box.querySelector(`[data-perm-admin="${uid}"]`);
+          if(adminCb){
+            payload.isAdmin = adminCb.checked;
+            const permissions = {};
+            box.querySelectorAll(`[data-perm-area="${uid}"]`).forEach(cb => { permissions[cb.dataset.areaKey] = cb.checked; });
+            payload.permissions = permissions;
+          }
+        }
         try{
           await updateDoc(doc(db,'users',uid), payload);
           btn.textContent = 'Uloženo!';
@@ -2380,13 +2386,18 @@ async function renderUsersList(){
       const unameSnap = await getDocs(collection(db,'usernames'));
       const uidSet = new Set(users.map(u=>u.uid));
       const unames = unameSnap.docs.map(d => ({ nickKey:d.id, ...d.data() }));
-      if(unames.length === 0){
-        unameBox.innerHTML = '<div class="empty">Žádné přezdívky.</div>';
+      const uidCounts = {};
+      unames.forEach(u => { uidCounts[u.uid] = (uidCounts[u.uid]||0) + 1; });
+      const flagged = unames.filter(u => !uidSet.has(u.uid) || uidCounts[u.uid] > 1);
+      if(flagged.length === 0){
+        unameBox.innerHTML = '<div class="empty">Žádné duplicity ani osamocené záznamy — vše v pořádku.</div>';
       }else{
-        unameBox.innerHTML = unames.map(u => {
+        unameBox.innerHTML = flagged.map(u => {
           const orphan = !uidSet.has(u.uid);
+          const dup = !orphan && uidCounts[u.uid] > 1;
+          const reason = orphan ? 'bez propojeného účtu' : `duplicita (${uidCounts[u.uid]}× stejný účet)`;
           return `<div class="row" style="max-width:600px; padding:6px 0; border-top:1px solid var(--line); align-items:center;">
-            <span style="flex:1; font-size:13px; ${orphan?'color:var(--crimson);':''}">${escapeHtml(u.nickKey)}${orphan ? ' — bez propojeného účtu' : ''}</span>
+            <span style="flex:1; font-size:13px; color:var(--crimson);">${escapeHtml(u.nickKey)} — ${reason}</span>
             <button type="button" class="btn-ghost btn-sm" data-delete-uname="${u.nickKey}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>
           </div>`;
         }).join('');
