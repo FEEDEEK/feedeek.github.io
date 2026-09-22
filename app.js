@@ -2326,6 +2326,7 @@ async function renderUsersList(){
 }
 
 function updateAuthUI(){
+  console.log('DEBUG uvnitř updateAuthUI, currentIsSuperAdmin=', currentIsSuperAdmin);
   const loggedOutBox = document.getElementById('auth-logged-out');
   const loggedInBox = document.getElementById('auth-logged-in');
   const googleNickPrompt = document.getElementById('auth-google-nick-prompt');
@@ -2399,7 +2400,9 @@ onAuthStateChanged(auth, async (user) => {
       if(myGen !== authStateGeneration) return; // mezitím se spustila novější kontrola, tuhle zahodíme
       if(userDoc.exists()){
         currentNick = userDoc.data().nick;
+        console.log('DEBUG raw isSuperAdmin:', userDoc.data().isSuperAdmin, '| typ:', typeof userDoc.data().isSuperAdmin);
         currentIsSuperAdmin = userDoc.data().isSuperAdmin === true || userDoc.data().isSuperAdmin === 'true';
+        console.log('DEBUG currentIsSuperAdmin hned po přiřazení:', currentIsSuperAdmin);
         currentIsAdmin = currentIsSuperAdmin || userDoc.data().isAdmin === true || userDoc.data().isAdmin === 'true';
         currentPermissions = userDoc.data().permissions || {};
         currentPhone = userDoc.data().phone || '';
@@ -2416,6 +2419,7 @@ onAuthStateChanged(auth, async (user) => {
       }
     }catch(err){ console.error(err); }
     if(myGen !== authStateGeneration) return;
+    console.log('DEBUG těsně před updateAuthUI:', 'currentIsSuperAdmin=', currentIsSuperAdmin, 'myGen=', myGen, 'authStateGeneration=', authStateGeneration);
     updateAuthUI();
     if(currentNick && pendingEventId){
       const evId = pendingEventId;
