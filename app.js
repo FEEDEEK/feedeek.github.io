@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, getDocs, setDoc,
+  getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, getDocFromServer, getDocs, setDoc,
   updateDoc, deleteDoc, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
@@ -2396,7 +2396,7 @@ onAuthStateChanged(auth, async (user) => {
   currentEmoji = '';
   if(user){
     try{
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userDoc = await getDocFromServer(doc(db, 'users', user.uid));
       if(myGen !== authStateGeneration) return; // mezitím se spustila novější kontrola, tuhle zahodíme
       if(userDoc.exists()){
         currentNick = userDoc.data().nick;
