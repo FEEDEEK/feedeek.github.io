@@ -2326,7 +2326,6 @@ async function renderUsersList(){
 }
 
 function updateAuthUI(){
-  console.log('DEBUG updateAuthUI voláno — currentUser:', currentUser?.uid, 'currentNick:', currentNick, 'currentIsAdmin:', currentIsAdmin, 'currentIsSuperAdmin:', currentIsSuperAdmin);
   const loggedOutBox = document.getElementById('auth-logged-out');
   const loggedInBox = document.getElementById('auth-logged-in');
   const googleNickPrompt = document.getElementById('auth-google-nick-prompt');
@@ -2382,8 +2381,11 @@ function updateAuthUI(){
   }
 }
 
+let authStateGeneration = 0;
+
 onAuthStateChanged(auth, async (user) => {
   if(suppressAuthStateHandling) return;
+  const myGen = ++authStateGeneration;
   currentUser = user;
   currentNick = null;
   currentIsAdmin = false;
@@ -2394,9 +2396,8 @@ onAuthStateChanged(auth, async (user) => {
   if(user){
     try{
       const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if(myGen !== authStateGeneration) return; // mezitím se spustila novější kontrola, tuhle zahodíme
       if(userDoc.exists()){
-        console.log('DEBUG — data z Firestore:', JSON.stringify(userDoc.data()));
-        console.log('DEBUG — přesný UID:', user.uid);
         currentNick = userDoc.data().nick;
         currentIsSuperAdmin = userDoc.data().isSuperAdmin === true || userDoc.data().isSuperAdmin === 'true';
         currentIsAdmin = currentIsSuperAdmin || userDoc.data().isAdmin === true || userDoc.data().isAdmin === 'true';
@@ -2408,10 +2409,13 @@ onAuthStateChanged(auth, async (user) => {
             await updateDoc(doc(db,'users',user.uid), { email: user.email });
             await updateDoc(usernameDocRef(currentNick), { email: user.email });
           }catch(e){ /* tichý fail, není kritické */ }
+          if(myGen !== authStateGeneration) return;
         }
-        try{ await updateDoc(doc(db,'users',user.uid), { lastLogin: new Date().toISOString() }); }catch(e){}
+        // aktualizace posledního přihlášení běží na pozadí, nečeká se na ni (nesmí blokovat vykreslení)
+        updateDoc(doc(db,'users',user.uid), { lastLogin: new Date().toISOString() }).catch(()=>{});
       }
     }catch(err){ console.error(err); }
+    if(myGen !== authStateGeneration) return;
     updateAuthUI();
     if(currentNick && pendingEventId){
       const evId = pendingEventId;
