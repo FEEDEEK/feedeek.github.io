@@ -2326,6 +2326,7 @@ async function renderUsersList(){
 }
 
 function updateAuthUI(){
+  console.log('DEBUG updateAuthUI voláno — currentUser:', currentUser?.uid, 'currentNick:', currentNick, 'currentIsAdmin:', currentIsAdmin, 'currentIsSuperAdmin:', currentIsSuperAdmin);
   const loggedOutBox = document.getElementById('auth-logged-out');
   const loggedInBox = document.getElementById('auth-logged-in');
   const googleNickPrompt = document.getElementById('auth-google-nick-prompt');
