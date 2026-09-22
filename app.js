@@ -1624,7 +1624,6 @@ function computeSwissTournament(t){
   const round0Complete = n >= 2 && round0.every(m => m.winnerIdx !== null);
 
   let rounds = [round0];
-  let exhibitionMatches = [];
   let placements = [];
 
   if(round0Complete){
@@ -1649,15 +1648,16 @@ function computeSwissTournament(t){
         return { key, teamA:a, teamB:b, result, winnerIdx };
       });
 
+      let exhibition = null;
       if(leftover !== null && placements.length > 0){
         const lastLocked = placements[placements.length-1].team;
         const key = `SR${roundIndex}-ex`;
         const { result, winnerSide } = resolvePair(swissResults, key);
         const winnerIdx = winnerSide==='A' ? leftover : (winnerSide==='B' ? lastLocked : null);
-        exhibitionMatches.push({ key, teamA:leftover, teamB:lastLocked, result, winnerIdx, exhibition:true, roundLabel: roundIndex+1 });
+        exhibition = { key, teamA:leftover, teamB:lastLocked, result, winnerIdx, exhibition:true };
       }
 
-      rounds.push(roundMatches);
+      rounds.push(exhibition ? [...roundMatches, exhibition] : roundMatches);
 
       const roundComplete = roundMatches.every(m => m.winnerIdx !== null);
       if(!roundComplete) break;
@@ -1685,7 +1685,7 @@ function computeSwissTournament(t){
     }
   }
 
-  return { round0, round0Complete, rounds, exhibitionMatches, placements, wins };
+  return { round0, round0Complete, rounds, placements, wins };
 }
 
 function renderSwissBody(t, swiss, container, compact){
@@ -1722,17 +1722,41 @@ function renderSwissBody(t, swiss, container, compact){
     wrap.appendChild(col);
   }
 
-  if(!compact) requestAnimationFrame(() => drawBracketConnectors(wrap));
+  if(!compact) requestAnimationFrame(() => {
+    layoutBracketRounds(wrap);
+    drawBracketConnectors(wrap);
+  });
+}
 
-  if(!compact && swiss.exhibitionMatches.length > 0){
-    const exWrap = document.createElement('div');
-    exWrap.className = 'bracket-exhibition-wrap';
-    exWrap.innerHTML = `<div class="bracket-round-title">Zápasy jen pro zábavu (nezapočítávají se)</div>`;
-    const row = document.createElement('div');
-    row.className = 'bracket-exhibition-row';
-    swiss.exhibitionMatches.forEach(m => row.appendChild(renderSwissMatchBox(t, 'swissResults', m, compact)));
-    exWrap.appendChild(row);
-    container.appendChild(exWrap);
+function layoutBracketRounds(wrap){
+  const roundCols = Array.from(wrap.querySelectorAll('[data-bracket-round-index]')).sort((a,b) => a.dataset.bracketRoundIndex - b.dataset.bracketRoundIndex);
+  if(roundCols.length < 2) return;
+
+  roundCols.forEach(col => col.querySelectorAll('.bracket-match').forEach(m => { m.style.marginTop = ''; }));
+
+  for(let r = 1; r < roundCols.length; r++){
+    const prevMatches = Array.from(roundCols[r-1].querySelectorAll('.bracket-match:not(.bracket-match-exhibition)'));
+    const curMatches = Array.from(roundCols[r].querySelectorAll('.bracket-match:not(.bracket-match-exhibition)'));
+    let prevBottom = null;
+
+    curMatches.forEach((m, j) => {
+      const srcA = prevMatches[2*j];
+      const srcB = prevMatches[2*j+1];
+      if(!srcA) return;
+      const aRect = srcA.getBoundingClientRect();
+      const bRect = srcB ? srcB.getBoundingClientRect() : aRect;
+      const centerY = ((aRect.top + aRect.height/2) + (bRect.top + bRect.height/2)) / 2;
+      const mRect = m.getBoundingClientRect();
+      const desiredTop = centerY - mRect.height/2;
+      let marginTop = desiredTop - mRect.top;
+      if(prevBottom !== null){
+        const minTop = prevBottom + 18;
+        if(desiredTop < minTop) marginTop = minTop - mRect.top;
+      }
+      m.style.marginTop = Math.max(0, marginTop) + 'px';
+      const newRect = m.getBoundingClientRect();
+      prevBottom = newRect.top + newRect.height;
+    });
   }
 }
 
@@ -1753,8 +1777,8 @@ function drawBracketConnectors(wrap){
   const roundCols = Array.from(wrap.querySelectorAll('[data-bracket-round-index]')).sort((a,b) => a.dataset.bracketRoundIndex - b.dataset.bracketRoundIndex);
 
   for(let r = 0; r < roundCols.length - 1; r++){
-    const matches = roundCols[r].querySelectorAll('.bracket-match');
-    const nextMatches = roundCols[r+1].querySelectorAll('.bracket-match');
+    const matches = roundCols[r].querySelectorAll('.bracket-match:not(.bracket-match-exhibition)');
+    const nextMatches = roundCols[r+1].querySelectorAll('.bracket-match:not(.bracket-match-exhibition)');
     if(nextMatches.length === 0) continue;
     matches.forEach((m, i) => {
       const targetIdx = Math.min(Math.floor(i/2), nextMatches.length-1);
@@ -1782,7 +1806,7 @@ function drawBracketConnectors(wrap){
 
 function renderSwissMatchBox(t, resultField, m, compact){
   const div = document.createElement('div');
-  div.className = 'bracket-match';
+  div.className = 'bracket-match' + (m.exhibition ? ' bracket-match-exhibition' : '');
   const teamAObj = t.teams[m.teamA], teamBObj = t.teams[m.teamB];
   const labelA = teamName(t, m.teamA), labelB = teamName(t, m.teamB);
   const emblemA = teamAObj?.emblem ? teamAObj.emblem+' ' : '';
@@ -1793,6 +1817,7 @@ function renderSwissMatchBox(t, resultField, m, compact){
   const curB = m.result ? m.result.b : 0;
   const clickable = hasPerm('turnaj') && !compact;
   div.innerHTML = `
+    ${m.exhibition ? `<div class="bracket-exhibition-label">Zápas mimo turnaj</div>` : ''}
     <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''} ${clickable?'bracket-slot-clickable':''}" ${clickable?'data-sw-slot="A"':''} title="${clickable?'Levé tlačítko = přidat výhru, pravé = ubrat':''}">
       <span class="bracket-slot-main"><span class="bracket-team-name">${emblemA}${escapeHtml(labelA)}</span>${membersA?`<span class="bracket-team-members">${escapeHtml(membersA)}</span>`:''}</span><span class="bracket-slot-score">${curA}</span>
     </div>
@@ -2523,6 +2548,6 @@ let resizeRedrawTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeRedrawTimer);
   resizeRedrawTimer = setTimeout(() => {
-    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => drawBracketConnectors(w));
+    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => { layoutBracketRounds(w); drawBracketConnectors(w); });
   }, 150);
 });
