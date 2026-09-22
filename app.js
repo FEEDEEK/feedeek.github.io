@@ -2394,6 +2394,8 @@ onAuthStateChanged(auth, async (user) => {
     try{
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if(userDoc.exists()){
+        console.log('DEBUG — data z Firestore:', JSON.stringify(userDoc.data()));
+        console.log('DEBUG — přesný UID:', user.uid);
         currentNick = userDoc.data().nick;
         currentIsSuperAdmin = userDoc.data().isSuperAdmin === true || userDoc.data().isSuperAdmin === 'true';
         currentIsAdmin = currentIsSuperAdmin || userDoc.data().isAdmin === true || userDoc.data().isAdmin === 'true';
