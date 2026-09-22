@@ -1388,46 +1388,78 @@ function renderTurnajPage(){
         <h3>${escapeHtml(t.name)}</h3>
         <div class="meta">${ev ? escapeHtml(ev.name) : 'Bez přiřazené akce'}</div>
         <p class="desc">${statusTxt}</p>
+        ${hasPerm('turnaj') ? `
+        <div class="row" style="margin-top:2px;">
+          <button type="button" class="btn-ghost btn-sm" data-edit-tourney="${t.id}" style="flex:1;">Upravit</button>
+          <button type="button" class="btn-ghost btn-sm" data-delete-tourney="${t.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+        </div>` : ''}
       </div>
     `;
   }).join('');
   grid.querySelectorAll('[data-open-tourney]').forEach(card => {
-    card.addEventListener('click', () => { currentTournamentId = card.dataset.openTourney; renderTurnajPage(); });
+    card.addEventListener('click', (e) => {
+      if(e.target.closest('[data-edit-tourney]') || e.target.closest('[data-delete-tourney]')) return;
+      currentTournamentId = card.dataset.openTourney;
+      renderTurnajPage();
+    });
+  });
+  grid.querySelectorAll('[data-edit-tourney]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = allTournaments.find(x => x.id === btn.dataset.editTourney);
+      if(t) openNewTournamentForm(t);
+    });
+  });
+  grid.querySelectorAll('[data-delete-tourney]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const t = allTournaments.find(x => x.id === btn.dataset.deleteTourney);
+      if(!t) return;
+      if(!confirm(`Opravdu smazat turnaj "${t.name}"? Tohle nejde vrátit zpět.`)) return;
+      try{ await deleteDoc(doc(db,'tournaments',t.id)); }
+      catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
+    });
   });
 }
 
-function openNewTournamentForm(){
+function openNewTournamentForm(existing){
   const slot = document.getElementById('turnaj-form-slot');
   const upcoming = events.filter(e => e.dateEnd >= todayIso());
   const evOptions = (upcoming.length ? upcoming : events);
+  const isEdit = !!existing;
   slot.innerHTML = `
     <form class="panel" id="form-new-tourney">
-      <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" required></div>
-      <div class="field"><label>Akce</label><select id="new-tourney-event">${evOptions.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}</select></div>
-      <div class="field"><label>Počet týmů</label><input type="number" id="new-tourney-count" min="2" value="4"></div>
-      <div class="field"><label>URL obrázku turnaje (nepovinné)</label><input type="url" id="new-tourney-image"></div>
+      <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" value="${isEdit?escapeHtml(existing.name):''}" required></div>
+      <div class="field"><label>Akce</label><select id="new-tourney-event">${evOptions.map(e=>`<option value="${e.id}" ${isEdit && existing.eventId===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}</select></div>
+      ${isEdit ? '' : `<div class="field"><label>Počet týmů</label><input type="number" id="new-tourney-count" min="2" value="4"></div>`}
+      <div class="field"><label>URL obrázku turnaje (nepovinné)</label><input type="url" id="new-tourney-image" value="${isEdit?escapeHtml(existing.imageUrl||''):''}"></div>
       <div style="display:flex; gap:10px;">
-        <button type="submit">Vytvořit</button>
+        <button type="submit">${isEdit ? 'Uložit změny' : 'Vytvořit'}</button>
         <button type="button" class="btn-ghost" id="btn-cancel-new-tourney">Zrušit</button>
       </div>
     </form>
   `;
+  slot.scrollIntoView({ behavior:'smooth', block:'start' });
   document.getElementById('btn-cancel-new-tourney').addEventListener('click', () => { slot.innerHTML = ''; });
   document.getElementById('form-new-tourney').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('new-tourney-name').value.trim();
     const eventId = document.getElementById('new-tourney-event').value;
-    const count = Math.max(2, parseInt(document.getElementById('new-tourney-count').value,10)||2);
     const imageUrl = document.getElementById('new-tourney-image').value.trim();
     if(!name || !eventId) return;
-    const teams = [];
-    for(let i=0;i<count;i++) teams.push({ name:`Tým ${i+1}`, members:[], emblem:'' });
     try{
-      const docRef = await addDoc(collection(db,'tournaments'), { name, eventId, teams, results:{}, swissResults:{}, imageUrl, createdAt: new Date().toISOString() });
-      currentTournamentId = docRef.id;
+      if(isEdit){
+        await updateDoc(doc(db,'tournaments',existing.id), { name, eventId, imageUrl });
+      }else{
+        const count = Math.max(2, parseInt(document.getElementById('new-tourney-count').value,10)||2);
+        const teams = [];
+        for(let i=0;i<count;i++) teams.push({ name:`Tým ${i+1}`, members:[], emblem:'' });
+        const docRef = await addDoc(collection(db,'tournaments'), { name, eventId, teams, results:{}, swissResults:{}, imageUrl, createdAt: new Date().toISOString() });
+        currentTournamentId = docRef.id;
+      }
       slot.innerHTML = '';
       renderTurnajPage();
-    }catch(err){ alert('Vytvoření turnaje se nepovedlo.'); console.error(err); }
+    }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
   });
 }
 
@@ -2217,7 +2249,6 @@ async function renderUsersList(){
           `).join('')}
         </tbody>
       </table>
-      ${users.some(u=>u.phone) ? `<button type="button" id="btn-copy-phones" class="btn-sm" style="margin-top:16px;">Kopírovat telefony (pro ruční SMS)</button>` : ''}
 
       ${currentIsSuperAdmin ? `
       <div class="section-title" style="font-size:16px; margin-top:36px;">Admin oprávnění</div>
@@ -2291,11 +2322,6 @@ async function renderUsersList(){
           renderUsersList();
         }catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
       });
-    });
-    const copyBtn = document.getElementById('btn-copy-phones');
-    if(copyBtn) copyBtn.addEventListener('click', () => {
-      const phones = users.filter(u=>u.phone).map(u=>u.phone).join(', ');
-      navigator.clipboard.writeText(phones).then(() => { copyBtn.textContent = 'Zkopírováno!'; setTimeout(()=>copyBtn.textContent='Kopírovat telefony (pro ruční SMS)', 1500); });
     });
 
     const unameBox = document.getElementById('usernames-list');
