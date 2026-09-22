@@ -229,8 +229,18 @@ form.panel, .panel{
 .tourney-setup-panel{ background:rgba(255,255,255,0.03); border:1px solid var(--line); padding:16px; margin-bottom:20px; }
 .team-editor{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:14px; margin-top:14px; }
 .team-editor-card{ background:var(--bg-void); border:1px solid var(--line); padding:12px; }
-.team-editor-card input.team-name{ width:100%; background:transparent; border:none; border-bottom:1px solid var(--line); color:var(--gold); font-weight:600; font-size:14px; padding:4px 0; margin-bottom:8px; }
+.team-editor-card input.team-name{ background:transparent; border:none; border-bottom:1px solid var(--line); font-weight:600; font-size:14px; padding:4px 0; }
 .team-editor-card input.team-name:focus{ outline:none; border-color:var(--gold); }
+.team-style-btn{ flex-shrink:0; width:34px; height:34px; border:2px solid var(--line); background:var(--bg-panel); font-size:16px; padding:0; cursor:pointer; border-radius:4px; }
+.team-style-panel{
+  position:absolute; top:100%; left:0; margin-top:4px; z-index:20;
+  background:var(--bg-panel); border:1px solid var(--gold-dim); padding:10px;
+  flex-direction:column; gap:6px; width:220px; box-shadow:0 4px 16px rgba(0,0,0,0.5);
+}
+.team-style-panel-label{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-top:4px; }
+.team-style-panel .chip-row{ margin-top:0; }
+.color-swatch{ width:20px; height:20px; border-radius:50%; border:2px solid var(--line); cursor:pointer; display:inline-block; }
+.color-swatch.active{ border-color:#fff; box-shadow:0 0 0 2px var(--gold); }
 .team-roster-list{ max-height:140px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; }
 .team-roster-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); }
 .team-roster-item input[type="checkbox"]{ accent-color:var(--gold); width:auto; }
@@ -239,9 +249,10 @@ form.panel, .panel{
 
 .bracket-section-title{ font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin:22px 0 10px; }
 
-.bracket-wrap{ display:flex; gap:30px; overflow-x:auto; padding-bottom:14px; width:100%; position:relative; }
+.bracket-wrap{ display:flex; gap:52px; overflow-x:auto; padding-bottom:14px; width:100%; position:relative; }
 .bracket-connectors{ position:absolute; left:0; top:0; z-index:0; }
-.bracket-round{ display:flex; flex-direction:column; justify-content:flex-start; gap:18px; flex:1 1 0; min-width:150px; max-width:220px; position:relative; z-index:1; }
+.bracket-round{ display:flex; flex-direction:column; flex:1 1 0; min-width:150px; max-width:220px; position:relative; z-index:1; }
+.bracket-round-matches{ display:flex; flex-direction:column; justify-content:center; gap:18px; flex:1; }
 .bracket-round-title{ font-size:15px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
 .bracket-match{ display:flex; flex-direction:column; gap:4px; position:relative; background:var(--bg-void); }
 .bracket-slot{ background:var(--bg-panel); border:1px solid var(--line); padding:9px 12px; font-size:15px; font-weight:500; display:flex; justify-content:space-between; align-items:center; gap:8px; }
@@ -256,6 +267,15 @@ form.panel, .panel{
 .bracket-slot.placeholder{ color:var(--text-muted); font-style:italic; }
 .bracket-score-btn{ font-size:11px; padding:2px 8px; }
 .bracket-champion-banner{ margin-top:20px; padding:18px 24px; background:linear-gradient(90deg, rgba(201,162,75,0.15), transparent); border:1px solid var(--gold); text-align:center; font-family:'Cinzel', serif; font-size:18px; color:var(--gold); }
+
+.bracket-round-podium{ min-width:220px; max-width:260px; }
+.podium-wrap{ display:flex; align-items:flex-end; gap:6px; }
+.podium-step{ flex:1; text-align:center; }
+.podium-team{ font-size:11px; font-weight:600; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.podium-bar{ display:flex; align-items:flex-end; justify-content:center; padding-bottom:4px; font-weight:800; font-size:13px; color:var(--bg-void); border-radius:3px 3px 0 0; }
+.podium-1 .podium-bar{ height:76px; background:linear-gradient(180deg,#f0c94e,#c9a24b); }
+.podium-2 .podium-bar{ height:56px; background:linear-gradient(180deg,#d8d8e0,#a8a8b4); }
+.podium-3 .podium-bar{ height:40px; background:linear-gradient(180deg,#d8985a,#a8693a); }
 
 .bracket-match-exhibition{ opacity:.7; }
 .bracket-exhibition-label{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
