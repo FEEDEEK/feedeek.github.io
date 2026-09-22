@@ -41,6 +41,20 @@ let regCounts = {};
 let currentUser = null;
 let currentNick = null;
 let currentIsAdmin = false;
+let currentIsSuperAdmin = false;
+let currentPermissions = {};
+const PERMISSION_AREAS = [
+  { key:'akce', label:'Akce (vytváření, úprava, účastníci)' },
+  { key:'turnaj', label:'Turnaje' },
+  { key:'jidlo', label:'Jídlo' },
+  { key:'kontakty', label:'Kontakty' },
+  { key:'uzivatele', label:'Uživatelé (správa profilů)' }
+];
+function hasPerm(area){
+  if(!currentUser) return false;
+  if(currentIsSuperAdmin) return true;
+  return currentIsAdmin && currentPermissions[area] === true;
+}
 let currentPhone = '';
 let currentEmoji = '';
 let pendingEventId = null;
@@ -163,7 +177,7 @@ onSnapshot(collection(db, 'contacts'), (snap) => {
 function renderContacts(){
   const grid = document.getElementById('contacts-grid');
   if(!grid) return;
-  document.getElementById('btn-new-contact').style.display = currentIsAdmin ? 'inline-flex' : 'none';
+  document.getElementById('btn-new-contact').style.display = hasPerm('kontakty') ? 'inline-flex' : 'none';
   if(contacts.length === 0){ grid.innerHTML = '<div class="empty">Zatím žádné kontakty.</div>'; return; }
   grid.innerHTML = contacts.map(c => `
     <div class="contact-card">
@@ -171,7 +185,7 @@ function renderContacts(){
       <h3>${escapeHtml(c.name)}</h3>
       ${c.role ? `<div class="role">${escapeHtml(c.role)}</div>` : ''}
       ${c.contact ? `<div class="info">${escapeHtml(c.contact)}</div>` : ''}
-      ${currentIsAdmin ? `
+      ${hasPerm('kontakty') ? `
       <div class="row" style="margin-top:14px; gap:6px;">
         <button type="button" class="btn-ghost btn-sm" data-edit-contact="${c.id}" style="flex:1;">Upravit</button>
         <button type="button" class="btn-ghost btn-sm" data-delete-contact="${c.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
@@ -491,7 +505,7 @@ async function deleteEvent(eventId, eventName){
 }
 
 function renderEvents(){
-  btnNewEvent.style.display = currentIsAdmin ? 'inline-flex' : 'none';
+  btnNewEvent.style.display = hasPerm('akce') ? 'inline-flex' : 'none';
   const featuredWrap = document.getElementById('featured-event-wrap');
   const grid = document.getElementById('events-grid');
   const historyWrap = document.getElementById('history-wrap');
@@ -528,7 +542,7 @@ function renderEvents(){
         <h3>${featured.number ? escapeHtml(featured.number) + ' — ' : ''}${escapeHtml(featured.name)}</h3>
         <div class="meta-strong">${fmtDateRange(featured)} · <span class="place">${escapeHtml(featured.place)}</span> · ${taken}/${featured.cap} míst</div>
         <p class="desc">${escapeHtml(featured.desc || '')}</p>
-        ${currentIsAdmin ? `
+        ${hasPerm('akce') ? `
         <div class="row" style="margin-top:14px; max-width:280px;">
           <button type="button" class="btn-ghost btn-sm" data-edit-featured style="flex:1;">Upravit</button>
           <button type="button" class="btn-ghost btn-sm" data-delete-featured style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
@@ -556,7 +570,7 @@ function renderEvents(){
         <div class="meta" style="font-weight:600; color:var(--gold); font-size:14px;">${fmtDateRange(ev)} · <span style="color:var(--teal);">${escapeHtml(ev.place)}</span></div>
         <p class="desc">${escapeHtml(ev.desc || 'Bez popisu.')}</p>
         <div class="row"><span class="slots">${t} / ${ev.cap} míst</span></div>
-        ${currentIsAdmin ? `
+        ${hasPerm('akce') ? `
         <div class="row" style="margin-top:2px;">
           <button type="button" class="btn-ghost btn-sm" data-edit="${ev.id}" style="flex:1;">Upravit</button>
           <button type="button" class="btn-ghost btn-sm" data-delete="${ev.id}" style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
@@ -585,7 +599,7 @@ function renderEvents(){
         <div class="info">
           <h4>${ev.number ? escapeHtml(ev.number) + ' — ' : ''}${escapeHtml(ev.name)}</h4>
           <div class="meta">${fmtDateRange(ev)}</div>
-          ${currentIsAdmin ? `
+          ${hasPerm('akce') ? `
           <div class="row" style="margin-top:8px; gap:6px;">
             <button type="button" class="btn-ghost btn-sm" data-edit-history style="flex:1;">Upravit</button>
             <button type="button" class="btn-ghost btn-sm" data-delete-history style="flex:1; color:var(--crimson); border-color:var(--crimson);">Smazat</button>
@@ -759,7 +773,7 @@ function renderDateVoteBlock(ev){
         <div class="row" style="margin-top:8px; align-items:center; flex-wrap:wrap;">
           <span style="flex:1; font-size:13px;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
           ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'✓ Hlasováno':'Hlasovat'}</button>` : ''}
-          ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
+          ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
         </div>
       `;
     }).join('')}
@@ -937,21 +951,21 @@ function renderAttendees(){
         statusHtml = `<span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>`;
       }
       const coinHtml = (ev && ev.fee)
-        ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} ${currentIsAdmin ? 'admin-toggle' : ''}" data-toggle-paid="${currentIsAdmin ? r._docId : ''}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}">${coinSvg(r.paid)}</span>`
+        ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} ${hasPerm('akce') ? 'admin-toggle' : ''}" data-toggle-paid="${hasPerm('akce') ? r._docId : ''}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}">${coinSvg(r.paid)}</span>`
         : '';
       return `
         <div class="attendee-row">
           <span style="display:flex; align-items:center; gap:6px;">${coinHtml}${r.emoji ? escapeHtml(r.emoji)+' ' : ''}${escapeHtml(r.nick || '(bez jména)')}</span>
           <span style="display:flex; align-items:center; gap:6px;">
             ${statusHtml}
-            ${(currentIsAdmin && !isSelf) ? `<button type="button" class="btn-ghost btn-sm" data-remove-attendee="${r._docId}" title="Odebrat" style="padding:2px 7px; color:var(--crimson); border-color:var(--crimson);">×</button>` : ''}
+            ${(hasPerm('akce') && !isSelf) ? `<button type="button" class="btn-ghost btn-sm" data-remove-attendee="${r._docId}" title="Odebrat" style="padding:2px 7px; color:var(--crimson); border-color:var(--crimson);">×</button>` : ''}
           </span>
         </div>
       `;
     }).join('');
   }
 
-  if(currentIsAdmin){
+  if(hasPerm('akce')){
     html += `<div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--line);"><button type="button" id="btn-add-manual-attendee" class="btn-ghost btn-sm" style="width:100%;">+ Přidat účastníka</button></div>`;
   }
 
@@ -1053,7 +1067,7 @@ function renderSuggestions(ev){
   sugList.innerHTML = currentSuggestions.map(s => {
     const liked = currentUser && (s.likes||[]).includes(currentUser.uid);
     const likers = (s.likeNicks||[]).join(', ');
-    const canEdit = currentUser && (s.uid === currentUser.uid || currentIsAdmin);
+    const canEdit = currentUser && (s.uid === currentUser.uid || hasPerm('akce'));
     return `
     <div class="suggestion-row" data-sug-row="${s.id}">
       <span class="txt" data-sug-display="${s.id}">Hráč: ${authorLabel(s.author, s.authorEmoji)} — ${escapeHtml(s.text)}</span>
@@ -1116,7 +1130,7 @@ function renderComments(ev){
     return;
   }
   commentsList.innerHTML = currentComments.map(c => {
-    const canEdit = currentUser && (c.uid === currentUser.uid || currentIsAdmin);
+    const canEdit = currentUser && (c.uid === currentUser.uid || hasPerm('akce'));
     return `
     <div class="comment-row" data-comment-row="${c.id}">
       <span class="who">${authorLabel(c.author, c.authorEmoji)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
@@ -1188,7 +1202,7 @@ function renderTabJidlo(ev){
             </svg>
           </span>
           <span>${escapeHtml(o)}</span>
-          ${currentIsAdmin ? `<span class="portion-count">${portionCounts[o]}×</span>` : ''}
+          ${hasPerm('jidlo') ? `<span class="portion-count">${portionCounts[o]}×</span>` : ''}
         </label>
       `).join('');
 
@@ -1254,7 +1268,7 @@ function renderTabJidlo(ev){
   foodCommentsList.innerHTML = currentFoodComments.length === 0
     ? '<div class="empty">Zatím žádná diskuze.</div>'
     : currentFoodComments.map(c => {
-        const canEdit = currentUser && (c.uid === currentUser.uid || currentIsAdmin);
+        const canEdit = currentUser && (c.uid === currentUser.uid || hasPerm('jidlo'));
         return `
         <div class="comment-row" data-food-comment-row="${c.id}">
           <span class="who">${authorLabel(c.author, c.authorEmoji)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
@@ -1319,7 +1333,7 @@ function renderTurnajPage(){
     `;
 
     const bodyWrap = document.getElementById('turnaj-detail-body');
-    if(currentIsAdmin){
+    if(hasPerm('turnaj')){
       const toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
       toggleBtn.className = 'btn-ghost btn-sm';
@@ -1350,7 +1364,7 @@ function renderTurnajPage(){
 
   // seznam turnajů
   let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaj</h1></div>`;
-  html += currentIsAdmin ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
+  html += hasPerm('turnaj') ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
   html += `</div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
   box.innerHTML = html;
 
@@ -1669,7 +1683,7 @@ function renderSwissMatchBox(t, resultField, m, compact){
   const emblemB = teamBObj?.emblem ? teamBObj.emblem+' ' : '';
   const curA = m.result ? m.result.a : 0;
   const curB = m.result ? m.result.b : 0;
-  const clickable = currentIsAdmin && !compact;
+  const clickable = hasPerm('turnaj') && !compact;
   div.innerHTML = `
     ${m.exhibition ? `<div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">jen pro zábavu</div>` : ''}
     <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''} ${clickable?'bracket-slot-clickable':''}" ${clickable?'data-sw-slot="A"':''} title="${clickable?'Levé tlačítko = přidat výhru, pravé = ubrat':''}">
@@ -1760,7 +1774,7 @@ function renderTabRozvrh(ev){
   }
 
   let html = `<div class="section-title" style="font-size:16px;">Rozvrh</div>`;
-  if(currentIsAdmin){
+  if(hasPerm('turnaj')){
     html += `
       <form class="panel" id="form-schedule-item" style="max-width:480px;">
         <div class="field"><label>Den</label><select id="sch-day">${days.map(d=>`<option value="${d}">${fmtDate(d)}</option>`).join('')}</select></div>
@@ -1805,7 +1819,7 @@ function renderTabRozvrh(ev){
         ${items.length === 0 ? '<div class="empty">Zatím nic naplánováno.</div>' : items.map(it => `
           <div class="suggestion-row">
             <span class="txt"><b style="color:var(--gold);">${it.timeStart}${it.timeEnd?'–'+it.timeEnd:''}</b> — ${escapeHtml(it.title)}</span>
-            ${currentIsAdmin ? `<button type="button" class="btn-ghost btn-sm" data-remove-sch="${it.idx}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>` : ''}
+            ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-remove-sch="${it.idx}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>` : ''}
           </div>
         `).join('')}
       </div>
@@ -1888,7 +1902,7 @@ function renderPhotoGrid(ev){
     return;
   }
   grid.innerHTML = currentPhotos.map(p => {
-    const canDelete = currentUser && (p.uid === currentUser.uid || currentIsAdmin);
+    const canDelete = currentUser && (p.uid === currentUser.uid || hasPerm('akce'));
     const mediaHtml = p.kind === 'video'
       ? `<video src="${p.url.replace(/"/g,'&quot;')}" muted controls></video>`
       : `<img src="${p.url.replace(/"/g,'&quot;')}" alt="Foto od ${escapeHtml(p.author)}" loading="lazy">`;
@@ -1958,6 +1972,8 @@ formAuth.addEventListener('submit', async (e) => {
       currentPhone = phone;
       currentEmoji = '';
       currentIsAdmin = false;
+      currentIsSuperAdmin = false;
+      currentPermissions = {};
       suppressAuthStateHandling = false;
       updateAuthUI();
     }
@@ -2196,17 +2212,60 @@ async function renderUsersList(){
               <td style="padding:8px 10px;"><input type="date" data-edit-created="${u.uid}" value="${u.createdAt ? u.createdAt.slice(0,10) : ''}" style="background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px; color:var(--text-muted);">${u.lastLogin ? fmtDate(u.lastLogin.slice(0,10)) : '—'}</td>
               <td style="padding:8px 10px;"><button type="button" class="btn-ghost btn-sm" data-save-user="${u.uid}">Uložit</button></td>
-              <td style="padding:8px 10px;">${u.isSuperAdmin ? '' : `<button type="button" class="btn-ghost btn-sm" data-delete-user="${u.uid}" data-delete-nick="${escapeHtml(u.nick||'')}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>`}</td>
+              <td style="padding:8px 10px;">${(u.isSuperAdmin || (u.isAdmin && !currentIsSuperAdmin)) ? '' : `<button type="button" class="btn-ghost btn-sm" data-delete-user="${u.uid}" data-delete-nick="${escapeHtml(u.nick||'')}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>`}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
       ${users.some(u=>u.phone) ? `<button type="button" id="btn-copy-phones" class="btn-sm" style="margin-top:16px;">Kopírovat telefony (pro ruční SMS)</button>` : ''}
 
+      ${currentIsSuperAdmin ? `
+      <div class="section-title" style="font-size:16px; margin-top:36px;">Admin oprávnění</div>
+      <p class="lede" style="margin-top:0;">Jako hlavní admin můžeš ostatním udělit admin práva a zaškrtnout, na co konkrétně mají přístup.</p>
+      <div id="admin-perms-list" style="margin-top:12px; display:flex; flex-direction:column; gap:14px;">
+        ${users.filter(u=>!u.isSuperAdmin).map(u => `
+          <div class="panel" style="max-width:520px; margin-top:0;" data-perm-row="${u.uid}">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
+              <input type="checkbox" data-perm-admin="${u.uid}" ${u.isAdmin?'checked':''}> ${escapeHtml(u.nick||'')} — admin
+            </label>
+            <div class="chip-row" data-perm-areas="${u.uid}" style="${u.isAdmin?'':'display:none;'}">
+              ${PERMISSION_AREAS.map(p => `
+                <label class="chip" style="cursor:pointer;">
+                  <input type="checkbox" data-perm-area="${u.uid}" data-area-key="${p.key}" ${(u.permissions&&u.permissions[p.key])?'checked':''} style="margin-right:5px;">${p.label}
+                </label>
+              `).join('')}
+            </div>
+            <button type="button" class="btn-sm" data-save-perms="${u.uid}" style="align-self:flex-start; margin-top:4px;">Uložit oprávnění</button>
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
       <div class="section-title" style="font-size:16px; margin-top:36px;">Přezdívky (usernames)</div>
       <p class="lede" style="margin-top:0;">Pokud tu vidíš přezdívku bez odpovídajícího uživatele výše (např. po nepovedené registraci), smaž ji, ať jde znovu použít.</p>
       <div id="usernames-list" style="margin-top:12px;"></div>
     `;
+    if(currentIsSuperAdmin){
+      box.querySelectorAll('[data-perm-admin]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const row = box.querySelector(`[data-perm-areas="${cb.dataset.permAdmin}"]`);
+          if(row) row.style.display = cb.checked ? 'flex' : 'none';
+        });
+      });
+      box.querySelectorAll('[data-save-perms]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const uid = btn.dataset.savePerms;
+          const isAdminChecked = box.querySelector(`[data-perm-admin="${uid}"]`).checked;
+          const permissions = {};
+          box.querySelectorAll(`[data-perm-area="${uid}"]`).forEach(cb => { permissions[cb.dataset.areaKey] = cb.checked; });
+          try{
+            await updateDoc(doc(db,'users',uid), { isAdmin: isAdminChecked, permissions });
+            btn.textContent = 'Uloženo!';
+            setTimeout(() => { btn.textContent = 'Uložit oprávnění'; }, 1200);
+          }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
+        });
+      });
+    }
     box.querySelectorAll('[data-save-user]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const uid = btn.dataset.saveUser;
@@ -2276,7 +2335,7 @@ function updateAuthUI(){
     loggedOutBox.style.display = 'none';
     loggedInBox.style.display = 'block';
     googleNickPrompt.style.display = 'none';
-    document.getElementById('account-nick-display').textContent = currentNick + (currentIsAdmin ? ' (admin)' : '');
+    document.getElementById('account-nick-display').textContent = currentNick + (currentIsSuperAdmin ? ' (hlavní admin)' : (currentIsAdmin ? ' (admin)' : ''));
     document.getElementById('account-email-display').textContent = currentUser.email || '';
     document.getElementById('account-phone-display').textContent = currentPhone || '—';
     document.getElementById('account-emoji-display').textContent = currentEmoji || '—';
@@ -2305,10 +2364,10 @@ function updateAuthUI(){
   renderContacts();
   if(currentDetailEventId){ renderStatsAndRsvp(); renderAttendees(); }
 
-  document.getElementById('nav-item-uzivatele').style.display = currentIsAdmin ? 'flex' : 'none';
-  document.getElementById('nav-sep-admin').style.display = currentIsAdmin ? 'block' : 'none';
-  if(currentIsAdmin) renderUsersList();
-  if(!currentIsAdmin && document.getElementById('view-uzivatele').classList.contains('active')){
+  document.getElementById('nav-item-uzivatele').style.display = hasPerm('uzivatele') ? 'flex' : 'none';
+  document.getElementById('nav-sep-admin').style.display = hasPerm('uzivatele') ? 'block' : 'none';
+  if(hasPerm('uzivatele')) renderUsersList();
+  if(!hasPerm('uzivatele') && document.getElementById('view-uzivatele').classList.contains('active')){
     showView('akce');
   }
 
@@ -2327,6 +2386,8 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   currentNick = null;
   currentIsAdmin = false;
+  currentIsSuperAdmin = false;
+  currentPermissions = {};
   currentPhone = '';
   currentEmoji = '';
   if(user){
@@ -2334,7 +2395,9 @@ onAuthStateChanged(auth, async (user) => {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if(userDoc.exists()){
         currentNick = userDoc.data().nick;
-        currentIsAdmin = userDoc.data().isAdmin === true;
+        currentIsSuperAdmin = userDoc.data().isSuperAdmin === true;
+        currentIsAdmin = currentIsSuperAdmin || userDoc.data().isAdmin === true;
+        currentPermissions = userDoc.data().permissions || {};
         currentPhone = userDoc.data().phone || '';
         currentEmoji = userDoc.data().emoji || '';
         if(userDoc.data().email !== user.email){
