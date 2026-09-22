@@ -2400,6 +2400,7 @@ onAuthStateChanged(auth, async (user) => {
       if(myGen !== authStateGeneration) return; // mezitím se spustila novější kontrola, tuhle zahodíme
       if(userDoc.exists()){
         currentNick = userDoc.data().nick;
+        console.log('DEBUG přesný UID používaný appkou (zkopíruj tohle):', user.uid);
         console.log('DEBUG raw isSuperAdmin:', userDoc.data().isSuperAdmin, '| typ:', typeof userDoc.data().isSuperAdmin);
         currentIsSuperAdmin = userDoc.data().isSuperAdmin === true || userDoc.data().isSuperAdmin === 'true';
         console.log('DEBUG currentIsSuperAdmin hned po přiřazení:', currentIsSuperAdmin);
