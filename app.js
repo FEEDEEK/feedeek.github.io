@@ -144,14 +144,13 @@ navItems.forEach(n => n.addEventListener('click', () => {
   closeEventForm();
   closeContactForm();
   showView(n.dataset.view);
-  if(n.dataset.view === 'turnaj') renderTurnajPage();
+  if(n.dataset.view === 'turnaj'){ currentTournamentId = null; renderTurnajPage(); }
 }));
 document.getElementById('brand-home-link').addEventListener('click', () => {
   closeEventForm();
   closeContactForm();
   showView('home');
 });
-document.getElementById('btn-back-to-akce').addEventListener('click', () => { showView('akce'); });
 
 // ---- Kontakty / Tablo ----
 let contacts = [];
@@ -1311,13 +1310,13 @@ function renderTurnajPage(){
     if(!t){ currentTournamentId = null; renderTurnajPage(); return; }
     const ev = events.find(x => x.id === t.eventId);
     box.innerHTML = `
-      <button type="button" class="btn-ghost back-link" id="btn-back-to-turnaj-list">← Zpět na seznam turnajů</button>
-      <div class="eyebrow">${ev ? escapeHtml(ev.name) : 'Bez přiřazené akce'}</div>
-      <h1 class="headline" style="font-size:28px;">${escapeHtml(t.name)}</h1>
-      ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="max-width:320px; margin-top:14px; border:1px solid var(--line);">` : ''}
+      <div style="text-align:center;">
+        ${ev ? `<div class="status-hint">${escapeHtml(ev.name)}</div>` : ''}
+        <h1 class="headline" style="font-size:28px; display:inline-block;">${escapeHtml(t.name)}</h1>
+        ${t.imageUrl ? `<div><img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="max-width:320px; margin-top:14px; border:1px solid var(--line);"></div>` : ''}
+      </div>
       <div id="turnaj-detail-body" style="margin-top:20px;"></div>
     `;
-    document.getElementById('btn-back-to-turnaj-list').addEventListener('click', () => { currentTournamentId = null; renderTurnajPage(); });
 
     const bodyWrap = document.getElementById('turnaj-detail-body');
     if(currentIsAdmin){
@@ -1350,7 +1349,7 @@ function renderTurnajPage(){
   }
 
   // seznam turnajů
-  let html = `<div class="toolbar"><div><div class="eyebrow">Turnaje</div><h1 class="headline" style="font-size:28px;">Turnaj</h1></div>`;
+  let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaj</h1></div>`;
   html += currentIsAdmin ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
   html += `</div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
   box.innerHTML = html;
@@ -1528,8 +1527,11 @@ async function renderTeamEditor(t, container){
   });
 
   document.getElementById('btn-save-teams').addEventListener('click', async () => {
-    try{ await updateDoc(doc(db,'tournaments',t.id), { teams: workingTeams }); }
-    catch(err){ alert('Uložení týmů se nepovedlo.'); console.error(err); }
+    try{
+      await updateDoc(doc(db,'tournaments',t.id), { teams: workingTeams });
+      teamEditorOpen = false;
+      renderTurnajPage();
+    }catch(err){ alert('Uložení týmů se nepovedlo.'); console.error(err); }
   });
 }
 
@@ -1665,44 +1667,36 @@ function renderSwissMatchBox(t, resultField, m, compact){
   const labelA = teamName(t, m.teamA), labelB = teamName(t, m.teamB);
   const emblemA = teamAObj?.emblem ? teamAObj.emblem+' ' : '';
   const emblemB = teamBObj?.emblem ? teamBObj.emblem+' ' : '';
-  const scoreTxt = m.result ? ` (${m.result.a}:${m.result.b})` : '';
+  const curA = m.result ? m.result.a : 0;
+  const curB = m.result ? m.result.b : 0;
+  const clickable = currentIsAdmin && !compact;
   div.innerHTML = `
     ${m.exhibition ? `<div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">jen pro zábavu</div>` : ''}
-    <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''}"><span>${emblemA}${escapeHtml(labelA)}</span>${m.winnerIdx===m.teamA?`<span>${scoreTxt}</span>`:''}</div>
-    <div class="bracket-slot ${m.winnerIdx===m.teamB ? 'winner-slot':''}"><span>${emblemB}${escapeHtml(labelB)}</span>${m.winnerIdx===m.teamB?`<span>${scoreTxt}</span>`:''}</div>
-    ${(currentIsAdmin && !compact) ? `<button type="button" class="bracket-score-btn btn-ghost" data-sw-score>${m.result?'Upravit':'Zadat výsledek'}</button>` : ''}
-  `;
-  const btn = div.querySelector('[data-sw-score]');
-  if(btn) btn.addEventListener('click', () => openScoreModal(t, resultField, m.key, labelA, labelB, m.result));
-  return div;
-}
-
-function openScoreModal(t, resultField, matchKey, labelA, labelB, existing){
-  const backdrop = document.createElement('div');
-  backdrop.className = 'score-modal-backdrop';
-  backdrop.innerHTML = `
-    <div class="score-modal">
-      <div style="font-size:14px; font-weight:600;">Zadej výsledek (na 2 vítězné sety)</div>
-      <div class="row"><span>${escapeHtml(labelA)}</span><input type="number" id="score-a" min="0" max="2" value="${existing?existing.a:0}"></div>
-      <div class="row"><span>${escapeHtml(labelB)}</span><input type="number" id="score-b" min="0" max="2" value="${existing?existing.b:0}"></div>
-      <div style="display:flex; gap:8px;">
-        <button type="button" id="score-save">Uložit</button>
-        <button type="button" class="btn-ghost" id="score-cancel">Zrušit</button>
-      </div>
+    <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''} ${clickable?'bracket-slot-clickable':''}" ${clickable?'data-sw-slot="A"':''} title="${clickable?'Levé tlačítko = přidat výhru, pravé = ubrat':''}">
+      <span>${emblemA}${escapeHtml(labelA)}</span><span>${curA}</span>
+    </div>
+    <div class="bracket-slot ${m.winnerIdx===m.teamB ? 'winner-slot':''} ${clickable?'bracket-slot-clickable':''}" ${clickable?'data-sw-slot="B"':''} title="${clickable?'Levé tlačítko = přidat výhru, pravé = ubrat':''}">
+      <span>${emblemB}${escapeHtml(labelB)}</span><span>${curB}</span>
     </div>
   `;
-  document.body.appendChild(backdrop);
-  document.getElementById('score-cancel').addEventListener('click', () => backdrop.remove());
-  document.getElementById('score-save').addEventListener('click', async () => {
-    const a = parseInt(document.getElementById('score-a').value,10)||0;
-    const b = parseInt(document.getElementById('score-b').value,10)||0;
-    if(a<2 && b<2){ alert('Jeden z týmů musí mít alespoň 2 vítězné sety.'); return; }
-    if(a===b){ alert('Skóre nemůže být nerozhodné.'); return; }
-    try{
-      await updateDoc(doc(db,'tournaments',t.id), { [`${resultField}.${matchKey}`]: { a, b } });
-      backdrop.remove();
-    }catch(err){ alert('Uložení výsledku se nepovedlo.'); console.error(err); }
-  });
+
+  if(clickable){
+    async function adjust(side, delta){
+      let a = curA, b = curB;
+      if(side === 'A') a = Math.max(0, Math.min(2, a + delta));
+      else b = Math.max(0, Math.min(2, b + delta));
+      try{ await updateDoc(doc(db,'tournaments',t.id), { [`${resultField}.${m.key}`]: { a, b } }); }
+      catch(err){ console.error(err); }
+    }
+    const slotA = div.querySelector('[data-sw-slot="A"]');
+    const slotB = div.querySelector('[data-sw-slot="B"]');
+    slotA.addEventListener('click', () => adjust('A', 1));
+    slotA.addEventListener('contextmenu', (e) => { e.preventDefault(); adjust('A', -1); });
+    slotB.addEventListener('click', () => adjust('B', 1));
+    slotB.addEventListener('contextmenu', (e) => { e.preventDefault(); adjust('B', -1); });
+  }
+
+  return div;
 }
 
 // ---- Kompaktní zobrazení turnajů v záložce akce ----
