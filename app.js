@@ -710,7 +710,7 @@ function updateHeaderVisibility(){
   const grid = document.querySelector('.detail-grid');
   const rightCol = document.querySelector('.detail-col-right');
   if(rightCol) rightCol.style.display = onPrehled ? 'block' : 'none';
-  if(grid) grid.style.gridTemplateColumns = onPrehled ? '240px 1fr 260px' : '240px 1fr';
+  if(grid) grid.classList.toggle('no-sidebar', !onPrehled);
 }
 
 function renderActiveTab(ev){
@@ -1827,6 +1827,7 @@ const authEmailField = document.getElementById('auth-email-field');
 const authSubmitBtn = document.getElementById('auth-submit-btn');
 let authStep = 1;
 let pendingNickForRegistration = null;
+let suppressAuthStateHandling = false;
 
 formAuth.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1854,11 +1855,20 @@ formAuth.addEventListener('submit', async (e) => {
       const email = document.getElementById('auth-email').value.trim();
       const phone = document.getElementById('auth-phone').value.trim();
       if(!email){ setAuthMessage('Doplň prosím e-mail.'); authSubmitBtn.disabled = false; return; }
+      suppressAuthStateHandling = true;
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await setDoc(usernameDocRef(pendingNickForRegistration), { uid: cred.user.uid, email });
       await setDoc(doc(db, 'users', cred.user.uid), { nick: pendingNickForRegistration, email, phone, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() });
+      currentUser = cred.user;
+      currentNick = pendingNickForRegistration;
+      currentPhone = phone;
+      currentEmoji = '';
+      currentIsAdmin = false;
+      suppressAuthStateHandling = false;
+      updateAuthUI();
     }
   }catch(err){
+    suppressAuthStateHandling = false;
     console.error(err);
     if(err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') setAuthMessage('Nesprávné heslo. Zkus to znovu.');
     else if(err.code === 'auth/email-already-in-use') setAuthMessage('Tenhle e-mail už je použitý u jiného účtu.');
@@ -2079,24 +2089,29 @@ async function renderUsersList(){
     const users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
     if(users.length === 0){ box.innerHTML = '<div class="empty">Zatím žádní uživatelé.</div>'; return; }
     box.innerHTML = `
-      <table style="width:100%; max-width:820px; border-collapse:collapse; font-size:14px;">
+      <table style="width:100%; max-width:900px; border-collapse:collapse; font-size:14px;">
         <thead><tr style="text-align:left; color:var(--text-muted); font-size:12px;">
-          <th style="padding:8px 10px 8px 0;">Přezdívka</th><th style="padding:8px 10px;">E-mail</th><th style="padding:8px 10px;">Telefon</th><th style="padding:8px 10px;">Registrace</th><th style="padding:8px 10px;">Poslední přihlášení</th><th></th>
+          <th style="padding:8px 10px 8px 0;">Přezdívka</th><th style="padding:8px 10px;">E-mail</th><th style="padding:8px 10px;">Telefon</th><th style="padding:8px 10px;">Registrace</th><th style="padding:8px 10px;">Poslední přihlášení</th><th></th><th></th>
         </tr></thead>
         <tbody>
           ${users.map(u => `
             <tr style="border-top:1px solid var(--line);" data-user-row="${u.uid}">
-              <td style="padding:8px 10px 8px 0;">${escapeHtml(u.nick||'')}${u.isAdmin?' <span style="color:var(--gold); font-size:11px;">(admin)</span>':''}</td>
+              <td style="padding:8px 10px 8px 0;">${escapeHtml(u.nick||'')}${u.isSuperAdmin?' <span style="color:var(--gold); font-size:11px;">(hlavní admin)</span>':(u.isAdmin?' <span style="color:var(--gold); font-size:11px;">(admin)</span>':'')}</td>
               <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.email||'')}</td>
               <td style="padding:8px 10px;"><input type="tel" data-edit-phone="${u.uid}" value="${escapeHtml(u.phone||'')}" placeholder="—" style="width:120px; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px;"><input type="date" data-edit-created="${u.uid}" value="${u.createdAt ? u.createdAt.slice(0,10) : ''}" style="background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px; color:var(--text-muted);">${u.lastLogin ? fmtDate(u.lastLogin.slice(0,10)) : '—'}</td>
               <td style="padding:8px 10px;"><button type="button" class="btn-ghost btn-sm" data-save-user="${u.uid}">Uložit</button></td>
+              <td style="padding:8px 10px;">${u.isSuperAdmin ? '' : `<button type="button" class="btn-ghost btn-sm" data-delete-user="${u.uid}" data-delete-nick="${escapeHtml(u.nick||'')}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>`}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
       ${users.some(u=>u.phone) ? `<button type="button" id="btn-copy-phones" class="btn-sm" style="margin-top:16px;">Kopírovat telefony (pro ruční SMS)</button>` : ''}
+
+      <div class="section-title" style="font-size:16px; margin-top:36px;">Přezdívky (usernames)</div>
+      <p class="lede" style="margin-top:0;">Pokud tu vidíš přezdívku bez odpovídajícího uživatele výše (např. po nepovedené registraci), smaž ji, ať jde znovu použít.</p>
+      <div id="usernames-list" style="margin-top:12px;"></div>
     `;
     box.querySelectorAll('[data-save-user]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -2112,11 +2127,48 @@ async function renderUsersList(){
         }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
       });
     });
+    box.querySelectorAll('[data-delete-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const uid = btn.dataset.deleteUser;
+        const nick = btn.dataset.deleteNick;
+        if(!confirm(`Opravdu úplně odstranit uživatele "${nick}"? Smaže se jeho profil i přezdívka. (Přihlašovací údaj ve Firebase zůstane technicky existovat, ale bez profilu se nepřihlásí.) Tohle nejde vrátit zpět.`)) return;
+        try{
+          await deleteDoc(doc(db,'users',uid));
+          if(nick) await deleteDoc(usernameDocRef(nick));
+          renderUsersList();
+        }catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
+      });
+    });
     const copyBtn = document.getElementById('btn-copy-phones');
     if(copyBtn) copyBtn.addEventListener('click', () => {
       const phones = users.filter(u=>u.phone).map(u=>u.phone).join(', ');
       navigator.clipboard.writeText(phones).then(() => { copyBtn.textContent = 'Zkopírováno!'; setTimeout(()=>copyBtn.textContent='Kopírovat telefony (pro ruční SMS)', 1500); });
     });
+
+    const unameBox = document.getElementById('usernames-list');
+    try{
+      const unameSnap = await getDocs(collection(db,'usernames'));
+      const uidSet = new Set(users.map(u=>u.uid));
+      const unames = unameSnap.docs.map(d => ({ nickKey:d.id, ...d.data() }));
+      if(unames.length === 0){
+        unameBox.innerHTML = '<div class="empty">Žádné přezdívky.</div>';
+      }else{
+        unameBox.innerHTML = unames.map(u => {
+          const orphan = !uidSet.has(u.uid);
+          return `<div class="row" style="max-width:600px; padding:6px 0; border-top:1px solid var(--line); align-items:center;">
+            <span style="flex:1; font-size:13px; ${orphan?'color:var(--crimson);':''}">${escapeHtml(u.nickKey)}${orphan ? ' — bez propojeného účtu' : ''}</span>
+            <button type="button" class="btn-ghost btn-sm" data-delete-uname="${u.nickKey}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>
+          </div>`;
+        }).join('');
+        unameBox.querySelectorAll('[data-delete-uname]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            if(!confirm(`Smazat přezdívku "${btn.dataset.deleteUname}"?`)) return;
+            try{ await deleteDoc(doc(db,'usernames',btn.dataset.deleteUname)); renderUsersList(); }
+            catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
+          });
+        });
+      }
+    }catch(err){ console.error(err); unameBox.innerHTML = '<div class="empty">Nepovedlo se načíst.</div>'; }
   }catch(err){ console.error(err); box.innerHTML = '<div class="empty">Nepovedlo se načíst uživatele.</div>'; }
 }
 
@@ -2162,6 +2214,9 @@ function updateAuthUI(){
   document.getElementById('nav-item-uzivatele').style.display = currentIsAdmin ? 'flex' : 'none';
   document.getElementById('nav-sep-admin').style.display = currentIsAdmin ? 'block' : 'none';
   if(currentIsAdmin) renderUsersList();
+  if(!currentIsAdmin && document.getElementById('view-uzivatele').classList.contains('active')){
+    showView('akce');
+  }
 
   const accWidget = document.getElementById('topbar-account-widget');
   if(currentUser && currentNick){
@@ -2174,6 +2229,7 @@ function updateAuthUI(){
 }
 
 onAuthStateChanged(auth, async (user) => {
+  if(suppressAuthStateHandling) return;
   currentUser = user;
   currentNick = null;
   currentIsAdmin = false;
