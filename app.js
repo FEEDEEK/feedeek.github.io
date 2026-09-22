@@ -2395,8 +2395,8 @@ onAuthStateChanged(auth, async (user) => {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if(userDoc.exists()){
         currentNick = userDoc.data().nick;
-        currentIsSuperAdmin = userDoc.data().isSuperAdmin === true;
-        currentIsAdmin = currentIsSuperAdmin || userDoc.data().isAdmin === true;
+        currentIsSuperAdmin = userDoc.data().isSuperAdmin === true || userDoc.data().isSuperAdmin === 'true';
+        currentIsAdmin = currentIsSuperAdmin || userDoc.data().isAdmin === true || userDoc.data().isAdmin === 'true';
         currentPermissions = userDoc.data().permissions || {};
         currentPhone = userDoc.data().phone || '';
         currentEmoji = userDoc.data().emoji || '';
