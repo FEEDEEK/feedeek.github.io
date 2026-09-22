@@ -246,6 +246,9 @@ form.panel, .panel{
   opacity:.5;
 }
 .bracket-slot{ background:var(--bg-panel); border:1px solid var(--line); padding:7px 10px; font-size:13px; display:flex; justify-content:space-between; gap:8px; }
+.bracket-slot-clickable{ cursor:pointer; user-select:none; -webkit-user-select:none; }
+.bracket-slot-clickable:hover{ border-color:var(--gold-dim); background:var(--bg-panel-2); }
+.bracket-slot-clickable span:last-child{ color:var(--gold); font-weight:600; }
 .bracket-slot.winner-slot{ border-color:var(--teal); color:var(--teal); }
 .bracket-slot.placeholder{ color:var(--text-muted); font-style:italic; }
 .bracket-score-btn{ font-size:11px; padding:2px 8px; }
