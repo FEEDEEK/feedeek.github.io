@@ -620,7 +620,7 @@ function clearDetailListeners(){
 function openEventDetail(eventId){
   currentDetailEventId = eventId;
   currentTab = 'prehled';
-  currentTournamentIndex = 0;
+  currentTournamentId = null;
   teamEditorOpen = false;
   const ev = events.find(x => x.id === eventId);
   if(!ev) return;
