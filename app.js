@@ -144,6 +144,7 @@ navItems.forEach(n => n.addEventListener('click', () => {
   closeEventForm();
   closeContactForm();
   showView(n.dataset.view);
+  if(n.dataset.view === 'turnaj') renderTurnajPage();
 }));
 document.getElementById('brand-home-link').addEventListener('click', () => {
   closeEventForm();
@@ -1283,89 +1284,136 @@ function renderTabJidlo(ev){
   });
 }
 
-// ---- Turnaj: round robin (každý s každým) + tiebreaky + play-off o umístění ----
-let currentTournamentIndex = 0;
+// ---- Turnaj: samostatná kolekce, propojená s konkrétní akcí přes eventId ----
+let allTournaments = [];
+let currentTournamentId = null;
 let teamEditorOpen = false;
+const TEAM_EMBLEMS = ['🛡️','⚔️','🐺','🦅','🔥','💀','👑','🌙','⭐','🐉','🦁','🍀','🐍','🦂','⚡','🎯'];
 
-// ---- Turnaj: iterativní systém podle pořadí ----
-// Kolo 1 = základní část (každý s každým). Další kola: aktuálně nejlepší dva hrají spolu,
-// další dva podle pořadí spolu atd. Jakmile lídr porazí svého nejbližšího soupeře a nikdo
-// ho už nemůže bodově dohnat, je určeno umístění a pokračuje se s dalšími týmy o zbylá místa.
+onSnapshot(collection(db, 'tournaments'), (snap) => {
+  allTournaments = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  if(document.getElementById('view-turnaj')?.classList.contains('active')) renderTurnajPage();
+  if(currentDetailEventId && currentTab === 'turnaj'){
+    const ev = events.find(x=>x.id===currentDetailEventId);
+    if(ev) renderTabTurnaj(ev);
+  }
+});
+
 function teamName(t, idx){ return t.teams[idx] ? t.teams[idx].name : `Tým ${idx+1}`; }
 
-function renderTabTurnaj(ev){
-  const box = document.getElementById('tab-turnaj');
-  const tournaments = ev.tournaments || [];
-  if(currentTournamentIndex >= tournaments.length) currentTournamentIndex = Math.max(0, tournaments.length-1);
+// ---- Horní stránka "Turnaj" (celostránkové zobrazení, správa) ----
+function renderTurnajPage(){
+  const box = document.getElementById('view-turnaj-content');
+  if(!box) return;
 
-  let html = `<div class="section-title" style="font-size:16px;">Turnaj</div><div class="tourney-select-row">`;
-  if(tournaments.length > 0){
-    html += `<div class="field" style="max-width:240px;"><label>Turnaj</label><select id="tourney-select">${tournaments.map((t,i)=>`<option value="${i}" ${i===currentTournamentIndex?'selected':''}>${escapeHtml(t.name||('Turnaj '+(i+1)))}</option>`).join('')}</select></div>`;
-  }
-  if(currentIsAdmin) html += `<button type="button" id="btn-new-tourney" class="btn-sm">+ Nový turnaj</button>`;
-  if(currentIsAdmin && tournaments.length > 0) html += `<button type="button" id="btn-delete-tourney" class="btn-ghost btn-sm" style="color:var(--crimson); border-color:var(--crimson);">Smazat turnaj</button>`;
-  html += `</div>`;
-  box.innerHTML = html;
+  if(currentTournamentId){
+    const t = allTournaments.find(x => x.id === currentTournamentId);
+    if(!t){ currentTournamentId = null; renderTurnajPage(); return; }
+    const ev = events.find(x => x.id === t.eventId);
+    box.innerHTML = `
+      <button type="button" class="btn-ghost back-link" id="btn-back-to-turnaj-list">← Zpět na seznam turnajů</button>
+      <div class="eyebrow">${ev ? escapeHtml(ev.name) : 'Bez přiřazené akce'}</div>
+      <h1 class="headline" style="font-size:28px;">${escapeHtml(t.name)}</h1>
+      ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="max-width:320px; margin-top:14px; border:1px solid var(--line);">` : ''}
+      <div id="turnaj-detail-body" style="margin-top:20px;"></div>
+    `;
+    document.getElementById('btn-back-to-turnaj-list').addEventListener('click', () => { currentTournamentId = null; renderTurnajPage(); });
 
-  const selectEl = document.getElementById('tourney-select');
-  if(selectEl) selectEl.addEventListener('change', () => { currentTournamentIndex = parseInt(selectEl.value,10); teamEditorOpen=false; renderTabTurnaj(ev); });
-  const newBtn = document.getElementById('btn-new-tourney');
-  if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm(ev));
-  const deleteBtn = document.getElementById('btn-delete-tourney');
-  if(deleteBtn) deleteBtn.addEventListener('click', async () => {
-    const tName = tournaments[currentTournamentIndex]?.name || 'tento turnaj';
-    if(!confirm(`Opravdu smazat "${tName}"? Tohle nejde vrátit zpět.`)) return;
-    const newTournaments = tournaments.filter((_, i) => i !== currentTournamentIndex);
-    try{
-      await updateDoc(doc(db,'events',ev.id), { tournaments: newTournaments });
-      currentTournamentIndex = Math.max(0, currentTournamentIndex - 1);
-    }catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
-  });
+    const bodyWrap = document.getElementById('turnaj-detail-body');
+    if(currentIsAdmin){
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'btn-ghost btn-sm';
+      toggleBtn.style.marginBottom = '14px';
+      toggleBtn.textContent = teamEditorOpen ? 'Skrýt úpravu týmů' : 'Upravit týmy';
+      toggleBtn.addEventListener('click', () => { teamEditorOpen = !teamEditorOpen; renderTurnajPage(); });
+      bodyWrap.appendChild(toggleBtn);
 
-  if(tournaments.length === 0){
-    box.insertAdjacentHTML('beforeend', '<div class="empty">Zatím žádný turnaj nebyl založen.</div>');
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn-ghost btn-sm';
+      delBtn.style.cssText = 'margin-bottom:14px; margin-left:10px; color:var(--crimson); border-color:var(--crimson);';
+      delBtn.textContent = 'Smazat turnaj';
+      delBtn.addEventListener('click', async () => {
+        if(!confirm(`Opravdu smazat turnaj "${t.name}"? Tohle nejde vrátit zpět.`)) return;
+        try{ await deleteDoc(doc(db,'tournaments',t.id)); currentTournamentId = null; }
+        catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
+      });
+      bodyWrap.appendChild(delBtn);
+
+      if(teamEditorOpen) renderTeamEditor(t, bodyWrap);
+    }
+
+    const swiss = computeSwissTournament(t);
+    renderSwissBody(t, swiss, bodyWrap, false);
     return;
   }
 
-  const t = tournaments[currentTournamentIndex];
-  const bodyWrap = document.createElement('div');
-  bodyWrap.id = 'tourney-body';
-  box.appendChild(bodyWrap);
+  // seznam turnajů
+  let html = `<div class="toolbar"><div><div class="eyebrow">Turnaje</div><h1 class="headline" style="font-size:28px;">Turnaj</h1></div>`;
+  html += currentIsAdmin ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
+  html += `</div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
+  box.innerHTML = html;
 
-  if(currentIsAdmin){
-    const toggleBtn = document.createElement('button');
-    toggleBtn.type = 'button';
-    toggleBtn.className = 'btn-ghost btn-sm';
-    toggleBtn.style.marginBottom = '14px';
-    toggleBtn.textContent = teamEditorOpen ? 'Skrýt úpravu týmů' : 'Upravit týmy';
-    toggleBtn.addEventListener('click', () => { teamEditorOpen = !teamEditorOpen; renderTabTurnaj(ev); });
-    bodyWrap.appendChild(toggleBtn);
-    if(teamEditorOpen) renderTeamEditor(ev, t, currentTournamentIndex, bodyWrap);
+  const newBtn = document.getElementById('btn-new-tourney-page');
+  if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm());
+
+  const grid = document.getElementById('turnaj-list-grid');
+  if(allTournaments.length === 0){
+    grid.innerHTML = '<div class="empty">Zatím žádný turnaj nebyl založen.</div>';
+    return;
   }
-
-  const swiss = computeSwissTournament(t);
-  renderSwissBody(ev, t, currentTournamentIndex, swiss, bodyWrap);
+  grid.innerHTML = allTournaments.map(t => {
+    const ev = events.find(x => x.id === t.eventId);
+    const swiss = computeSwissTournament(t);
+    const champion = swiss.placements.find(p => p.rank === 1);
+    let statusTxt = 'Základní část se ještě hraje';
+    if(champion) statusTxt = `🏆 Vítěz: ${escapeHtml(teamName(t, champion.team))}`;
+    return `
+      <div class="event-card" data-open-tourney="${t.id}">
+        <span class="tag">${(t.teams||[]).length} týmů</span>
+        <h3>${escapeHtml(t.name)}</h3>
+        <div class="meta">${ev ? escapeHtml(ev.name) : 'Bez přiřazené akce'}</div>
+        <p class="desc">${statusTxt}</p>
+      </div>
+    `;
+  }).join('');
+  grid.querySelectorAll('[data-open-tourney]').forEach(card => {
+    card.addEventListener('click', () => { currentTournamentId = card.dataset.openTourney; renderTurnajPage(); });
+  });
 }
 
-function openNewTournamentForm(ev){
-  const box = document.getElementById('tab-turnaj');
-  const panel = document.createElement('div');
-  panel.className = 'tourney-setup-panel';
-  panel.innerHTML = `
-    <div class="field" style="max-width:300px;"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj"></div>
-    <div class="field" style="max-width:160px;"><label>Počet týmů</label><input type="number" id="new-tourney-count" min="2" value="4"></div>
-    <button type="button" id="btn-create-tourney" class="btn-sm">Vytvořit</button>
+function openNewTournamentForm(){
+  const slot = document.getElementById('turnaj-form-slot');
+  const upcoming = events.filter(e => e.dateEnd >= todayIso());
+  const evOptions = (upcoming.length ? upcoming : events);
+  slot.innerHTML = `
+    <form class="panel" id="form-new-tourney">
+      <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" required></div>
+      <div class="field"><label>Akce</label><select id="new-tourney-event">${evOptions.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Počet týmů</label><input type="number" id="new-tourney-count" min="2" value="4"></div>
+      <div class="field"><label>URL obrázku turnaje (nepovinné)</label><input type="url" id="new-tourney-image"></div>
+      <div style="display:flex; gap:10px;">
+        <button type="submit">Vytvořit</button>
+        <button type="button" class="btn-ghost" id="btn-cancel-new-tourney">Zrušit</button>
+      </div>
+    </form>
   `;
-  box.appendChild(panel);
-  document.getElementById('btn-create-tourney').addEventListener('click', async () => {
-    const name = document.getElementById('new-tourney-name').value.trim() || `Turnaj ${(ev.tournaments||[]).length+1}`;
+  document.getElementById('btn-cancel-new-tourney').addEventListener('click', () => { slot.innerHTML = ''; });
+  document.getElementById('form-new-tourney').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('new-tourney-name').value.trim();
+    const eventId = document.getElementById('new-tourney-event').value;
     const count = Math.max(2, parseInt(document.getElementById('new-tourney-count').value,10)||2);
+    const imageUrl = document.getElementById('new-tourney-image').value.trim();
+    if(!name || !eventId) return;
     const teams = [];
-    for(let i=0;i<count;i++) teams.push({ name:`Tým ${i+1}`, members:[] });
-    const tournaments = [...(ev.tournaments||[]), { name, teams, results:{} }];
+    for(let i=0;i<count;i++) teams.push({ name:`Tým ${i+1}`, members:[], emblem:'' });
     try{
-      await updateDoc(doc(db,'events',ev.id), { tournaments });
-      currentTournamentIndex = tournaments.length-1;
+      const docRef = await addDoc(collection(db,'tournaments'), { name, eventId, teams, results:{}, swissResults:{}, imageUrl, createdAt: new Date().toISOString() });
+      currentTournamentId = docRef.id;
+      slot.innerHTML = '';
+      renderTurnajPage();
     }catch(err){ alert('Vytvoření turnaje se nepovedlo.'); console.error(err); }
   });
 }
@@ -1374,10 +1422,18 @@ function isMemberElsewhere(teams, currentIdx, nick){
   return teams.some((tm,i) => i!==currentIdx && tm.members.includes(nick));
 }
 
-function renderTeamEditor(ev, t, tIndex, container){
-  const goingRegs = Object.values(currentRegistrationsMap).filter(r=>r.status!=='maybe').sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+async function renderTeamEditor(t, container){
   const editorWrap = document.createElement('div');
   editorWrap.className = 'tourney-setup-panel';
+  editorWrap.innerHTML = `<div class="empty">Načítám přihlášené na akci...</div>`;
+  container.appendChild(editorWrap);
+
+  let goingRegs = [];
+  try{
+    const snap = await getDocs(collection(db, 'events', t.eventId, 'registrations'));
+    goingRegs = snap.docs.map(d => d.data()).filter(r => r.status !== 'maybe').sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+  }catch(err){ console.error(err); }
+
   editorWrap.innerHTML = `
     <div class="team-editor" id="team-editor-grid"></div>
     <div style="display:flex; gap:10px; margin-top:14px;">
@@ -1385,7 +1441,6 @@ function renderTeamEditor(ev, t, tIndex, container){
       <button type="button" id="btn-save-teams">Uložit týmy</button>
     </div>
   `;
-  container.appendChild(editorWrap);
 
   let workingTeams = JSON.parse(JSON.stringify(t.teams || []));
 
@@ -1393,7 +1448,12 @@ function renderTeamEditor(ev, t, tIndex, container){
     const grid = document.getElementById('team-editor-grid');
     grid.innerHTML = workingTeams.map((team, ti) => `
       <div class="team-editor-card">
-        <input type="text" class="team-name" data-team-name="${ti}" value="${escapeHtml(team.name)}">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <input type="text" class="team-name" data-team-name="${ti}" value="${escapeHtml(team.name)}" style="flex:1;">
+        </div>
+        <div class="chip-row" style="margin-bottom:8px;">
+          ${TEAM_EMBLEMS.map(em => `<span class="chip" data-team-emblem="${ti}" data-emblem-val="${em}" style="cursor:pointer; font-size:15px; ${team.emblem===em?'border-color:var(--gold); color:var(--gold);':''}">${em}</span>`).join('')}
+        </div>
         <div class="team-roster-list">
           ${goingRegs.map(r => `
             <label class="team-roster-item">
@@ -1409,7 +1469,7 @@ function renderTeamEditor(ev, t, tIndex, container){
           `).join('')}
         </div>
         <div class="team-guest-row">
-          <input type="text" placeholder="Přidat hráče mimo seznam" data-guest-input="${ti}">
+          <input type="text" placeholder="Přidat hráče mimo seznam (i neregistrovaného)" data-guest-input="${ti}">
           <button type="button" class="btn-ghost btn-sm" data-guest-add="${ti}">+</button>
         </div>
         ${workingTeams.length > 2 ? `<button type="button" class="btn-ghost btn-sm" data-remove-team="${ti}" style="margin-top:8px; color:var(--crimson); border-color:var(--crimson);">Odebrat tým</button>` : ''}
@@ -1418,6 +1478,12 @@ function renderTeamEditor(ev, t, tIndex, container){
 
     grid.querySelectorAll('[data-team-name]').forEach(inp => {
       inp.addEventListener('input', () => { workingTeams[parseInt(inp.dataset.teamName,10)].name = inp.value; });
+    });
+    grid.querySelectorAll('[data-team-emblem]').forEach(el => {
+      el.addEventListener('click', () => {
+        workingTeams[parseInt(el.dataset.teamEmblem,10)].emblem = el.dataset.emblemVal;
+        renderGrid();
+      });
     });
     grid.querySelectorAll('[data-team-member]').forEach(cb => {
       cb.addEventListener('change', () => {
@@ -1457,14 +1523,12 @@ function renderTeamEditor(ev, t, tIndex, container){
   renderGrid();
 
   document.getElementById('btn-add-team').addEventListener('click', () => {
-    workingTeams.push({ name:`Tým ${workingTeams.length+1}`, members:[] });
+    workingTeams.push({ name:`Tým ${workingTeams.length+1}`, members:[], emblem:'' });
     renderGrid();
   });
 
   document.getElementById('btn-save-teams').addEventListener('click', async () => {
-    const tournaments = JSON.parse(JSON.stringify(ev.tournaments||[]));
-    tournaments[tIndex].teams = workingTeams;
-    try{ await updateDoc(doc(db,'events',ev.id), { tournaments }); }
+    try{ await updateDoc(doc(db,'tournaments',t.id), { teams: workingTeams }); }
     catch(err){ alert('Uložení týmů se nepovedlo.'); console.error(err); }
   });
 }
@@ -1483,7 +1547,6 @@ function computeSwissTournament(t){
     return { result: res||null, winnerSide: null };
   }
 
-  // Kolo 1 — základní část, každý s každým
   let round0 = [];
   let wins = new Array(n).fill(0);
   for(let i=0;i<n;i++){
@@ -1562,16 +1625,16 @@ function computeSwissTournament(t){
   return { round0, round0Complete, rounds, placements, wins };
 }
 
-function renderSwissBody(ev, t, tIndex, swiss, container){
+function renderSwissBody(t, swiss, container, compact){
   const wrap = document.createElement('div');
-  wrap.className = 'bracket-wrap';
+  wrap.className = 'bracket-wrap' + (compact ? ' bracket-compact' : '');
   container.appendChild(wrap);
 
   swiss.rounds.forEach((roundMatches, ri) => {
     const col = document.createElement('div');
     col.className = 'bracket-round';
     col.innerHTML = `<div class="bracket-round-title">Kolo ${ri+1}</div>`;
-    roundMatches.forEach(m => col.appendChild(renderSwissMatchBox(ev, tIndex, ri===0?'results':'swissResults', m, t)));
+    roundMatches.forEach(m => col.appendChild(renderSwissMatchBox(t, ri===0?'results':'swissResults', m, compact)));
     wrap.appendChild(col);
   });
 
@@ -1595,23 +1658,26 @@ function renderSwissBody(ev, t, tIndex, swiss, container){
   }
 }
 
-function renderSwissMatchBox(ev, tIndex, resultField, m, t){
+function renderSwissMatchBox(t, resultField, m, compact){
   const div = document.createElement('div');
   div.className = 'bracket-match';
+  const teamAObj = t.teams[m.teamA], teamBObj = t.teams[m.teamB];
   const labelA = teamName(t, m.teamA), labelB = teamName(t, m.teamB);
+  const emblemA = teamAObj?.emblem ? teamAObj.emblem+' ' : '';
+  const emblemB = teamBObj?.emblem ? teamBObj.emblem+' ' : '';
   const scoreTxt = m.result ? ` (${m.result.a}:${m.result.b})` : '';
   div.innerHTML = `
     ${m.exhibition ? `<div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">jen pro zábavu</div>` : ''}
-    <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''}"><span>${escapeHtml(labelA)}</span>${m.winnerIdx===m.teamA?`<span>${scoreTxt}</span>`:''}</div>
-    <div class="bracket-slot ${m.winnerIdx===m.teamB ? 'winner-slot':''}"><span>${escapeHtml(labelB)}</span>${m.winnerIdx===m.teamB?`<span>${scoreTxt}</span>`:''}</div>
-    ${currentIsAdmin ? `<button type="button" class="bracket-score-btn btn-ghost" data-sw-score>${m.result?'Upravit':'Zadat výsledek'}</button>` : ''}
+    <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''}"><span>${emblemA}${escapeHtml(labelA)}</span>${m.winnerIdx===m.teamA?`<span>${scoreTxt}</span>`:''}</div>
+    <div class="bracket-slot ${m.winnerIdx===m.teamB ? 'winner-slot':''}"><span>${emblemB}${escapeHtml(labelB)}</span>${m.winnerIdx===m.teamB?`<span>${scoreTxt}</span>`:''}</div>
+    ${(currentIsAdmin && !compact) ? `<button type="button" class="bracket-score-btn btn-ghost" data-sw-score>${m.result?'Upravit':'Zadat výsledek'}</button>` : ''}
   `;
   const btn = div.querySelector('[data-sw-score]');
-  if(btn) btn.addEventListener('click', () => openScoreModal(ev, tIndex, resultField, m.key, labelA, labelB, m.result));
+  if(btn) btn.addEventListener('click', () => openScoreModal(t, resultField, m.key, labelA, labelB, m.result));
   return div;
 }
 
-function openScoreModal(ev, tIndex, resultField, matchKey, labelA, labelB, existing){
+function openScoreModal(t, resultField, matchKey, labelA, labelB, existing){
   const backdrop = document.createElement('div');
   backdrop.className = 'score-modal-backdrop';
   backdrop.innerHTML = `
@@ -1632,15 +1698,49 @@ function openScoreModal(ev, tIndex, resultField, matchKey, labelA, labelB, exist
     const b = parseInt(document.getElementById('score-b').value,10)||0;
     if(a<2 && b<2){ alert('Jeden z týmů musí mít alespoň 2 vítězné sety.'); return; }
     if(a===b){ alert('Skóre nemůže být nerozhodné.'); return; }
-    const tournaments = JSON.parse(JSON.stringify(ev.tournaments||[]));
-    if(!tournaments[tIndex][resultField]) tournaments[tIndex][resultField] = {};
-    tournaments[tIndex][resultField][matchKey] = { a, b };
     try{
-      await updateDoc(doc(db,'events',ev.id), { tournaments });
+      await updateDoc(doc(db,'tournaments',t.id), { [`${resultField}.${matchKey}`]: { a, b } });
       backdrop.remove();
     }catch(err){ alert('Uložení výsledku se nepovedlo.'); console.error(err); }
   });
 }
+
+// ---- Kompaktní zobrazení turnajů v záložce akce ----
+function renderTabTurnaj(ev){
+  const box = document.getElementById('tab-turnaj');
+  const linked = allTournaments.filter(t => t.eventId === ev.id);
+
+  let html = `<div class="section-title" style="font-size:16px;">Turnaj</div>`;
+  if(linked.length === 0){
+    html += '<div class="empty">K téhle akci zatím není přiřazený žádný turnaj. Založíš ho v horním menu "Turnaj".</div>';
+    box.innerHTML = html;
+    return;
+  }
+  html += linked.map(t => {
+    const swiss = computeSwissTournament(t);
+    const champion = swiss.placements.find(p => p.rank === 1);
+    const statusTxt = champion ? `🏆 Vítěz: ${escapeHtml(teamName(t, champion.team))}` : 'Základní část se ještě hraje';
+    return `
+      <div class="event-card" data-open-tourney-compact="${t.id}" style="margin-top:14px; cursor:pointer;">
+        <span class="tag">${(t.teams||[]).length} týmů</span>
+        <h3>${escapeHtml(t.name)}</h3>
+        <p class="desc">${statusTxt}</p>
+        <span class="status-hint">Zobrazit celý pavouk →</span>
+      </div>
+    `;
+  }).join('');
+  box.innerHTML = html;
+  box.querySelectorAll('[data-open-tourney-compact]').forEach(card => {
+    card.addEventListener('click', () => {
+      currentTournamentId = card.dataset.openTourneyCompact;
+      closeEventForm();
+      closeContactForm();
+      showView('turnaj');
+      renderTurnajPage();
+    });
+  });
+}
+
 
 // ---- Rozvrh ----
 function eventDayList(ev){
