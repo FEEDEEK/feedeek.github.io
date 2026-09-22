@@ -1314,6 +1314,7 @@ let allTournaments = [];
 let currentTournamentId = null;
 let teamEditorOpen = false;
 const TEAM_EMBLEMS = ['🛡️','⚔️','🐺','🦅','🔥','💀','👑','🌙','⭐','🐉','🦁','🍀','🐍','🦂','⚡','🎯'];
+const TEAM_COLORS = ['#e8e3d8','#c9a24b','#8b2635','#2f8f8f','#4a90d9','#9b59b6','#e67e22','#2ecc71','#e84393','#95a5a6'];
 
 onSnapshot(collection(db, 'tournaments'), (snap) => {
   allTournaments = snap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -1508,11 +1509,21 @@ async function renderTeamEditor(t, container){
     const grid = document.getElementById('team-editor-grid');
     grid.innerHTML = workingTeams.map((team, ti) => `
       <div class="team-editor-card">
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-          <input type="text" class="team-name" data-team-name="${ti}" value="${escapeHtml(team.name)}" style="flex:1;">
-        </div>
-        <div class="chip-row" style="margin-bottom:8px;">
-          ${TEAM_EMBLEMS.map(em => `<span class="chip" data-team-emblem="${ti}" data-emblem-val="${em}" style="cursor:pointer; font-size:15px; ${team.emblem===em?'border-color:var(--gold); color:var(--gold);':''}">${em}</span>`).join('')}
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; position:relative;">
+          <button type="button" class="team-style-btn" data-team-style-toggle="${ti}" style="border-color:${team.color||'var(--line)'};">
+            <span style="color:${team.color||'inherit'};">${team.emblem || '🚩'}</span>
+          </button>
+          <input type="text" class="team-name" data-team-name="${ti}" value="${escapeHtml(team.name)}" style="flex:1; color:${team.color||'inherit'};">
+          <div class="team-style-panel" data-team-style-panel="${ti}" style="display:none;">
+            <div class="team-style-panel-label">Logo</div>
+            <div class="chip-row">
+              ${TEAM_EMBLEMS.map(em => `<span class="chip" data-team-emblem="${ti}" data-emblem-val="${em}" style="cursor:pointer; font-size:15px; ${team.emblem===em?'border-color:var(--gold); color:var(--gold);':''}">${em}</span>`).join('')}
+            </div>
+            <div class="team-style-panel-label">Barva</div>
+            <div class="chip-row">
+              ${TEAM_COLORS.map(c => `<span class="color-swatch ${team.color===c?'active':''}" data-team-color="${ti}" data-color-val="${c}" style="background:${c};"></span>`).join('')}
+            </div>
+          </div>
         </div>
         <div class="team-roster-list">
           ${goingRegs.map(r => `
@@ -1539,9 +1550,24 @@ async function renderTeamEditor(t, container){
     grid.querySelectorAll('[data-team-name]').forEach(inp => {
       inp.addEventListener('input', () => { workingTeams[parseInt(inp.dataset.teamName,10)].name = inp.value; });
     });
+    grid.querySelectorAll('[data-team-style-toggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const ti = btn.dataset.teamStyleToggle;
+        grid.querySelectorAll('[data-team-style-panel]').forEach(p => {
+          p.style.display = (p.dataset.teamStylePanel === ti && p.style.display === 'none') ? 'flex' : 'none';
+        });
+      });
+    });
     grid.querySelectorAll('[data-team-emblem]').forEach(el => {
       el.addEventListener('click', () => {
         workingTeams[parseInt(el.dataset.teamEmblem,10)].emblem = el.dataset.emblemVal;
+        renderGrid();
+      });
+    });
+    grid.querySelectorAll('[data-team-color]').forEach(el => {
+      el.addEventListener('click', () => {
+        workingTeams[parseInt(el.dataset.teamColor,10)].color = el.dataset.colorVal;
         renderGrid();
       });
     });
@@ -1581,6 +1607,11 @@ async function renderTeamEditor(t, container){
     });
   }
   renderGrid();
+  document.addEventListener('click', (e) => {
+    if(!e.target.closest('[data-team-style-panel]') && !e.target.closest('[data-team-style-toggle]')){
+      document.querySelectorAll('[data-team-style-panel]').forEach(p => { p.style.display = 'none'; });
+    }
+  });
 
   document.getElementById('btn-add-team').addEventListener('click', () => {
     workingTeams.push({ name:`Tým ${workingTeams.length+1}`, members:[], emblem:'' });
@@ -1648,16 +1679,18 @@ function computeSwissTournament(t){
         return { key, teamA:a, teamB:b, result, winnerIdx };
       });
 
-      let exhibition = null;
-      if(leftover !== null && placements.length > 0){
-        const lastLocked = placements[placements.length-1].team;
-        const key = `SR${roundIndex}-ex`;
+      const benched = [...placements.map(p => p.team)];
+      if(leftover !== null) benched.push(leftover);
+      const exhibitions = [];
+      for(let bi = 0; bi + 1 < benched.length; bi += 2){
+        const a = benched[bi], b = benched[bi+1];
+        const key = `SR${roundIndex}-ex${bi/2}`;
         const { result, winnerSide } = resolvePair(swissResults, key);
-        const winnerIdx = winnerSide==='A' ? leftover : (winnerSide==='B' ? lastLocked : null);
-        exhibition = { key, teamA:leftover, teamB:lastLocked, result, winnerIdx, exhibition:true };
+        const winnerIdx = winnerSide==='A' ? a : (winnerSide==='B' ? b : null);
+        exhibitions.push({ key, teamA:a, teamB:b, result, winnerIdx, exhibition:true });
       }
 
-      rounds.push(exhibition ? [...roundMatches, exhibition] : roundMatches);
+      rounds.push(exhibitions.length ? [...roundMatches, ...exhibitions] : roundMatches);
 
       const roundComplete = roundMatches.every(m => m.winnerIdx !== null);
       if(!roundComplete) break;
@@ -1699,7 +1732,10 @@ function renderSwissBody(t, swiss, container, compact){
     col.className = 'bracket-round';
     col.dataset.bracketRoundIndex = ri;
     col.innerHTML = `<div class="bracket-round-title">Kolo ${ri+1}</div>`;
-    roundMatches.forEach(m => col.appendChild(renderSwissMatchBox(t, ri===0?'results':'swissResults', m, compact)));
+    const matchesBox = document.createElement('div');
+    matchesBox.className = 'bracket-round-matches';
+    roundMatches.forEach(m => matchesBox.appendChild(renderSwissMatchBox(t, ri===0?'results':'swissResults', m, compact)));
+    col.appendChild(matchesBox);
     wrap.appendChild(col);
   });
 
@@ -1712,52 +1748,27 @@ function renderSwissBody(t, swiss, container, compact){
 
   if(swiss.placements.length > 0){
     const col = document.createElement('div');
-    col.className = 'bracket-round';
-    const medalColor = r => r===1 ? '#f0c94e' : r===2 ? '#c9c9d4' : r===3 ? '#c9834a' : null;
-    col.innerHTML = `<div class="bracket-round-title">Výsledek</div>` + swiss.placements.map(p => {
-      const mc = medalColor(p.rank);
-      const medal = mc ? `<span style="display:inline-block; width:14px; height:14px; border-radius:50%; background:${mc}; box-shadow:0 0 5px ${mc}88; margin-right:6px; vertical-align:middle;"></span>` : '';
-      return `<div class="bracket-slot ${p.rank===1?'winner-slot':''}" style="${mc ? `border-color:${mc};` : ''}"><span>${medal}${p.rank}. ${escapeHtml(teamName(t,p.team))}</span></div>`;
-    }).join('');
+    col.className = 'bracket-round bracket-round-podium';
+    const p1 = swiss.placements.find(p=>p.rank===1);
+    const p2 = swiss.placements.find(p=>p.rank===2);
+    const p3 = swiss.placements.find(p=>p.rank===3);
+    const rest = swiss.placements.filter(p=>p.rank>3);
+    let html = `<div class="bracket-round-title">Výsledek</div><div class="podium-wrap">`;
+    if(p2) html += `<div class="podium-step podium-2"><div class="podium-team">🥈 ${escapeHtml(teamName(t,p2.team))}</div><div class="podium-bar">2</div></div>`;
+    if(p1) html += `<div class="podium-step podium-1"><div class="podium-team">🥇 ${escapeHtml(teamName(t,p1.team))}</div><div class="podium-bar">1</div></div>`;
+    if(p3) html += `<div class="podium-step podium-3"><div class="podium-team">🥉 ${escapeHtml(teamName(t,p3.team))}</div><div class="podium-bar">3</div></div>`;
+    html += `</div>`;
+    if(rest.length > 0){
+      html += rest.map(p => {
+        const isFourth = p.rank === 4;
+        return `<div class="bracket-slot" style="margin-top:8px;"><span>${isFourth ? '🥔' : (p.rank+'.')} ${escapeHtml(teamName(t,p.team))}</span></div>`;
+      }).join('');
+    }
+    col.innerHTML = html;
     wrap.appendChild(col);
   }
 
-  if(!compact) requestAnimationFrame(() => {
-    layoutBracketRounds(wrap);
-    drawBracketConnectors(wrap);
-  });
-}
-
-function layoutBracketRounds(wrap){
-  const roundCols = Array.from(wrap.querySelectorAll('[data-bracket-round-index]')).sort((a,b) => a.dataset.bracketRoundIndex - b.dataset.bracketRoundIndex);
-  if(roundCols.length < 2) return;
-
-  roundCols.forEach(col => col.querySelectorAll('.bracket-match').forEach(m => { m.style.marginTop = ''; }));
-
-  for(let r = 1; r < roundCols.length; r++){
-    const prevMatches = Array.from(roundCols[r-1].querySelectorAll('.bracket-match:not(.bracket-match-exhibition)'));
-    const curMatches = Array.from(roundCols[r].querySelectorAll('.bracket-match:not(.bracket-match-exhibition)'));
-    let prevBottom = null;
-
-    curMatches.forEach((m, j) => {
-      const srcA = prevMatches[2*j];
-      const srcB = prevMatches[2*j+1];
-      if(!srcA) return;
-      const aRect = srcA.getBoundingClientRect();
-      const bRect = srcB ? srcB.getBoundingClientRect() : aRect;
-      const centerY = ((aRect.top + aRect.height/2) + (bRect.top + bRect.height/2)) / 2;
-      const mRect = m.getBoundingClientRect();
-      const desiredTop = centerY - mRect.height/2;
-      let marginTop = desiredTop - mRect.top;
-      if(prevBottom !== null){
-        const minTop = prevBottom + 18;
-        if(desiredTop < minTop) marginTop = minTop - mRect.top;
-      }
-      m.style.marginTop = Math.max(0, marginTop) + 'px';
-      const newRect = m.getBoundingClientRect();
-      prevBottom = newRect.top + newRect.height;
-    });
-  }
+  if(!compact) requestAnimationFrame(() => drawBracketConnectors(wrap));
 }
 
 function drawBracketConnectors(wrap){
@@ -1815,14 +1826,16 @@ function renderSwissMatchBox(t, resultField, m, compact){
   const membersB = (teamBObj?.members||[]).join(' · ');
   const curA = m.result ? m.result.a : 0;
   const curB = m.result ? m.result.b : 0;
+  const colorA = teamAObj?.color ? `style="color:${teamAObj.color};"` : '';
+  const colorB = teamBObj?.color ? `style="color:${teamBObj.color};"` : '';
   const clickable = hasPerm('turnaj') && !compact;
   div.innerHTML = `
     ${m.exhibition ? `<div class="bracket-exhibition-label">Zápas mimo turnaj</div>` : ''}
     <div class="bracket-slot ${m.winnerIdx===m.teamA ? 'winner-slot':''} ${clickable?'bracket-slot-clickable':''}" ${clickable?'data-sw-slot="A"':''} title="${clickable?'Levé tlačítko = přidat výhru, pravé = ubrat':''}">
-      <span class="bracket-slot-main"><span class="bracket-team-name">${emblemA}${escapeHtml(labelA)}</span>${membersA?`<span class="bracket-team-members">${escapeHtml(membersA)}</span>`:''}</span><span class="bracket-slot-score">${curA}</span>
+      <span class="bracket-slot-main"><span class="bracket-team-name" ${colorA}>${emblemA}${escapeHtml(labelA)}</span>${membersA?`<span class="bracket-team-members">${escapeHtml(membersA)}</span>`:''}</span><span class="bracket-slot-score">${curA}</span>
     </div>
     <div class="bracket-slot ${m.winnerIdx===m.teamB ? 'winner-slot':''} ${clickable?'bracket-slot-clickable':''}" ${clickable?'data-sw-slot="B"':''} title="${clickable?'Levé tlačítko = přidat výhru, pravé = ubrat':''}">
-      <span class="bracket-slot-main"><span class="bracket-team-name">${emblemB}${escapeHtml(labelB)}</span>${membersB?`<span class="bracket-team-members">${escapeHtml(membersB)}</span>`:''}</span><span class="bracket-slot-score">${curB}</span>
+      <span class="bracket-slot-main"><span class="bracket-team-name" ${colorB}>${emblemB}${escapeHtml(labelB)}</span>${membersB?`<span class="bracket-team-members">${escapeHtml(membersB)}</span>`:''}</span><span class="bracket-slot-score">${curB}</span>
     </div>
   `;
 
@@ -2548,6 +2561,6 @@ let resizeRedrawTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeRedrawTimer);
   resizeRedrawTimer = setTimeout(() => {
-    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => { layoutBracketRounds(w); drawBracketConnectors(w); });
+    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => drawBracketConnectors(w));
   }, 150);
 });
