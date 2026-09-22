@@ -1327,7 +1327,7 @@ function renderTurnajPage(){
       <div style="text-align:center;">
         ${ev ? `<div class="status-hint">${escapeHtml(ev.name)}</div>` : ''}
         <h1 class="headline" style="font-size:28px; display:inline-block;">${escapeHtml(t.name)}</h1>
-        ${t.imageUrl ? `<div><img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="max-width:320px; margin-top:14px; border:1px solid var(--line);"></div>` : ''}
+        ${t.imageUrl ? `<div><img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="width:64px; height:64px; object-fit:cover; border-radius:50%; margin-top:10px; border:2px solid var(--gold-dim);"></div>` : ''}
       </div>
       <div id="turnaj-detail-body" style="margin-top:20px;"></div>
     `;
@@ -1384,7 +1384,10 @@ function renderTurnajPage(){
     if(champion) statusTxt = `🏆 Vítěz: ${escapeHtml(teamName(t, champion.team))}`;
     return `
       <div class="event-card" data-open-tourney="${t.id}">
-        <span class="tag">${(t.teams||[]).length} týmů</span>
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="width:36px; height:36px; object-fit:cover; border-radius:50%; border:1px solid var(--gold-dim); flex-shrink:0;">` : ''}
+          <span class="tag">${(t.teams||[]).length} týmů</span>
+        </div>
         <h3>${escapeHtml(t.name)}</h3>
         <div class="meta">${ev ? escapeHtml(ev.name) : 'Bez přiřazené akce'}</div>
         <p class="desc">${statusTxt}</p>
@@ -1676,11 +1679,13 @@ function computeSwissTournament(t){
 function renderSwissBody(t, swiss, container, compact){
   const wrap = document.createElement('div');
   wrap.className = 'bracket-wrap' + (compact ? ' bracket-compact' : '');
+  wrap.style.position = 'relative';
   container.appendChild(wrap);
 
   swiss.rounds.forEach((roundMatches, ri) => {
     const col = document.createElement('div');
     col.className = 'bracket-round';
+    col.dataset.bracketRoundIndex = ri;
     col.innerHTML = `<div class="bracket-round-title">Kolo ${ri+1}</div>`;
     roundMatches.forEach(m => col.appendChild(renderSwissMatchBox(t, ri===0?'results':'swissResults', m, compact)));
     wrap.appendChild(col);
@@ -1704,6 +1709,52 @@ function renderSwissBody(t, swiss, container, compact){
     }).join('');
     wrap.appendChild(col);
   }
+
+  if(!compact) requestAnimationFrame(() => drawBracketConnectors(wrap));
+}
+
+function drawBracketConnectors(wrap){
+  const old = wrap.querySelector('svg.bracket-connectors');
+  if(old) old.remove();
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'bracket-connectors');
+  svg.style.position = 'absolute';
+  svg.style.left = '0'; svg.style.top = '0';
+  svg.style.width = wrap.scrollWidth + 'px';
+  svg.style.height = wrap.scrollHeight + 'px';
+  svg.style.pointerEvents = 'none';
+  svg.style.zIndex = '0';
+
+  const wrapRect = wrap.getBoundingClientRect();
+  const roundCols = Array.from(wrap.querySelectorAll('[data-bracket-round-index]')).sort((a,b) => a.dataset.bracketRoundIndex - b.dataset.bracketRoundIndex);
+
+  for(let r = 0; r < roundCols.length - 1; r++){
+    const matches = roundCols[r].querySelectorAll('.bracket-match');
+    const nextMatches = roundCols[r+1].querySelectorAll('.bracket-match');
+    if(nextMatches.length === 0) continue;
+    matches.forEach((m, i) => {
+      const targetIdx = Math.min(Math.floor(i/2), nextMatches.length-1);
+      const target = nextMatches[targetIdx];
+      if(!target) return;
+      const a = m.getBoundingClientRect();
+      const b = target.getBoundingClientRect();
+      const x1 = a.right - wrapRect.left;
+      const y1 = a.top + a.height/2 - wrapRect.top;
+      const x2 = b.left - wrapRect.left;
+      const y2 = b.top + b.height/2 - wrapRect.top;
+      const midX = x1 + (x2 - x1) / 2;
+      const path = document.createElementNS(ns, 'path');
+      path.setAttribute('d', `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', 'var(--gold-dim)');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('stroke-dasharray', '4 4');
+      path.setAttribute('opacity', '0.7');
+      svg.appendChild(path);
+    });
+  }
+  wrap.insertBefore(svg, wrap.firstChild);
 }
 
 function renderSwissMatchBox(t, resultField, m, compact){
@@ -2456,3 +2507,11 @@ onAuthStateChanged(auth, async (user) => {
 // inicializace pomocných bloků formuláře (prázdné hry/jídlo)
 renderFormGames();
 renderFormFood();
+
+let resizeRedrawTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeRedrawTimer);
+  resizeRedrawTimer = setTimeout(() => {
+    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => drawBracketConnectors(w));
+  }, 150);
+});
