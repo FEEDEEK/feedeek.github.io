@@ -145,6 +145,7 @@ onSnapshot(eventsQuery, (snapshot) => {
     const ev = events.find(x=>x.id===currentDetailEventId);
     if(ev) renderEventDetailStatic(ev);
   }
+  tryInitialRoute();
 }, (err) => console.error('Chyba připojení k Firestore:', err));
 
 // ---- Navigation ----
@@ -154,17 +155,50 @@ function showView(name){
   navItems.forEach(n => n.classList.toggle('active', n.dataset.view === name));
   views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
 }
-navItems.forEach(n => n.addEventListener('click', () => {
+
+function setRoute(hash){
+  if(location.hash === hash){ applyRoute(); return; }
+  location.hash = hash;
+}
+
+function applyRoute(){
   closeEventForm();
   closeContactForm();
-  showView(n.dataset.view);
-  if(n.dataset.view === 'turnaj'){ currentTournamentId = null; renderTurnajPage(); }
-}));
-document.getElementById('brand-home-link').addEventListener('click', () => {
-  closeEventForm();
-  closeContactForm();
-  showView('home');
-});
+  const raw = location.hash.replace(/^#/, '');
+  const [view, id] = raw.split('/');
+
+  if(view === 'event' && id){
+    currentTournamentId = null;
+    openEventDetail(id);
+  }else if(view === 'turnaj'){
+    currentTournamentId = id || null;
+    showView('turnaj');
+    renderTurnajPage();
+  }else if(view){
+    showView(view);
+  }else{
+    showView('home');
+  }
+}
+window.addEventListener('hashchange', applyRoute);
+
+let initialRouteApplied = false;
+function tryInitialRoute(){
+  if(initialRouteApplied) return;
+  if(location.hash.startsWith('#event/')){
+    const id = location.hash.split('/')[1];
+    if(!events.find(e => e.id === id)) return; // data z Firestore ještě nedorazila, zkusíme znovu příště
+  }
+  if(location.hash.startsWith('#turnaj/')){
+    const id = location.hash.split('/')[1];
+    if(!allTournaments.find(x => x.id === id)) return;
+  }
+  initialRouteApplied = true;
+  applyRoute();
+}
+
+navItems.forEach(n => n.addEventListener('click', () => setRoute('#' + n.dataset.view)));
+document.getElementById('brand-home-link').addEventListener('click', () => setRoute('#home'));
 
 // ---- Kontakty / Tablo ----
 let contacts = [];
@@ -276,7 +310,7 @@ function renderHome(){
   metaBox.innerHTML = `${fmtDateRange(next)} · <span class="place">${escapeHtml(next.place)}</span>`;
   subBox.textContent = next.desc || '';
   card.style.backgroundImage = next.imageUrl ? `url('${next.imageUrl.replace(/'/g,"")}')` : 'none';
-  card.onclick = () => openEventDetail(next.id);
+  card.onclick = () => setRoute('#event/' + next.id);
 }
 
 // ==================== FORMULÁŘ AKCE: hry (tagy) ====================
@@ -551,7 +585,7 @@ function renderEvents(){
     `;
     fc.addEventListener('click', (e) => {
       if(e.target.closest('[data-edit-featured]') || e.target.closest('[data-delete-featured]')) return;
-      openEventDetail(featured.id);
+      setRoute('#event/' + featured.id);
     });
     const featEditBtn = fc.querySelector('[data-edit-featured]');
     if(featEditBtn) featEditBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditEvent(featured); });
@@ -578,7 +612,7 @@ function renderEvents(){
       `;
       card.addEventListener('click', (e) => {
         if(e.target.closest('[data-edit]') || e.target.closest('[data-delete]')) return;
-        openEventDetail(ev.id);
+        setRoute('#event/' + ev.id);
       });
       const editBtn = card.querySelector('[data-edit]');
       if(editBtn) editBtn.addEventListener('click', () => startEditEvent(ev));
@@ -608,7 +642,7 @@ function renderEvents(){
       `;
       card.addEventListener('click', (e) => {
         if(e.target.closest('[data-edit-history]') || e.target.closest('[data-delete-history]')) return;
-        openEventDetail(ev.id);
+        setRoute('#event/' + ev.id);
       });
       const editBtn = card.querySelector('[data-edit-history]');
       if(editBtn) editBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditEvent(ev); });
@@ -1323,6 +1357,7 @@ onSnapshot(collection(db, 'tournaments'), (snap) => {
     const ev = events.find(x=>x.id===currentDetailEventId);
     if(ev) renderTabTurnaj(ev);
   }
+  tryInitialRoute();
 });
 
 function teamName(t, idx){ return t.teams[idx] ? t.teams[idx].name : `Tým ${idx+1}`; }
@@ -1334,7 +1369,7 @@ function renderTurnajPage(){
 
   if(currentTournamentId){
     const t = allTournaments.find(x => x.id === currentTournamentId);
-    if(!t){ currentTournamentId = null; renderTurnajPage(); return; }
+    if(!t){ currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; renderTurnajPage(); return; }
     const ev = events.find(x => x.id === t.eventId);
     box.innerHTML = `
       <div style="text-align:center;">
@@ -1362,7 +1397,7 @@ function renderTurnajPage(){
       delBtn.textContent = 'Smazat turnaj';
       delBtn.addEventListener('click', async () => {
         if(!confirm(`Opravdu smazat turnaj "${t.name}"? Tohle nejde vrátit zpět.`)) return;
-        try{ await deleteDoc(doc(db,'tournaments',t.id)); currentTournamentId = null; }
+        try{ await deleteDoc(doc(db,'tournaments',t.id)); currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; }
         catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
       });
       bodyWrap.appendChild(delBtn);
@@ -1415,8 +1450,7 @@ function renderTurnajPage(){
   grid.querySelectorAll('[data-open-tourney]').forEach(card => {
     card.addEventListener('click', (e) => {
       if(e.target.closest('[data-edit-tourney]') || e.target.closest('[data-delete-tourney]')) return;
-      currentTournamentId = card.dataset.openTourney;
-      renderTurnajPage();
+      setRoute('#turnaj/' + card.dataset.openTourney);
     });
   });
   grid.querySelectorAll('[data-edit-tourney]').forEach(btn => {
@@ -1776,7 +1810,30 @@ function renderSwissBody(t, swiss, container, compact){
     wrap.appendChild(col);
   }
 
-  if(!compact) requestAnimationFrame(() => drawBracketConnectors(wrap));
+  if(!compact) requestAnimationFrame(() => {
+    layoutBracketRounds(wrap);
+    drawBracketConnectors(wrap);
+  });
+}
+
+function layoutBracketRounds(wrap){
+  const roundCols = Array.from(wrap.querySelectorAll('[data-bracket-round-index]')).sort((a,b) => a.dataset.bracketRoundIndex - b.dataset.bracketRoundIndex);
+  if(roundCols.length < 2) return;
+
+  roundCols.forEach(col => { col.style.marginTop = ''; });
+
+  for(let r = 1; r < roundCols.length; r++){
+    const prevReal = roundCols[r-1].querySelectorAll('.bracket-round-matches .bracket-match');
+    const curMatchesBox = roundCols[r].querySelector('.bracket-round-matches');
+    if(prevReal.length === 0 || !curMatchesBox) continue;
+    const firstRect = prevReal[0].getBoundingClientRect();
+    const lastRect = prevReal[prevReal.length-1].getBoundingClientRect();
+    const spanCenterY = (firstRect.top + lastRect.bottom) / 2;
+    const boxRect = curMatchesBox.getBoundingClientRect();
+    const desiredTop = spanCenterY - boxRect.height/2;
+    const marginTop = desiredTop - boxRect.top;
+    roundCols[r].style.marginTop = Math.max(0, marginTop) + 'px';
+  }
 }
 
 function drawBracketConnectors(wrap){
@@ -1893,11 +1950,7 @@ function renderTabTurnaj(ev){
   box.innerHTML = html;
   box.querySelectorAll('[data-open-tourney-compact]').forEach(card => {
     card.addEventListener('click', () => {
-      currentTournamentId = card.dataset.openTourneyCompact;
-      closeEventForm();
-      closeContactForm();
-      showView('turnaj');
-      renderTurnajPage();
+      setRoute('#turnaj/' + card.dataset.openTourneyCompact);
     });
   });
 }
@@ -2377,8 +2430,8 @@ async function renderUsersList(){
               <td style="padding:8px 10px;">${(u.isSuperAdmin || (u.isAdmin && !currentIsSuperAdmin)) ? '' : `<button type="button" class="btn-ghost btn-sm" data-delete-user="${u.uid}" data-delete-nick="${escapeHtml(u.nick||'')}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>`}</td>
               ${showPerms ? (u.isSuperAdmin ? `<td style="border-left:1px solid var(--line);"></td><td colspan="${1+PERMISSION_AREAS.length}" style="padding:8px 10px; color:var(--text-muted); font-style:italic;">má vše automaticky</td>` : `
               <td style="border-left:1px solid var(--line);"></td>
-              <td style="padding:8px 10px; text-align:center;"><input type="checkbox" data-perm-admin="${u.uid}" ${u.isAdmin?'checked':''}></td>
-              ${PERMISSION_AREAS.map(p=>`<td style="padding:8px 10px; text-align:center;"><input type="checkbox" data-perm-area="${u.uid}" data-area-key="${p.key}" ${(u.permissions&&u.permissions[p.key])?'checked':''}></td>`).join('')}
+              <td style="padding:8px 10px; text-align:center; background:rgba(201,162,75,0.08);"><input type="checkbox" data-perm-admin="${u.uid}" ${u.isAdmin?'checked':''} style="width:18px; height:18px; accent-color:var(--gold);"></td>
+              ${PERMISSION_AREAS.map(p=>`<td style="padding:8px 10px; text-align:center;" data-perm-area-cell="${u.uid}"><input type="checkbox" data-perm-area="${u.uid}" data-area-key="${p.key}" ${(u.permissions&&u.permissions[p.key])?'checked':''} ${u.isAdmin?'':'disabled'}></td>`).join('')}
               `) : ''}
             </tr>
           `).join('')}
@@ -2391,6 +2444,16 @@ async function renderUsersList(){
       <p class="lede" style="margin-top:0;">Tady se zobrazují jen přezdívky, které buď nemají odpovídající účet (osamocené, třeba po nepovedené registraci), nebo jich je pro stejný účet víc (duplicity). Běžné, správně fungující přezdívky se tu nezobrazují.</p>
       <div id="usernames-list" style="margin-top:12px;"></div>
     `;
+    if(showPerms){
+      box.querySelectorAll('[data-perm-admin]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          box.querySelectorAll(`[data-perm-area="${cb.dataset.permAdmin}"]`).forEach(areaCb => {
+            areaCb.disabled = !cb.checked;
+            if(!cb.checked) areaCb.checked = false;
+          });
+        });
+      });
+    }
     box.querySelectorAll('[data-save-user]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const uid = btn.dataset.saveUser;
@@ -2554,7 +2617,7 @@ onAuthStateChanged(auth, async (user) => {
     if(currentNick && pendingEventId){
       const evId = pendingEventId;
       pendingEventId = null;
-      openEventDetail(evId);
+      setRoute('#event/' + evId);
     }
   }else{
     updateAuthUI();
@@ -2564,11 +2627,12 @@ onAuthStateChanged(auth, async (user) => {
 // inicializace pomocných bloků formuláře (prázdné hry/jídlo)
 renderFormGames();
 renderFormFood();
+tryInitialRoute();
 
 let resizeRedrawTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeRedrawTimer);
   resizeRedrawTimer = setTimeout(() => {
-    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => drawBracketConnectors(w));
+    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => { layoutBracketRounds(w); drawBracketConnectors(w); });
   }, 150);
 });
