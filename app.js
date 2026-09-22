@@ -1732,10 +1732,18 @@ function renderSwissBody(t, swiss, container, compact){
     col.className = 'bracket-round';
     col.dataset.bracketRoundIndex = ri;
     col.innerHTML = `<div class="bracket-round-title">Kolo ${ri+1}</div>`;
+    const realMatches = roundMatches.filter(m => !m.exhibition);
+    const exMatches = roundMatches.filter(m => m.exhibition);
     const matchesBox = document.createElement('div');
     matchesBox.className = 'bracket-round-matches';
-    roundMatches.forEach(m => matchesBox.appendChild(renderSwissMatchBox(t, ri===0?'results':'swissResults', m, compact)));
+    realMatches.forEach(m => matchesBox.appendChild(renderSwissMatchBox(t, ri===0?'results':'swissResults', m, compact)));
     col.appendChild(matchesBox);
+    if(exMatches.length > 0){
+      const exBox = document.createElement('div');
+      exBox.className = 'bracket-round-exhibitions';
+      exMatches.forEach(m => exBox.appendChild(renderSwissMatchBox(t, 'swissResults', m, compact)));
+      col.appendChild(exBox);
+    }
     wrap.appendChild(col);
   });
 
