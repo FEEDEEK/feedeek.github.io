@@ -241,7 +241,7 @@ form.panel, .panel{
 
 .bracket-wrap{ display:flex; gap:30px; overflow-x:auto; padding-bottom:14px; width:100%; position:relative; }
 .bracket-connectors{ position:absolute; left:0; top:0; z-index:0; }
-.bracket-round{ display:flex; flex-direction:column; justify-content:space-around; gap:18px; flex:1 1 0; min-width:150px; max-width:220px; position:relative; z-index:1; }
+.bracket-round{ display:flex; flex-direction:column; justify-content:flex-start; gap:18px; flex:1 1 0; min-width:150px; max-width:220px; position:relative; z-index:1; }
 .bracket-round-title{ font-size:15px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
 .bracket-match{ display:flex; flex-direction:column; gap:4px; position:relative; background:var(--bg-void); }
 .bracket-slot{ background:var(--bg-panel); border:1px solid var(--line); padding:9px 12px; font-size:15px; font-weight:500; display:flex; justify-content:space-between; align-items:center; gap:8px; }
@@ -257,9 +257,8 @@ form.panel, .panel{
 .bracket-score-btn{ font-size:11px; padding:2px 8px; }
 .bracket-champion-banner{ margin-top:20px; padding:18px 24px; background:linear-gradient(90deg, rgba(201,162,75,0.15), transparent); border:1px solid var(--gold); text-align:center; font-family:'Cinzel', serif; font-size:18px; color:var(--gold); }
 
-.bracket-exhibition-wrap{ margin-top:28px; padding-top:18px; border-top:1px dashed var(--line); }
-.bracket-exhibition-row{ display:flex; gap:16px; flex-wrap:wrap; }
-.bracket-exhibition-row .bracket-match{ width:220px; opacity:.75; }
+.bracket-match-exhibition{ opacity:.7; }
+.bracket-exhibition-label{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
 
 .score-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:50; }
 .score-modal{ background:var(--bg-panel); border:1px solid var(--gold-dim); padding:24px; width:280px; display:flex; flex-direction:column; gap:12px; }
