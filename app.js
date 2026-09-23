@@ -1474,13 +1474,15 @@ function renderTurnajPage(){
 
 function openNewTournamentForm(existing){
   const slot = document.getElementById('turnaj-form-slot');
-  const upcoming = events.filter(e => e.dateEnd >= todayIso());
-  const evOptions = (upcoming.length ? upcoming : events);
+  const evOptions = [...events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
   const isEdit = !!existing;
   slot.innerHTML = `
     <form class="panel" id="form-new-tourney">
       <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" value="${isEdit?escapeHtml(existing.name):''}" required></div>
-      <div class="field"><label>Akce</label><select id="new-tourney-event">${evOptions.map(e=>`<option value="${e.id}" ${isEdit && existing.eventId===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Akce (nepovinné)</label><select id="new-tourney-event">
+        <option value="">— bez přiřazené akce —</option>
+        ${evOptions.map(e=>`<option value="${e.id}" ${isEdit && existing.eventId===e.id?'selected':''}>${escapeHtml(e.name)}${e.dateEnd < todayIso() ? ' (proběhlo)' : ''}</option>`).join('')}
+      </select></div>
       ${isEdit ? '' : `<div class="field"><label>Počet týmů</label><input type="number" id="new-tourney-count" min="2" value="4"></div>`}
       <div class="field"><label>URL obrázku turnaje (nepovinné)</label><input type="url" id="new-tourney-image" value="${isEdit?escapeHtml(existing.imageUrl||''):''}"></div>
       <div style="display:flex; gap:10px;">
@@ -1496,7 +1498,7 @@ function openNewTournamentForm(existing){
     const name = document.getElementById('new-tourney-name').value.trim();
     const eventId = document.getElementById('new-tourney-event').value;
     const imageUrl = document.getElementById('new-tourney-image').value.trim();
-    if(!name || !eventId) return;
+    if(!name) return;
     try{
       if(isEdit){
         await updateDoc(doc(db,'tournaments',existing.id), { name, eventId, imageUrl });
@@ -1524,10 +1526,12 @@ async function renderTeamEditor(t, container){
   container.appendChild(editorWrap);
 
   let goingRegs = [];
-  try{
-    const snap = await getDocs(collection(db, 'events', t.eventId, 'registrations'));
-    goingRegs = snap.docs.map(d => d.data()).filter(r => r.status !== 'maybe').sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
-  }catch(err){ console.error(err); }
+  if(t.eventId){
+    try{
+      const snap = await getDocs(collection(db, 'events', t.eventId, 'registrations'));
+      goingRegs = snap.docs.map(d => d.data()).filter(r => r.status !== 'maybe').sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+    }catch(err){ console.error(err); }
+  }
 
   editorWrap.innerHTML = `
     <div class="team-editor" id="team-editor-grid"></div>
