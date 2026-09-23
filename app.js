@@ -656,6 +656,7 @@ function renderEvents(){
 // ==================== DETAIL AKCE ====================
 let currentDetailEventId = null;
 let currentTab = 'prehled';
+let showVoteBreakdown = false;
 let detailUnsubs = [];
 let currentRegistrationsMap = {};
 
@@ -669,6 +670,7 @@ function openEventDetail(eventId){
   currentTab = 'prehled';
   currentTournamentId = null;
   teamEditorOpen = false;
+  showVoteBreakdown = false;
   const ev = events.find(x => x.id === eventId);
   if(!ev) return;
   showView('event');
@@ -803,15 +805,23 @@ function renderDateVoteBlock(ev){
     ${options.map((opt, idx) => {
       const count = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).length;
       const isMine = myVotes.includes(idx);
+      const voterNicks = hasPerm('akce') && showVoteBreakdown ? Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => currentRegistrationsMap[uid]?.nick || '(neznámý)') : [];
       return `
-        <div class="row" style="margin-top:8px; align-items:center; flex-wrap:wrap;">
-          <span style="flex:1; font-size:13px;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
-          ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'✓ Hlasováno':'Hlasovat'}</button>` : ''}
-          ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
+        <div style="margin-top:8px;">
+          <div class="row" style="align-items:center; flex-wrap:wrap;">
+            <span style="flex:1; font-size:13px;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
+            ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'✓ Hlasováno':'Hlasovat'}</button>` : ''}
+            ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
+          </div>
+          ${showVoteBreakdown ? `<div class="status-hint" style="margin-top:3px; padding-left:2px;">${voterNicks.length ? escapeHtml(voterNicks.join(', ')) : 'Zatím nikdo'}</div>` : ''}
         </div>
       `;
     }).join('')}
+    ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" id="btn-toggle-vote-breakdown" style="margin-top:10px;">${showVoteBreakdown ? 'Skrýt kdo jak hlasoval' : 'Kdo jak hlasoval'}</button>` : ''}
   `;
+
+  const breakdownBtn = document.getElementById('btn-toggle-vote-breakdown');
+  if(breakdownBtn) breakdownBtn.addEventListener('click', () => { showVoteBreakdown = !showVoteBreakdown; renderDateVoteBlock(ev); });
 
   box.querySelectorAll('[data-vote-date]').forEach(btn => {
     btn.addEventListener('click', async () => {
