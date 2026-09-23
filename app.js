@@ -656,7 +656,6 @@ function renderEvents(){
 // ==================== DETAIL AKCE ====================
 let currentDetailEventId = null;
 let currentTab = 'prehled';
-let showVoteBreakdown = false;
 let detailUnsubs = [];
 let currentRegistrationsMap = {};
 
@@ -670,7 +669,6 @@ function openEventDetail(eventId){
   currentTab = 'prehled';
   currentTournamentId = null;
   teamEditorOpen = false;
-  showVoteBreakdown = false;
   const ev = events.find(x => x.id === eventId);
   if(!ev) return;
   showView('event');
@@ -805,23 +803,19 @@ function renderDateVoteBlock(ev){
     ${options.map((opt, idx) => {
       const count = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).length;
       const isMine = myVotes.includes(idx);
-      const voterNicks = hasPerm('akce') && showVoteBreakdown ? Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => currentRegistrationsMap[uid]?.nick || '(neznámý)') : [];
       return `
-        <div style="margin-top:8px;">
-          <div class="row" style="align-items:center; flex-wrap:wrap;">
-            <span style="flex:1; font-size:13px;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
-            ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'✓ Hlasováno':'Hlasovat'}</button>` : ''}
-            ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
-          </div>
-          ${showVoteBreakdown ? `<div class="status-hint" style="margin-top:3px; padding-left:2px;">${voterNicks.length ? escapeHtml(voterNicks.join(', ')) : 'Zatím nikdo'}</div>` : ''}
+        <div class="row" style="margin-top:8px; align-items:center; flex-wrap:wrap;">
+          <span style="flex:1; font-size:13px;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint">(${count} hlasů)</span></span>
+          ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'✓ Hlasováno':'Hlasovat'}</button>` : ''}
+          ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
         </div>
       `;
     }).join('')}
-    ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" id="btn-toggle-vote-breakdown" style="margin-top:10px;">${showVoteBreakdown ? 'Skrýt kdo jak hlasoval' : 'Kdo jak hlasoval'}</button>` : ''}
+    ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" id="btn-show-vote-breakdown" style="margin-top:10px;">Kdo jak hlasoval</button>` : ''}
   `;
 
-  const breakdownBtn = document.getElementById('btn-toggle-vote-breakdown');
-  if(breakdownBtn) breakdownBtn.addEventListener('click', () => { showVoteBreakdown = !showVoteBreakdown; renderDateVoteBlock(ev); });
+  const breakdownBtn = document.getElementById('btn-show-vote-breakdown');
+  if(breakdownBtn) breakdownBtn.addEventListener('click', () => openVoteBreakdownModal(ev, options, votes, votesOf));
 
   box.querySelectorAll('[data-vote-date]').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -842,6 +836,27 @@ function renderDateVoteBlock(ev){
       catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
     });
   });
+}
+
+function openVoteBreakdownModal(ev, options, votes, votesOf){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'score-modal-backdrop';
+  const voterUids = Object.keys(votes).filter(uid => votesOf(uid).length > 0);
+  const rows = voterUids.map(uid => {
+    const nick = currentRegistrationsMap[uid]?.nick || '(neznámý)';
+    const myOptions = votesOf(uid).map(idx => options[idx] ? `${fmtDateShort(options[idx].start)} – ${fmtDate(options[idx].end)}` : '?');
+    return `<div class="row" style="padding:6px 0; border-top:1px solid var(--line);"><span style="flex:1; font-weight:600;">${escapeHtml(nick)}</span><span class="status-hint" style="text-align:right;">${myOptions.map(escapeHtml).join('<br>')}</span></div>`;
+  }).join('');
+  backdrop.innerHTML = `
+    <div class="score-modal" style="width:360px; max-height:70vh; overflow-y:auto;">
+      <div style="font-size:14px; font-weight:600;">Kdo jak hlasoval</div>
+      ${rows || '<div class="empty">Zatím nikdo nehlasoval.</div>'}
+      <button type="button" class="btn-ghost" id="vote-breakdown-close" style="margin-top:10px;">Zavřít</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.getElementById('vote-breakdown-close').addEventListener('click', () => backdrop.remove());
+  backdrop.addEventListener('click', (e) => { if(e.target === backdrop) backdrop.remove(); });
 }
 
 function isPastDeadline(ev){
