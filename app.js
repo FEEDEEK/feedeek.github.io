@@ -1099,15 +1099,17 @@ function renderTabPrehled(ev){
     </div>
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze</div>
-    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
-      <div class="discussion-input-wrap">
-        <textarea class="discussion-input" id="comment-input" placeholder="Napiš příspěvek do diskuze..."></textarea>
-        <button type="button" class="emoji-picker-btn" id="emoji-btn-comment" title="Vložit emotikon">🙂</button>
-        <div class="emoji-picker-panel" id="emoji-panel-comment" style="display:none;"></div>
+    <div class="discussion-block">
+      <div class="discussion-list" id="comments-list"></div>
+      <div class="discussion-input-row">
+        <div class="discussion-input-wrap">
+          <textarea class="discussion-input" id="comment-input" placeholder="Napiš příspěvek do diskuze..."></textarea>
+          <button type="button" class="emoji-picker-btn" id="emoji-btn-comment" title="Vložit emotikon">🙂</button>
+          <div class="emoji-picker-panel" id="emoji-panel-comment" style="display:none;"></div>
+        </div>
+        <button type="button" id="btn-add-comment" class="btn-sm">Odeslat</button>
       </div>
-      <button type="button" id="btn-add-comment" class="btn-sm">Odeslat</button>
     </div>
-    <div id="comments-list" style="margin-top:6px;"></div>
   `;
   setupChatEmojiRow('emoji-btn-comment', 'emoji-panel-comment', 'comment-input');
 
@@ -1319,15 +1321,17 @@ function renderTabJidlo(ev){
       </div>` : ''}
 
     <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze k jídlu</div>
-    <div class="field" style="max-width:460px; display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
-      <div class="discussion-input-wrap">
-        <textarea class="discussion-input" id="food-comment-input" placeholder="Kdo co doveze, návrhy..."></textarea>
-        <button type="button" class="emoji-picker-btn" id="emoji-btn-food" title="Vložit emotikon">🙂</button>
-        <div class="emoji-picker-panel" id="emoji-panel-food" style="display:none;"></div>
+    <div class="discussion-block">
+      <div class="discussion-list" id="food-comments-list"></div>
+      <div class="discussion-input-row">
+        <div class="discussion-input-wrap">
+          <textarea class="discussion-input" id="food-comment-input" placeholder="Kdo co doveze, návrhy..."></textarea>
+          <button type="button" class="emoji-picker-btn" id="emoji-btn-food" title="Vložit emotikon">🙂</button>
+          <div class="emoji-picker-panel" id="emoji-panel-food" style="display:none;"></div>
+        </div>
+        <button type="button" id="btn-add-food-comment" class="btn-sm">Odeslat</button>
       </div>
-      <button type="button" id="btn-add-food-comment" class="btn-sm">Odeslat</button>
     </div>
-    <div id="food-comments-list" style="margin-top:6px;"></div>
   `;
   setupChatEmojiRow('emoji-btn-food', 'emoji-panel-food', 'food-comment-input');
 
@@ -1861,9 +1865,12 @@ function renderSwissBody(t, swiss, container, compact){
 }
 
 function aegisSvg(){
-  return `<svg viewBox="0 0 60 72" class="aegis-svg" xmlns="http://www.w3.org/2000/svg">
-    <path d="M30 2 C45 8 55 10 55 10 L55 34 C55 55 42 66 30 70 C18 66 5 55 5 34 L5 10 C5 10 15 8 30 2 Z" fill="currentColor" stroke="#1a1a1a" stroke-width="2"/>
-    <path d="M30 20 L38 34 L30 50 L22 34 Z" fill="#1a1a1a" opacity="0.35"/>
+  return `<svg viewBox="0 0 100 112" class="aegis-svg" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 4 C78 4 92 20 92 20 L92 54 C92 71 81 87 65 97 C59 101 54 103 50 105 C46 103 41 101 35 97 C19 87 8 71 8 54 L8 20 C8 20 22 4 50 4 Z" fill="currentColor" stroke="#241f14" stroke-width="2.5"/>
+    <path d="M50 12 C71 12 83 24 83 24 L83 53 C83 67 74 80 61 89 C57 93 53 94 50 96 C47 94 43 93 39 89 C26 80 17 67 17 53 L17 24 C17 24 29 12 50 12 Z" fill="#1a1a1a" opacity="0.55"/>
+    <path d="M50 18 C38 18 29 26 29 36 C29 46 38 50 44 54 C50 58 50 64 44 68 C38 72 29 76 29 88" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" opacity="0.92"/>
+    <circle cx="50" cy="53" r="10" fill="currentColor" stroke="#241f14" stroke-width="1.5"/>
+    <circle cx="50" cy="53" r="4.5" fill="#241f14"/>
   </svg>`;
 }
 
