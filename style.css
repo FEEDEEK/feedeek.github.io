@@ -76,7 +76,7 @@ body::before{
 }
 
 /* ---- Main ---- */
-.main{ flex:1; padding:48px 5vw; max-width:100%; margin:0 auto; width:100%; }
+.main{ flex:1; padding:22px 5vw 48px; max-width:100%; margin:0 auto; width:100%; }
 .view{ display:none; }
 .view.active{ display:block; animation:fadein .35s ease; }
 @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
@@ -224,8 +224,15 @@ form.panel, .panel{
 .comment-row .txt{ margin-top:4px; color:var(--text); line-height:1.5; }
 .comment-row .row-actions{ display:flex; gap:6px; margin-top:6px; }
 
-.discussion-block{ max-width:640px; margin-top:12px; border:1px solid var(--line); background:var(--bg-panel); }
-.discussion-list{ max-height:440px; overflow-y:auto; padding:4px 16px; }
+.discussion-block{ max-width:none; margin-top:12px; border:1px solid var(--line); background:var(--bg-panel); }
+.discussion-list{
+  max-height:440px; overflow-y:auto; padding:4px 16px;
+  scrollbar-width:thin; scrollbar-color:var(--gold-dim) var(--bg-panel);
+}
+.discussion-list::-webkit-scrollbar{ width:9px; }
+.discussion-list::-webkit-scrollbar-track{ background:var(--bg-panel); }
+.discussion-list::-webkit-scrollbar-thumb{ background:var(--gold-dim); border-radius:5px; border:2px solid var(--bg-panel); }
+.discussion-list::-webkit-scrollbar-thumb:hover{ background:var(--gold); }
 .discussion-list .comment-row:first-child{ border-top:none; }
 .discussion-list .empty{ padding:16px 0; }
 .discussion-input-row{ display:flex; gap:8px; align-items:flex-end; padding:14px 16px; border-top:1px solid var(--line); background:var(--bg-panel-2); }
@@ -340,7 +347,11 @@ form.panel, .panel{
 .food-confirm-row{ margin-top:14px; display:flex; align-items:center; gap:12px; }
 
 /* ---- Diskuze: větší textarea ---- */
-textarea.discussion-input{ min-height:90px; width:100%; }
+textarea.discussion-input{
+  min-height:90px; width:100%; background:var(--bg-void); border:1px solid var(--line); color:var(--text);
+  padding:9px 10px; font-family:'Work Sans', sans-serif; font-size:14px; resize:vertical;
+}
+textarea.discussion-input:focus{ outline:none; border-color:var(--gold); }
 
 .emoji-picker-btn{
   position:absolute; right:6px; bottom:6px; z-index:2;
