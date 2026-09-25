@@ -362,11 +362,11 @@ textarea.discussion-input:focus{ outline:none; border-color:var(--gold); }
 .emoji-picker-panel{
   position:absolute; bottom:100%; right:0; margin-bottom:6px; z-index:60;
   background:var(--bg-panel); border:1px solid var(--gold-dim); padding:8px;
-  display:grid; grid-template-columns:repeat(8, 1fr); gap:4px; width:220px;
+  display:grid; grid-template-columns:repeat(8, minmax(0, 1fr)); gap:4px; width:220px; box-sizing:border-box;
   box-shadow:0 4px 16px rgba(0,0,0,0.5);
   font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif;
 }
-.emoji-picker-panel span{ cursor:pointer; font-size:17px; text-align:center; padding:3px; border-radius:3px; }
+.emoji-picker-panel span{ cursor:pointer; font-size:17px; text-align:center; padding:3px; border-radius:3px; overflow:hidden; min-width:0; }
 .emoji-picker-panel span:hover{ background:var(--bg-panel-2); }
 textarea.discussion-input{ padding-right:34px; }
 .discussion-input-wrap{ position:relative; flex:1; }
@@ -465,5 +465,5 @@ textarea.discussion-input{ padding-right:34px; }
 
   .bracket-round{ min-width:150px; }
   .bracket-slot{ font-size:13px; padding:9px 10px; }
-  .emoji-picker-panel{ width:180px; grid-template-columns:repeat(6,1fr); right:auto; left:0; }
+  .emoji-picker-panel{ width:180px; grid-template-columns:repeat(6, minmax(0, 1fr)); right:auto; left:0; }
 }
