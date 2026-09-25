@@ -314,13 +314,21 @@ function renderHome(){
 }
 
 // ==================== FORMULÁŘ AKCE: hry (tagy) ====================
+// Zdroj log her: RAWG.io (zdarma, potřeba vlastní API klíč z rawg.io/apidocs)
+const RAWG_API_KEY = ''; // <-- sem vlož svůj klíč z https://rawg.io/apidocs
+
+function normalizeGame(g){
+  return (typeof g === 'string') ? { name: g, image: '' } : g;
+}
+
 function renderFormGames(){
   const list = document.getElementById('ev-games-list');
   list.innerHTML = '';
-  currentEventGames.forEach((game, idx) => {
+  currentEventGames.forEach((rawGame, idx) => {
+    const game = normalizeGame(rawGame);
     const li = document.createElement('li');
     li.className = 'tag-chip';
-    li.innerHTML = `<span>${escapeHtml(game)}</span><span class="x" data-remove-game="${idx}">×</span>`;
+    li.innerHTML = `${game.image ? `<img src="${game.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo">` : ''}<span>${escapeHtml(game.name)}</span><span class="x" data-remove-game="${idx}">×</span>`;
     list.appendChild(li);
   });
   list.querySelectorAll('[data-remove-game]').forEach(el => {
@@ -330,13 +338,51 @@ function renderFormGames(){
     });
   });
 }
+
 document.getElementById('btn-add-game').addEventListener('click', () => {
   const input = document.getElementById('input-add-game');
   const val = input.value.trim();
   if(!val) return;
-  currentEventGames.push(val);
+  currentEventGames.push({ name: val, image: '' });
   input.value = '';
+  document.getElementById('game-autocomplete-list').style.display = 'none';
   renderFormGames();
+});
+
+let gameSearchDebounce = null;
+document.getElementById('input-add-game').addEventListener('input', (e) => {
+  clearTimeout(gameSearchDebounce);
+  const q = e.target.value.trim();
+  const box = document.getElementById('game-autocomplete-list');
+  if(!RAWG_API_KEY || q.length < 2){ box.style.display = 'none'; return; }
+  gameSearchDebounce = setTimeout(async () => {
+    try{
+      const res = await fetch(`https://api.rawg.io/api/games?key=${RAWG_API_KEY}&search=${encodeURIComponent(q)}&page_size=6`);
+      const data = await res.json();
+      const results = data.results || [];
+      if(results.length === 0){ box.style.display = 'none'; return; }
+      box.innerHTML = results.map(r => `
+        <div class="game-autocomplete-item" data-pick-game="${escapeHtml(r.name)}" data-pick-image="${r.background_image ? r.background_image.replace(/"/g,'&quot;') : ''}">
+          ${r.background_image ? `<img src="${r.background_image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-autocomplete-noimg">🎮</div>'}
+          <span>${escapeHtml(r.name)}</span>
+        </div>
+      `).join('');
+      box.style.display = 'block';
+      box.querySelectorAll('[data-pick-game]').forEach(item => {
+        item.addEventListener('click', () => {
+          currentEventGames.push({ name: item.dataset.pickGame, image: item.dataset.pickImage || '' });
+          document.getElementById('input-add-game').value = '';
+          box.style.display = 'none';
+          renderFormGames();
+        });
+      });
+    }catch(err){ console.error(err); box.style.display = 'none'; }
+  }, 400);
+});
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('#input-add-game') && !e.target.closest('#game-autocomplete-list')){
+    document.getElementById('game-autocomplete-list').style.display = 'none';
+  }
 });
 
 // ==================== FORMULÁŘ AKCE: jídlo po blocích ====================
@@ -1036,12 +1082,12 @@ function renderAttendees(){
 // ---- Přehled: hry + návrhy (editovatelné vlastníkem/adminem) + Diskuze (editovatelná vlastníkem/adminem) ----
 function renderTabPrehled(ev){
   const box = document.getElementById('tab-prehled');
-  const games = [...(ev.games || [])].sort((a,b) => a.localeCompare(b, 'cs'));
+  const games = [...(ev.games || [])].map(normalizeGame).sort((a,b) => a.name.localeCompare(b.name, 'cs'));
   box.innerHTML = `
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:28px;">
       <div>
         <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
-        <div class="chip-row" style="flex-direction:column; align-items:flex-start;">${games.length ? games.map(g=>`<span class="chip">${escapeHtml(g)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
+        <div class="chip-row" style="flex-direction:column; align-items:flex-start;">${games.length ? games.map(g=>`<span class="chip">${g.image ? `<img src="${g.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo">` : ''}${escapeHtml(g.name)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
       </div>
       <div>
         <div class="section-title" style="font-size:16px;">Chtěl by sis zahrát ještě něco jiného?</div>
@@ -1372,39 +1418,53 @@ function renderTurnajPage(){
     const t = allTournaments.find(x => x.id === currentTournamentId);
     if(!t){ currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; renderTurnajPage(); return; }
     const ev = events.find(x => x.id === t.eventId);
+    const swissPreview = computeSwissTournament(t);
     box.innerHTML = `
-      <div style="text-align:center;">
-        ${ev ? `<div class="status-hint">${escapeHtml(ev.name)}</div>` : ''}
-        <h1 class="headline" style="font-size:28px; display:inline-block;">${escapeHtml(t.name)}</h1>
-        ${t.imageUrl ? `<div><img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="width:64px; height:64px; object-fit:cover; border-radius:50%; margin-top:10px; border:2px solid var(--gold-dim);"></div>` : ''}
+      <div class="tourney-toolbar" id="tourney-toolbar"></div>
+      <div class="tourney-main-row">
+        <div class="tourney-bracket-col">
+          <div class="bracket-scale-wrap" id="turnaj-detail-body"></div>
+        </div>
+        <div class="tourney-title-corner">
+          ${ev ? `<div class="status-hint">${escapeHtml(ev.name)}</div>` : ''}
+          <h1 class="headline" style="font-size:22px;">${escapeHtml(t.name)}</h1>
+          ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" class="tourney-title-image">` : ''}
+        </div>
       </div>
-      <div id="turnaj-detail-body" style="margin-top:20px;"></div>
     `;
 
-    const bodyWrap = document.getElementById('turnaj-detail-body');
+    const toolbar = document.getElementById('tourney-toolbar');
     if(hasPerm('turnaj')){
       const toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
       toggleBtn.className = 'btn-ghost btn-sm';
-      toggleBtn.style.marginBottom = '14px';
       toggleBtn.textContent = teamEditorOpen ? 'Skrýt úpravu týmů' : 'Upravit týmy';
       toggleBtn.addEventListener('click', () => { teamEditorOpen = !teamEditorOpen; renderTurnajPage(); });
-      bodyWrap.appendChild(toggleBtn);
+      toolbar.appendChild(toggleBtn);
 
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'btn-ghost btn-sm';
-      delBtn.style.cssText = 'margin-bottom:14px; margin-left:10px; color:var(--crimson); border-color:var(--crimson);';
+      delBtn.style.cssText = 'color:var(--crimson); border-color:var(--crimson);';
       delBtn.textContent = 'Smazat turnaj';
       delBtn.addEventListener('click', async () => {
         if(!confirm(`Opravdu smazat turnaj "${t.name}"? Tohle nejde vrátit zpět.`)) return;
         try{ await deleteDoc(doc(db,'tournaments',t.id)); currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; }
         catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
       });
-      bodyWrap.appendChild(delBtn);
-
-      if(teamEditorOpen) renderTeamEditor(t, bodyWrap);
+      toolbar.appendChild(delBtn);
     }
+    if(swissPreview.placements.length > 0){
+      const resultBtn = document.createElement('button');
+      resultBtn.type = 'button';
+      resultBtn.className = 'btn-sm';
+      resultBtn.textContent = '🏆 Výsledek turnaje';
+      resultBtn.addEventListener('click', () => openTournamentResultModal(t, swissPreview));
+      toolbar.appendChild(resultBtn);
+    }
+
+    const bodyWrap = document.getElementById('turnaj-detail-body');
+    if(hasPerm('turnaj') && teamEditorOpen) renderTeamEditor(t, box.querySelector('.tourney-bracket-col'));
 
     const swiss = computeSwissTournament(t);
     renderSwissBody(t, swiss, bodyWrap, false);
@@ -1793,32 +1853,67 @@ function renderSwissBody(t, swiss, container, compact){
     wrap.appendChild(col);
   }
 
-  if(swiss.placements.length > 0){
-    const col = document.createElement('div');
-    col.className = 'bracket-round bracket-round-podium';
-    const p1 = swiss.placements.find(p=>p.rank===1);
-    const p2 = swiss.placements.find(p=>p.rank===2);
-    const p3 = swiss.placements.find(p=>p.rank===3);
-    const rest = swiss.placements.filter(p=>p.rank>3);
-    let html = `<div class="bracket-round-title">Výsledek</div><div class="podium-wrap">`;
-    if(p2) html += `<div class="podium-step podium-2"><div class="podium-team">🥈 ${escapeHtml(teamName(t,p2.team))}</div><div class="podium-bar">2</div></div>`;
-    if(p1) html += `<div class="podium-step podium-1"><div class="podium-team">🥇 ${escapeHtml(teamName(t,p1.team))}</div><div class="podium-bar">1</div></div>`;
-    if(p3) html += `<div class="podium-step podium-3"><div class="podium-team">🥉 ${escapeHtml(teamName(t,p3.team))}</div><div class="podium-bar">3</div></div>`;
-    html += `</div>`;
-    if(rest.length > 0){
-      html += rest.map(p => {
-        const isFourth = p.rank === 4;
-        return `<div class="bracket-slot" style="margin-top:8px;"><span>${isFourth ? '🥔' : (p.rank+'.')} ${escapeHtml(teamName(t,p.team))}</span></div>`;
-      }).join('');
-    }
-    col.innerHTML = html;
-    wrap.appendChild(col);
-  }
-
   if(!compact) requestAnimationFrame(() => {
+    wrap.style.transform = 'none';
     layoutBracketRounds(wrap);
     drawBracketConnectors(wrap);
+    fitBracketToScreen(wrap);
   });
+}
+
+function buildPodiumHtml(t, swiss, big){
+  const p1 = swiss.placements.find(p=>p.rank===1);
+  const p2 = swiss.placements.find(p=>p.rank===2);
+  const p3 = swiss.placements.find(p=>p.rank===3);
+  const rest = swiss.placements.filter(p=>p.rank>3);
+  let html = `<div class="podium-wrap ${big?'podium-wrap-big':''}">`;
+  if(p2) html += `<div class="podium-step podium-2"><div class="podium-team">🥈 ${escapeHtml(teamName(t,p2.team))}</div><div class="podium-bar">2</div></div>`;
+  if(p1) html += `<div class="podium-step podium-1"><div class="podium-team">🥇 ${escapeHtml(teamName(t,p1.team))}</div><div class="podium-bar">1</div></div>`;
+  if(p3) html += `<div class="podium-step podium-3"><div class="podium-team">🥉 ${escapeHtml(teamName(t,p3.team))}</div><div class="podium-bar">3</div></div>`;
+  html += `</div>`;
+  if(rest.length > 0){
+    html += rest.map(p => {
+      const isFourth = p.rank === 4;
+      return `<div class="bracket-slot" style="margin-top:8px;"><span>${isFourth ? '🥔' : (p.rank+'.')} ${escapeHtml(teamName(t,p.team))}</span></div>`;
+    }).join('');
+  }
+  return html;
+}
+
+function openTournamentResultModal(t, swiss){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'score-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="score-modal result-modal">
+      <div style="font-size:18px; font-weight:700; font-family:'Cinzel', serif; color:var(--gold); text-align:center;">🏆 ${escapeHtml(t.name)}</div>
+      ${buildPodiumHtml(t, swiss, true)}
+      <button type="button" class="btn-ghost" id="result-modal-close" style="margin-top:16px;">Zavřít</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.getElementById('result-modal-close').addEventListener('click', () => backdrop.remove());
+  backdrop.addEventListener('click', (e) => { if(e.target === backdrop) backdrop.remove(); });
+}
+
+function fitBracketToScreen(wrap){
+  const container = wrap.parentElement; // .bracket-scale-wrap
+  if(!container) return;
+  wrap.style.transform = 'none';
+  container.style.height = 'auto';
+  const naturalWidth = wrap.scrollWidth;
+  const naturalHeight = wrap.scrollHeight;
+  const availableWidth = container.clientWidth;
+  const top = wrap.getBoundingClientRect().top;
+  const availableHeight = Math.max(300, window.innerHeight - top - 40);
+  let scale = Math.min(1, availableWidth / naturalWidth, availableHeight / naturalHeight);
+  if(scale < 1){
+    wrap.style.transformOrigin = 'top left';
+    wrap.style.transform = `scale(${scale})`;
+    container.style.height = (naturalHeight * scale) + 'px';
+  }else{
+    wrap.style.transform = 'none';
+    container.style.height = naturalHeight + 'px';
+  }
 }
 
 function layoutBracketRounds(wrap){
@@ -2638,6 +2733,6 @@ let resizeRedrawTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeRedrawTimer);
   resizeRedrawTimer = setTimeout(() => {
-    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => { layoutBracketRounds(w); drawBracketConnectors(w); });
+    document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => { w.style.transform = 'none'; layoutBracketRounds(w); drawBracketConnectors(w); fitBracketToScreen(w); });
   }, 150);
 });
