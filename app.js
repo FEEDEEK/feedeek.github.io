@@ -1889,10 +1889,15 @@ function renderSwissBody(t, swiss, container, compact){
 function aegisSvg(){
   return `<svg viewBox="0 0 100 112" class="aegis-svg" xmlns="http://www.w3.org/2000/svg">
     <path d="M50 4 C78 4 92 20 92 20 L92 54 C92 71 81 87 65 97 C59 101 54 103 50 105 C46 103 41 101 35 97 C19 87 8 71 8 54 L8 20 C8 20 22 4 50 4 Z" fill="currentColor" stroke="#241f14" stroke-width="2.5"/>
-    <path d="M50 12 C71 12 83 24 83 24 L83 53 C83 67 74 80 61 89 C57 93 53 94 50 96 C47 94 43 93 39 89 C26 80 17 67 17 53 L17 24 C17 24 29 12 50 12 Z" fill="#1a1a1a" opacity="0.55"/>
-    <path d="M50 18 C38 18 29 26 29 36 C29 46 38 50 44 54 C50 58 50 64 44 68 C38 72 29 76 29 88" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" opacity="0.92"/>
-    <circle cx="50" cy="53" r="10" fill="currentColor" stroke="#241f14" stroke-width="1.5"/>
+    <circle cx="10.5" cy="27" r="4" fill="#241f14" opacity="0.75"/>
+    <circle cx="89.5" cy="27" r="4" fill="#241f14" opacity="0.75"/>
+    <circle cx="26" cy="92" r="3" fill="#241f14" opacity="0.6"/>
+    <circle cx="74" cy="92" r="3" fill="#241f14" opacity="0.6"/>
+    <path d="M50 12 C71 12 83 24 83 24 L83 53 C83 67 74 80 61 89 C57 93 53 94 50 96 C47 94 43 93 39 89 C26 80 17 67 17 53 L17 24 C17 24 29 12 50 12 Z" fill="#151312"/>
+    <path d="M50 18 C39 18 31 25 31 34 C31 43 39 46 45 50 C51 54 51 60 45 64 C39 68 31 71 31 80 C31 89 39 96 50 96" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round" opacity="0.95"/>
+    <circle cx="50" cy="53" r="10.5" fill="currentColor" stroke="#241f14" stroke-width="1.5"/>
     <circle cx="50" cy="53" r="4.5" fill="#241f14"/>
+    <path d="M50 46 L52 51 L57 53 L52 55 L50 60 L48 55 L43 53 L48 51 Z" fill="#fff" opacity="0.5"/>
   </svg>`;
 }
 
