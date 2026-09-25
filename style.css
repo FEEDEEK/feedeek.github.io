@@ -289,25 +289,27 @@ form.panel, .panel{
 .podium-wrap{ display:flex; align-items:flex-end; gap:10px; }
 .podium-wrap-big{ gap:18px; max-width:420px; margin:20px auto; }
 .podium-wrap-big .podium-team{ font-size:18px; }
-.podium-wrap-big .podium-bar{ font-size:26px; }
-.podium-wrap-big .podium-1 .podium-bar{ height:140px; }
-.podium-wrap-big .podium-2 .podium-bar{ height:105px; }
-.podium-wrap-big .podium-3 .podium-bar{ height:75px; }
+.podium-wrap-big .podium-1 .aegis-svg{ width:100px; height:120px; }
+.podium-wrap-big .podium-2 .aegis-svg{ width:74px; height:89px; }
+.podium-wrap-big .podium-3 .aegis-svg{ width:60px; height:72px; }
 .podium-step{ flex:1; text-align:center; }
 .podium-team{ font-size:16px; font-weight:700; margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.podium-bar{ display:flex; align-items:flex-end; justify-content:center; padding-bottom:8px; font-weight:800; font-size:20px; color:var(--bg-void); border-radius:4px 4px 0 0; }
-.podium-1 .podium-bar{ height:110px; background:linear-gradient(180deg,#f0c94e,#c9a24b); }
-.podium-2 .podium-bar{ height:82px; background:linear-gradient(180deg,#d8d8e0,#a8a8b4); }
-.podium-3 .podium-bar{ height:58px; background:linear-gradient(180deg,#d8985a,#a8693a); }
+.aegis-holder{ display:flex; align-items:flex-end; justify-content:center; }
+.aegis-svg{ width:60px; height:72px; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
+.podium-1 .aegis-svg{ width:72px; height:86px; color:#f0c94e; }
+.podium-2 .aegis-svg{ width:54px; height:65px; color:#c9c9d4; }
+.podium-3 .aegis-svg{ width:46px; height:55px; color:#c9834a; }
 
 .bracket-match-exhibition{ opacity:.7; }
 .bracket-exhibition-label{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
 
-.tourney-toolbar{ display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
-.tourney-main-row{ display:flex; gap:28px; align-items:flex-start; }
+.tourney-corner-actions{ position:fixed; right:24px; bottom:24px; display:flex; gap:10px; z-index:15; }
+.tourney-main-row{ display:flex; gap:28px; align-items:stretch; }
+
 .tourney-bracket-col{ flex:1; min-width:0; }
 .bracket-scale-wrap{ overflow:hidden; }
-.tourney-title-corner{ flex:0 0 200px; text-align:right; }
+.tourney-title-corner{ flex:0 0 200px; text-align:right; display:flex; flex-direction:column; }
+.tourney-title-result{ flex:1; display:flex; align-items:center; justify-content:center; }
 .tourney-title-image{ width:72px; height:72px; object-fit:cover; border-radius:50%; margin-top:10px; border:2px solid var(--gold-dim); }
 
 .score-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:50; }
@@ -315,6 +317,7 @@ form.panel, .panel{
 .score-modal .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .score-modal input{ width:60px; text-align:center; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:6px; }
 .result-modal{ width:460px; max-width:90vw; }
+.team-editor-modal{ width:700px; max-width:92vw; max-height:85vh; overflow-y:auto; }
 
 /* ---- Jídlo: checkboxy ---- */
 .food-checkbox-row{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:14px; }
