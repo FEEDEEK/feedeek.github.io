@@ -157,6 +157,16 @@ form.panel, .panel{
 .tag-input-row input, .tag-input-row select{ flex:1; }
 .tag-chip-list{ list-style:none; display:flex; flex-wrap:wrap; gap:8px; }
 .tag-chip{ background:var(--bg-panel-2); border:1px solid var(--line); padding:5px 10px; font-size:13px; display:flex; align-items:center; gap:8px; }
+.game-chip-logo{ width:20px; height:20px; object-fit:cover; border-radius:3px; }
+.game-autocomplete-list{
+  position:absolute; top:100%; left:0; right:0; margin-top:4px; z-index:20;
+  background:var(--bg-panel); border:1px solid var(--gold-dim); max-height:260px; overflow-y:auto;
+  box-shadow:0 4px 16px rgba(0,0,0,0.5);
+}
+.game-autocomplete-item{ display:flex; align-items:center; gap:10px; padding:8px 10px; cursor:pointer; font-size:13px; }
+.game-autocomplete-item:hover{ background:var(--bg-panel-2); }
+.game-autocomplete-item img{ width:32px; height:32px; object-fit:cover; border-radius:3px; flex-shrink:0; }
+.game-autocomplete-noimg{ width:32px; height:32px; display:flex; align-items:center; justify-content:center; background:var(--bg-panel-2); border-radius:3px; flex-shrink:0; }
 .tag-chip .x{ color:var(--crimson); cursor:pointer; font-weight:700; }
 .meal-slot-block{ margin-bottom:12px; font-size:13px; }
 .meal-slot-block b{ color:var(--text); }
@@ -254,7 +264,8 @@ form.panel, .panel{
 
 .bracket-section-title{ font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin:22px 0 10px; }
 
-.bracket-wrap{ display:flex; align-items:flex-start; gap:52px; overflow-x:auto; padding-bottom:14px; width:100%; position:relative; }
+
+.bracket-wrap{ display:inline-flex; align-items:flex-start; gap:52px; padding-bottom:14px; position:relative; }
 .bracket-connectors{ position:absolute; left:0; top:0; z-index:0; }
 .bracket-round{ display:flex; flex-direction:column; flex:1 1 0; min-width:150px; max-width:220px; position:relative; z-index:1; }
 .bracket-round-matches{ display:flex; flex-direction:column; gap:18px; }
@@ -276,6 +287,12 @@ form.panel, .panel{
 
 .bracket-round-podium{ min-width:320px; max-width:400px; }
 .podium-wrap{ display:flex; align-items:flex-end; gap:10px; }
+.podium-wrap-big{ gap:18px; max-width:420px; margin:20px auto; }
+.podium-wrap-big .podium-team{ font-size:18px; }
+.podium-wrap-big .podium-bar{ font-size:26px; }
+.podium-wrap-big .podium-1 .podium-bar{ height:140px; }
+.podium-wrap-big .podium-2 .podium-bar{ height:105px; }
+.podium-wrap-big .podium-3 .podium-bar{ height:75px; }
 .podium-step{ flex:1; text-align:center; }
 .podium-team{ font-size:16px; font-weight:700; margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .podium-bar{ display:flex; align-items:flex-end; justify-content:center; padding-bottom:8px; font-weight:800; font-size:20px; color:var(--bg-void); border-radius:4px 4px 0 0; }
@@ -286,10 +303,18 @@ form.panel, .panel{
 .bracket-match-exhibition{ opacity:.7; }
 .bracket-exhibition-label{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
 
+.tourney-toolbar{ display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.tourney-main-row{ display:flex; gap:28px; align-items:flex-start; }
+.tourney-bracket-col{ flex:1; min-width:0; }
+.bracket-scale-wrap{ overflow:hidden; }
+.tourney-title-corner{ flex:0 0 200px; text-align:right; }
+.tourney-title-image{ width:72px; height:72px; object-fit:cover; border-radius:50%; margin-top:10px; border:2px solid var(--gold-dim); }
+
 .score-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:50; }
 .score-modal{ background:var(--bg-panel); border:1px solid var(--gold-dim); padding:24px; width:280px; display:flex; flex-direction:column; gap:12px; }
 .score-modal .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .score-modal input{ width:60px; text-align:center; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:6px; }
+.result-modal{ width:460px; max-width:90vw; }
 
 /* ---- Jídlo: checkboxy ---- */
 .food-checkbox-row{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:14px; }
@@ -405,6 +430,8 @@ textarea.discussion-input{ padding-right:34px; }
   .detail-grid, .detail-grid.no-sidebar{ grid-template-columns:1fr; gap:18px; margin-top:20px; }
   .detail-col-left{ flex-direction:row; flex-wrap:wrap; gap:10px; }
   .ed-header-map{ flex:1 1 100%; width:100%; height:140px; }
+  .tourney-main-row{ flex-direction:column; }
+  .tourney-title-corner{ flex:1 1 auto; text-align:left; }
   .tab-switch{ flex-direction:row; flex-wrap:wrap; flex:1 1 100%; }
   .tab-btn{ flex:1 1 auto; text-align:center; font-size:12px; padding:8px 6px; }
   .attendee-sidebar{ position:static; }
