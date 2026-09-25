@@ -224,6 +224,13 @@ form.panel, .panel{
 .comment-row .txt{ margin-top:4px; color:var(--text); line-height:1.5; }
 .comment-row .row-actions{ display:flex; gap:6px; margin-top:6px; }
 
+.discussion-block{ max-width:640px; margin-top:12px; border:1px solid var(--line); background:var(--bg-panel); }
+.discussion-list{ max-height:440px; overflow-y:auto; padding:4px 16px; }
+.discussion-list .comment-row:first-child{ border-top:none; }
+.discussion-list .empty{ padding:16px 0; }
+.discussion-input-row{ display:flex; gap:8px; align-items:flex-end; padding:14px 16px; border-top:1px solid var(--line); background:var(--bg-panel-2); }
+.discussion-input-row .discussion-input-wrap{ flex:1; }
+
 .attendee-sidebar{ background:var(--bg-panel); border:1px solid var(--line); padding:16px; position:sticky; top:88px; }
 .attendee-stats{ display:flex; flex-direction:column; gap:6px; padding-bottom:14px; margin-bottom:12px; border-bottom:1px solid var(--line); }
 .attendee-stats .row-stat{ display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted); }
@@ -242,7 +249,7 @@ form.panel, .panel{
 /* ---- Turnaj (double elimination) ---- */
 .tourney-select-row{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:18px; }
 .tourney-setup-panel{ background:rgba(255,255,255,0.03); border:1px solid var(--line); padding:16px; margin-bottom:20px; }
-.team-editor{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:14px; margin-top:14px; }
+.team-editor{ display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:14px; margin-top:14px; }
 .team-editor-card{ background:var(--bg-void); border:1px solid var(--line); padding:12px; }
 .team-editor-card input.team-name{ background:transparent; border:none; border-bottom:1px solid var(--line); font-weight:600; font-size:14px; padding:4px 0; }
 .team-editor-card input.team-name:focus{ outline:none; border-color:var(--gold); }
@@ -286,19 +293,19 @@ form.panel, .panel{
 .bracket-champion-banner{ margin-top:20px; padding:18px 24px; background:linear-gradient(90deg, rgba(201,162,75,0.15), transparent); border:1px solid var(--gold); text-align:center; font-family:'Cinzel', serif; font-size:18px; color:var(--gold); }
 
 .bracket-round-podium{ min-width:320px; max-width:400px; }
-.podium-wrap{ display:flex; align-items:flex-end; gap:10px; }
+.podium-wrap{ display:flex; align-items:flex-end; justify-content:center; gap:10px; width:100%; }
 .podium-wrap-big{ gap:18px; max-width:420px; margin:20px auto; }
 .podium-wrap-big .podium-team{ font-size:18px; }
-.podium-wrap-big .podium-1 .aegis-svg{ width:100px; height:120px; }
-.podium-wrap-big .podium-2 .aegis-svg{ width:74px; height:89px; }
-.podium-wrap-big .podium-3 .aegis-svg{ width:60px; height:72px; }
-.podium-step{ flex:1; text-align:center; }
+.podium-wrap-big .podium-1 .aegis-svg{ width:100px; height:112px; }
+.podium-wrap-big .podium-2 .aegis-svg{ width:74px; height:83px; }
+.podium-wrap-big .podium-3 .aegis-svg{ width:60px; height:67px; }
+.podium-step{ flex:0 1 130px; text-align:center; }
 .podium-team{ font-size:16px; font-weight:700; margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .aegis-holder{ display:flex; align-items:flex-end; justify-content:center; }
-.aegis-svg{ width:60px; height:72px; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
-.podium-1 .aegis-svg{ width:72px; height:86px; color:#f0c94e; }
-.podium-2 .aegis-svg{ width:54px; height:65px; color:#c9c9d4; }
-.podium-3 .aegis-svg{ width:46px; height:55px; color:#c9834a; }
+.aegis-svg{ width:60px; height:67px; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
+.podium-1 .aegis-svg{ width:76px; height:85px; color:#f0c94e; }
+.podium-2 .aegis-svg{ width:56px; height:63px; color:#c9c9d4; }
+.podium-3 .aegis-svg{ width:48px; height:54px; color:#c9834a; }
 
 .bracket-match-exhibition{ opacity:.7; }
 .bracket-exhibition-label{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
@@ -317,7 +324,7 @@ form.panel, .panel{
 .score-modal .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .score-modal input{ width:60px; text-align:center; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:6px; }
 .result-modal{ width:460px; max-width:90vw; }
-.team-editor-modal{ width:700px; max-width:92vw; max-height:85vh; overflow-y:auto; }
+.team-editor-modal{ width:920px; max-width:94vw; max-height:85vh; overflow-y:auto; }
 
 /* ---- Jídlo: checkboxy ---- */
 .food-checkbox-row{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:14px; }
@@ -342,7 +349,7 @@ textarea.discussion-input{ min-height:90px; width:100%; }
 }
 .emoji-picker-btn:hover{ background:rgba(255,255,255,0.08); }
 .emoji-picker-panel{
-  position:absolute; bottom:100%; right:0; margin-bottom:6px; z-index:20;
+  position:absolute; bottom:100%; right:0; margin-bottom:6px; z-index:60;
   background:var(--bg-panel); border:1px solid var(--gold-dim); padding:8px;
   display:grid; grid-template-columns:repeat(8, 1fr); gap:4px; width:220px;
   box-shadow:0 4px 16px rgba(0,0,0,0.5);
