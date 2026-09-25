@@ -100,9 +100,25 @@ function setupChatEmojiRow(btnId, panelId, inputId){
   const panel = document.getElementById(panelId);
   if(!btn || !panel) return;
   panel.innerHTML = CHAT_EMOJIS.map(e => `<span data-chat-emoji="${e}">${e}</span>`).join('');
+  panel.style.position = 'fixed';
+
+  function positionPanel(){
+    const rect = btn.getBoundingClientRect();
+    const panelWidth = panel.offsetWidth || 220;
+    let left = rect.right - panelWidth;
+    left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
+    panel.style.left = left + 'px';
+    panel.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+    panel.style.top = 'auto';
+    panel.style.right = 'auto';
+    panel.style.marginBottom = '0';
+  }
+
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    panel.style.display = panel.style.display === 'none' ? 'grid' : 'none';
+    const opening = panel.style.display === 'none';
+    if(opening) positionPanel();
+    panel.style.display = opening ? 'grid' : 'none';
   });
   panel.querySelectorAll('[data-chat-emoji]').forEach(el => {
     el.addEventListener('click', () => {
@@ -115,6 +131,8 @@ function setupChatEmojiRow(btnId, panelId, inputId){
   document.addEventListener('click', (e) => {
     if(!panel.contains(e.target) && e.target !== btn) panel.style.display = 'none';
   });
+  window.addEventListener('resize', () => { if(panel.style.display !== 'none') positionPanel(); });
+  window.addEventListener('scroll', () => { if(panel.style.display !== 'none') positionPanel(); }, true);
 }
 function todayIso(){ return new Date().toISOString().slice(0,10); }
 
@@ -1249,6 +1267,8 @@ function renderComments(ev){
       });
     });
   });
+
+  commentsList.scrollTop = commentsList.scrollHeight;
 }
 
 // ---- Jídlo: zaškrtávací výběr + potvrzení + počty porcí pro admina ----
@@ -1380,6 +1400,8 @@ function renderTabJidlo(ev){
       catch(err){ console.error(err); }
     });
   });
+
+  foodCommentsList.scrollTop = foodCommentsList.scrollHeight;
 
   document.getElementById('btn-add-food-comment').addEventListener('click', async () => {
     if(!currentUser || !currentNick){ showView('ucet'); return; }
@@ -1934,7 +1956,7 @@ function fitBracketToScreen(wrap){
   const naturalHeight = wrap.scrollHeight;
   const availableWidth = container.clientWidth;
   const top = wrap.getBoundingClientRect().top;
-  const availableHeight = Math.max(300, window.innerHeight - top - 40);
+  const availableHeight = Math.max(300, window.innerHeight - top - 70);
   let scale = Math.min(1, availableWidth / naturalWidth, availableHeight / naturalHeight);
   if(scale < 1){
     wrap.style.transformOrigin = 'top left';
