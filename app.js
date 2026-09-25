@@ -714,7 +714,6 @@ function openEventDetail(eventId){
   currentDetailEventId = eventId;
   currentTab = 'prehled';
   currentTournamentId = null;
-  teamEditorOpen = false;
   const ev = events.find(x => x.id === eventId);
   if(!ev) return;
   showView('event');
@@ -1393,7 +1392,6 @@ function renderTabJidlo(ev){
 // ---- Turnaj: samostatná kolekce, propojená s konkrétní akcí přes eventId ----
 let allTournaments = [];
 let currentTournamentId = null;
-let teamEditorOpen = false;
 const TEAM_EMBLEMS = ['🛡️','⚔️','🐺','🦅','🔥','💀','👑','🌙','⭐','🐉','🦁','🍀','🐍','🦂','⚡','🎯'];
 const TEAM_COLORS = ['#e8e3d8','#c9a24b','#8b2635','#2f8f8f','#4a90d9','#9b59b6','#e67e22','#2ecc71','#e84393','#95a5a6'];
 
@@ -1420,27 +1418,30 @@ function renderTurnajPage(){
     const ev = events.find(x => x.id === t.eventId);
     const swissPreview = computeSwissTournament(t);
     box.innerHTML = `
-      <div class="tourney-toolbar" id="tourney-toolbar"></div>
       <div class="tourney-main-row">
         <div class="tourney-bracket-col">
           <div class="bracket-scale-wrap" id="turnaj-detail-body"></div>
         </div>
         <div class="tourney-title-corner">
-          ${ev ? `<div class="status-hint">${escapeHtml(ev.name)}</div>` : ''}
-          <h1 class="headline" style="font-size:22px;">${escapeHtml(t.name)}</h1>
-          ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" class="tourney-title-image">` : ''}
+          <div class="tourney-title-top">
+            ${ev ? `<div class="status-hint">${escapeHtml(ev.name)}</div>` : ''}
+            <h1 class="headline" style="font-size:22px;">${escapeHtml(t.name)}</h1>
+            ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" class="tourney-title-image">` : ''}
+          </div>
+          <div class="tourney-title-result" id="tourney-title-result"></div>
         </div>
       </div>
+      <div class="tourney-corner-actions" id="tourney-corner-actions"></div>
     `;
 
-    const toolbar = document.getElementById('tourney-toolbar');
+    const cornerActions = document.getElementById('tourney-corner-actions');
     if(hasPerm('turnaj')){
       const toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
       toggleBtn.className = 'btn-ghost btn-sm';
-      toggleBtn.textContent = teamEditorOpen ? 'Skrýt úpravu týmů' : 'Upravit týmy';
-      toggleBtn.addEventListener('click', () => { teamEditorOpen = !teamEditorOpen; renderTurnajPage(); });
-      toolbar.appendChild(toggleBtn);
+      toggleBtn.textContent = 'Upravit týmy';
+      toggleBtn.addEventListener('click', () => openTeamEditorModal(t));
+      cornerActions.appendChild(toggleBtn);
 
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
@@ -1452,7 +1453,7 @@ function renderTurnajPage(){
         try{ await deleteDoc(doc(db,'tournaments',t.id)); currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; }
         catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
       });
-      toolbar.appendChild(delBtn);
+      cornerActions.appendChild(delBtn);
     }
     if(swissPreview.placements.length > 0){
       const resultBtn = document.createElement('button');
@@ -1460,11 +1461,10 @@ function renderTurnajPage(){
       resultBtn.className = 'btn-sm';
       resultBtn.textContent = '🏆 Výsledek turnaje';
       resultBtn.addEventListener('click', () => openTournamentResultModal(t, swissPreview));
-      toolbar.appendChild(resultBtn);
+      document.getElementById('tourney-title-result').appendChild(resultBtn);
     }
 
     const bodyWrap = document.getElementById('turnaj-detail-body');
-    if(hasPerm('turnaj') && teamEditorOpen) renderTeamEditor(t, box.querySelector('.tourney-bracket-col'));
 
     const swiss = computeSwissTournament(t);
     renderSwissBody(t, swiss, bodyWrap, false);
@@ -1580,7 +1580,7 @@ function isMemberElsewhere(teams, currentIdx, nick){
   return teams.some((tm,i) => i!==currentIdx && tm.members.includes(nick));
 }
 
-async function renderTeamEditor(t, container){
+async function renderTeamEditor(t, container, onSaved){
   const editorWrap = document.createElement('div');
   editorWrap.className = 'tourney-setup-panel';
   editorWrap.innerHTML = `<div class="empty">Načítám přihlášené na akci...</div>`;
@@ -1720,8 +1720,7 @@ async function renderTeamEditor(t, container){
   document.getElementById('btn-save-teams').addEventListener('click', async () => {
     try{
       await updateDoc(doc(db,'tournaments',t.id), { teams: workingTeams });
-      teamEditorOpen = false;
-      renderTurnajPage();
+      if(onSaved) onSaved(); else renderTurnajPage();
     }catch(err){ alert('Uložení týmů se nepovedlo.'); console.error(err); }
   });
 }
@@ -1861,15 +1860,22 @@ function renderSwissBody(t, swiss, container, compact){
   });
 }
 
+function aegisSvg(){
+  return `<svg viewBox="0 0 60 72" class="aegis-svg" xmlns="http://www.w3.org/2000/svg">
+    <path d="M30 2 C45 8 55 10 55 10 L55 34 C55 55 42 66 30 70 C18 66 5 55 5 34 L5 10 C5 10 15 8 30 2 Z" fill="currentColor" stroke="#1a1a1a" stroke-width="2"/>
+    <path d="M30 20 L38 34 L30 50 L22 34 Z" fill="#1a1a1a" opacity="0.35"/>
+  </svg>`;
+}
+
 function buildPodiumHtml(t, swiss, big){
   const p1 = swiss.placements.find(p=>p.rank===1);
   const p2 = swiss.placements.find(p=>p.rank===2);
   const p3 = swiss.placements.find(p=>p.rank===3);
   const rest = swiss.placements.filter(p=>p.rank>3);
   let html = `<div class="podium-wrap ${big?'podium-wrap-big':''}">`;
-  if(p2) html += `<div class="podium-step podium-2"><div class="podium-team">🥈 ${escapeHtml(teamName(t,p2.team))}</div><div class="podium-bar">2</div></div>`;
-  if(p1) html += `<div class="podium-step podium-1"><div class="podium-team">🥇 ${escapeHtml(teamName(t,p1.team))}</div><div class="podium-bar">1</div></div>`;
-  if(p3) html += `<div class="podium-step podium-3"><div class="podium-team">🥉 ${escapeHtml(teamName(t,p3.team))}</div><div class="podium-bar">3</div></div>`;
+  if(p2) html += `<div class="podium-step podium-2"><div class="podium-team">${escapeHtml(teamName(t,p2.team))}</div><div class="aegis-holder">${aegisSvg()}</div></div>`;
+  if(p1) html += `<div class="podium-step podium-1"><div class="podium-team">${escapeHtml(teamName(t,p1.team))}</div><div class="aegis-holder">${aegisSvg()}</div></div>`;
+  if(p3) html += `<div class="podium-step podium-3"><div class="podium-team">${escapeHtml(teamName(t,p3.team))}</div><div class="aegis-holder">${aegisSvg()}</div></div>`;
   html += `</div>`;
   if(rest.length > 0){
     html += rest.map(p => {
@@ -1878,6 +1884,23 @@ function buildPodiumHtml(t, swiss, big){
     }).join('');
   }
   return html;
+}
+
+function openTeamEditorModal(t){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'score-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="score-modal result-modal team-editor-modal">
+      <div style="font-size:16px; font-weight:600;">Upravit týmy — ${escapeHtml(t.name)}</div>
+      <div id="team-editor-modal-body"></div>
+      <button type="button" class="btn-ghost" id="team-editor-modal-close" style="align-self:flex-start;">Zavřít</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = () => { backdrop.remove(); renderTurnajPage(); };
+  document.getElementById('team-editor-modal-close').addEventListener('click', close);
+  backdrop.addEventListener('click', (e) => { if(e.target === backdrop) close(); });
+  renderTeamEditor(t, document.getElementById('team-editor-modal-body'), close);
 }
 
 function openTournamentResultModal(t, swiss){
