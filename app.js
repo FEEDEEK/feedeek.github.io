@@ -1418,6 +1418,7 @@ function renderTabJidlo(ev){
 // ---- Turnaj: samostatná kolekce, propojená s konkrétní akcí přes eventId ----
 let allTournaments = [];
 let currentTournamentId = null;
+let turnajDrawToolOpen = false;
 const TEAM_EMBLEMS = ['🛡️','⚔️','🐺','🦅','🔥','💀','👑','🌙','⭐','🐉','🦁','🍀','🐍','🦂','⚡','🎯'];
 const TEAM_COLORS = ['#e8e3d8','#c9a24b','#8b2635','#2f8f8f','#4a90d9','#9b59b6','#e67e22','#2ecc71','#e84393','#95a5a6'];
 
@@ -1437,6 +1438,11 @@ function teamName(t, idx){ return t.teams[idx] ? t.teams[idx].name : `Tým ${idx
 function renderTurnajPage(){
   const box = document.getElementById('view-turnaj-content');
   if(!box) return;
+
+  if(turnajDrawToolOpen){
+    renderTeamDrawTool(box);
+    return;
+  }
 
   if(currentTournamentId){
     const t = allTournaments.find(x => x.id === currentTournamentId);
@@ -1498,10 +1504,14 @@ function renderTurnajPage(){
   }
 
   // seznam turnajů
-  let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaj</h1></div>`;
+  let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaj</h1></div><div style="display:flex; gap:10px;">`;
+  html += hasPerm('turnaj') ? `<button type="button" class="btn-ghost" id="btn-open-draw-tool">🎰 Losovačka týmů</button>` : '';
   html += hasPerm('turnaj') ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
-  html += `</div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
+  html += `</div></div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
   box.innerHTML = html;
+
+  const drawToolBtn = document.getElementById('btn-open-draw-tool');
+  if(drawToolBtn) drawToolBtn.addEventListener('click', () => { turnajDrawToolOpen = true; renderTurnajPage(); });
 
   const newBtn = document.getElementById('btn-new-tourney-page');
   if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm());
@@ -1601,6 +1611,1004 @@ function openNewTournamentForm(existing){
     }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
   });
 }
+
+// ==================== LOSOVAČKA TÝMŮ (výherní automat) ====================
+let tbPlayers = [];
+let tbSoundEnabled = true;
+let tbAudioCtx = null;
+let tbDraftInProgress = false;
+let tbEventQueue = Promise.resolve();
+let tbPendingEvents = [];
+let tbBatchTimer = null;
+const TB_BATCH_WINDOW = 2000;
+let tbSelectedVoiceURI = '';
+let tbCurrentDraft = null;
+let tbSpinBusy = false;
+let tbDraftCancelled = false;
+const TB_REEL_ITEM_H = 58;
+
+const TB_SHOT_ICON = `<svg class="tb-icon-inline" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 4 L17 4 L14.5 17 Q10 19 5.5 17 Z" fill="#f2a71b" stroke="#1a1a1a" stroke-width="1.6"/>
+    <rect x="7" y="6" width="1.6" height="8" fill="#fff" opacity="0.7"/>
+    <rect x="10.5" y="6" width="1.6" height="8" fill="#fff" opacity="0.5"/>
+</svg>`;
+const TB_JOINT_ICON = `<svg class="tb-icon-inline" viewBox="0 0 28 10" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 4 Q0.3 5 2 6 L20 6 Q22 5 20 4 Z" fill="#f2efe6" stroke="#8a8a8a" stroke-width="0.5"/>
+    <ellipse cx="8" cy="5" rx="2.2" ry="1" fill="#d9d5c8" opacity="0.5"/>
+    <ellipse cx="14" cy="5" rx="2.5" ry="1" fill="#dcd8cc" opacity="0.5"/>
+    <ellipse cx="23" cy="5" rx="3.4" ry="2.6" fill="#ff6a3d"/>
+    <ellipse cx="23" cy="5" rx="5" ry="4" fill="#ff6a3d" opacity="0.3"/>
+</svg>`;
+
+function tbCalculateCurrentSkill(player) {
+    let skill = player.baseSkill;
+    skill *= Math.pow(0.94, player.beers);
+    skill *= Math.pow(0.91, player.shots);
+    skill *= Math.pow(0.85, player.joints);
+    return Math.max(5, Math.round(skill));
+}
+
+async function tbSaveSkill(name, skill){
+  try{ await setDoc(doc(db,'playerSkills', name.toLowerCase()), { skill, name }); }catch(err){ console.error(err); }
+}
+async function tbLoadSkill(name){
+  try{
+    const snap = await getDoc(doc(db,'playerSkills', name.toLowerCase()));
+    return snap.exists() ? snap.data().skill : null;
+  }catch(err){ return null; }
+}
+
+function tbAddPlayerObj(name, baseSkill){
+  if(tbPlayers.some(p => p.name.toLowerCase() === name.toLowerCase())){ return; }
+  tbPlayers.push({ id: Date.now()+Math.random(), name, baseSkill, beers:0, shots:0, joints:0 });
+  tbSaveSkill(name, baseSkill);
+  tbRenderPlayers();
+}
+
+function tbRemovePlayer(id) {
+    tbPlayers = tbPlayers.filter(p => p.id !== id);
+    tbRenderPlayers();
+}
+
+const tbBeerUpMsgs = [
+    "{name} si dává pivo a slibuje, že tohle bylo fakt poslední",
+    "{name} loknul piva, najednou vidí dva monitory",
+    "Pivo pro {name}! Skill dolů, nálada nahoru",
+    "{name} si přihnul, mířidla se rozostřují",
+    "{name} si dává další rundu, gg skill",
+    "{name} tvrdí, že pivo mu naopak pomáhá. Data říkají něco jiného",
+    "{name} si dal loka a hned je z něj profesionál... na kecání",
+    "Level piva u {name} +1, level hry -5",
+    "{name} má žízeň jak velbloud, skill jak šnek",
+    "{name} slaví gólovou akci pivem, i když ještě nepadl žádný gól"
+];
+const tbBeerDownMsgs = [
+    "{name} vystřízlivěl (aspoň trochu)",
+    "{name} to pivo raději vylil, moudré rozhodnutí",
+    "{name} našel v sobě sílu říct dost",
+    "{name} si to rozmyslel, forma se vrací",
+    "{name} vyměnil pivo za vodu, respekt",
+    "{name} se rozhodl hrát fér a bez piva",
+    "{name} zpytuje svědomí a odkládá sklenici",
+    "{name} sype popel na hlavu a střízliví"
+];
+const tbShotUpMsgs = [
+    "{name} si dává panáka, ruce se třesou",
+    "Panák pro {name}! Reakce klesají jak kámen",
+    "{name} to srazil na ex, teď to sráží i skill",
+    "{name} si dal frťana na kuráž, kuráž našel, skill ztratil",
+    "{name} má oči jak návarka, po panáku",
+    "Panák číslo další, kdo to u {name} ještě počítá",
+    "{name} zvládl panáka bez grimasy, respekt, skill ale klesá",
+    "{name} si připil na výhru, která ještě nepřišla",
+    "{name} cítí, jak mu prsty samy míří vedle myši",
+    "{name} slaví další frťana, tým pláče"
+];
+const tbShotDownMsgs = [
+    "{name} nechal panáka na stole, moudrost vítězí",
+    "{name} panáka radši vylil zpátky do lahve",
+    "{name} se rozhodl přibrzdit",
+    "{name} si řekl dost, forma se vrací",
+    "{name} panáka věnoval kamarádovi",
+    "{name} zvolil cestu střízlivosti",
+    "{name} nechal sklenku plnou, tým děkuje",
+    "{name} se semkl a nedal si další"
+];
+const tbJointUpMsgs = [
+    "{name} se zapálil! Handicap roste",
+    "{name} je v cloudu devět, real-life bohužel ne",
+    "{name} si zapálil, teď hraje na city z jiné galaxie",
+    "{name} má najednou filozofické myšlenky místo callů",
+    "{name} se dokonale zrelaxoval, mapu už tolik nevidí",
+    "{name} plave v pohodě, tým plave v problémech",
+    "{name} si zapálil a zapomněl, že hraje ranked",
+    "{name} je chill, tým je v podzemí",
+    "{name} objevil vesmír, ztratil mapu",
+    "{name} se nadýchl inspirace, ztratil koordinaci"
+];
+const tbJointDownMsgs = [
+    "{name} to uhasil, jde zpátky do formy",
+    "{name} si to rozmyslel a joint uhasil",
+    "{name} se probral z cloudu",
+    "{name} se vrací zpátky na zem",
+    "{name} joint raději věnoval sousedům",
+    "{name} volí čistou hlavu",
+    "{name} uhasil a je zase při smyslech",
+    "{name} se semkl, forma stoupá"
+];
+const tbBeerCollectiveMsgs = [
+    "{names} si dávají rundu piva, tým se boří rychleji než síť",
+    "{names} zvedají čepované, formy padají jak podzimní listí",
+    "{names} slaví další kolo piva, kapitán pláče",
+    "{names} si přiťukli, skilly kolektivně klesají",
+    "{names} objednali rundu, tahle hra už nebude fér",
+    "{names} mají žízeň jako poušť, hra bez nich by šla líp",
+    "{names} pijí na kuráž, kuráž je, skill není",
+    "{names} se semkli u dalšího piva, tým se pomalu rozpadá"
+];
+const tbShotCollectiveMsgs = [
+    "{names} si dávají rundu panáků, reakce jdou spát",
+    "{names} to sráží na ex, tým sráží skóre",
+    "{names} připíjí na vítězství, které se pomalu vzdaluje",
+    "{names} mají po panáku oči jak návarky",
+    "{names} slaví frťanem, protivníci se smějí",
+    "{names} si dali frťana na kuráž, kuráž je, mířidla nejsou",
+    "{names} zvládli panáka bez grimasy, formu ne",
+    "{names} si připíjí, tým si připlácí"
+];
+const tbJointCollectiveMsgs = [
+    "{names} se zapálili společně, handicap roste jako lavina",
+    "{names} jsou v cloudu devět, real-life bohužel ne",
+    "{names} si zapálili a zapomněli, že hrají ranked",
+    "{names} plavou v pohodě, tým plave v problémech",
+    "{names} objevili vesmír, ztratili mapu",
+    "{names} jsou naprosto chill, tým je naprosto v podzemí",
+    "{names} se nadechli inspirace, ztratili koordinaci",
+    "{names} mají najednou filozofické myšlenky místo callů"
+];
+function tbJoinNamesCz(names) {
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return names[0] + ' a ' + names[1];
+    return names.slice(0, -1).join(', ') + ' a ' + names[names.length - 1];
+}
+function tbPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function tbShuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+function tbSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+function tbEnsureAudio() {
+    if (!tbAudioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) tbAudioCtx = new Ctx();
+    }
+}
+function tbPlayBeep(freq, dur, type) {
+    if (!tbSoundEnabled) return;
+    try {
+        tbEnsureAudio();
+        if (!tbAudioCtx) return;
+        const osc = tbAudioCtx.createOscillator();
+        const gain = tbAudioCtx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.14, tbAudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, tbAudioCtx.currentTime + dur);
+        osc.connect(gain); gain.connect(tbAudioCtx.destination);
+        osc.start(); osc.stop(tbAudioCtx.currentTime + dur);
+    } catch (e) { /* ticho, když audio nejde */ }
+}
+function tbSpeak(text) {
+    if (!tbSoundEnabled) return;
+    try {
+        if (!('speechSynthesis' in window)) return;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 1.0; utter.pitch = 1.0;
+        const voices = speechSynthesis.getVoices();
+        let voice = null;
+        if (tbSelectedVoiceURI) voice = voices.find(v => v.voiceURI === tbSelectedVoiceURI);
+        if (!voice) voice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('cs'));
+        if (voice) { utter.voice = voice; utter.lang = voice.lang; } else { utter.lang = 'cs-CZ'; }
+        speechSynthesis.speak(utter);
+    } catch (e) { /* ticho */ }
+}
+function tbPopulateVoiceList() {
+    try {
+        const select = document.getElementById('tbVoiceSelect');
+        if (!select || !('speechSynthesis' in window)) return;
+        const voices = speechSynthesis.getVoices();
+        if (!voices.length) return;
+        const current = select.value;
+        select.innerHTML = '<option value="">Výchozí hlas</option>';
+        const sorted = [...voices].sort((a, b) => {
+            const aCs = a.lang && a.lang.toLowerCase().startsWith('cs') ? 0 : 1;
+            const bCs = b.lang && b.lang.toLowerCase().startsWith('cs') ? 0 : 1;
+            if (aCs !== bCs) return aCs - bCs;
+            return a.name.localeCompare(b.name);
+        });
+        sorted.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.voiceURI;
+            opt.textContent = `${v.name} (${v.lang})`;
+            select.appendChild(opt);
+        });
+        if (current) select.value = current;
+    } catch (e) { /* ticho */ }
+}
+if ('speechSynthesis' in window) {
+    speechSynthesis.onvoiceschanged = tbPopulateVoiceList;
+}
+
+function tbPlayGulpSound() {
+    if (!tbSoundEnabled) return;
+    try {
+        tbEnsureAudio();
+        if (!tbAudioCtx) return;
+        const t0 = tbAudioCtx.currentTime;
+        const osc = tbAudioCtx.createOscillator();
+        const gain = tbAudioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(190, t0);
+        osc.frequency.exponentialRampToValueAtTime(85, t0 + 0.16);
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.22, t0 + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+        osc.connect(gain); gain.connect(tbAudioCtx.destination);
+        osc.start(t0); osc.stop(t0 + 0.22);
+    } catch (e) { /* ticho */ }
+}
+function tbPlayClink() {
+    if (!tbSoundEnabled) return;
+    try {
+        tbEnsureAudio();
+        if (!tbAudioCtx) return;
+        const t0 = tbAudioCtx.currentTime;
+        const osc = tbAudioCtx.createOscillator();
+        const gain = tbAudioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1500, t0);
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.15, t0 + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.25);
+        osc.connect(gain); gain.connect(tbAudioCtx.destination);
+        osc.start(t0); osc.stop(t0 + 0.27);
+    } catch (e) { /* ticho */ }
+}
+function tbPlaySizzle(durationSec) {
+    if (!tbSoundEnabled) return;
+    try {
+        tbEnsureAudio();
+        if (!tbAudioCtx) return;
+        const bufferSize = Math.floor(tbAudioCtx.sampleRate * durationSec);
+        const buffer = tbAudioCtx.createBuffer(1, bufferSize, tbAudioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) { data[i] = (Math.random() * 2 - 1) * 0.6; }
+        const noise = tbAudioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = tbAudioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 3200;
+        filter.Q.value = 0.6;
+        const gain = tbAudioCtx.createGain();
+        const t0 = tbAudioCtx.currentTime;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.045, t0 + 0.3);
+        gain.gain.setValueAtTime(0.045, t0 + Math.max(0.3, durationSec - 0.4));
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
+        noise.connect(filter); filter.connect(gain); gain.connect(tbAudioCtx.destination);
+        noise.start(t0); noise.stop(t0 + durationSec);
+    } catch (e) { /* ticho */ }
+}
+async function tbDrinkWithGulps(totalMs, gulps) {
+    const interval = totalMs / gulps;
+    for (let i = 0; i < gulps; i++) {
+        tbPlayGulpSound();
+        await tbSleep(interval);
+    }
+}
+function tbPlayReelTick() {
+    if (!tbSoundEnabled) return;
+    try {
+        tbEnsureAudio();
+        if (!tbAudioCtx) return;
+        const t0 = tbAudioCtx.currentTime;
+        const osc = tbAudioCtx.createOscillator();
+        const gain = tbAudioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = 480 + Math.random() * 260;
+        gain.gain.setValueAtTime(0.045, t0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.035);
+        osc.connect(gain); gain.connect(tbAudioCtx.destination);
+        osc.start(t0); osc.stop(t0 + 0.04);
+    } catch (e) { /* ticho */ }
+}
+function tbPlayLandSound(pitch) {
+    tbPlayBeep(pitch, 0.14, 'triangle');
+    setTimeout(() => tbPlayBeep(pitch * 1.5, 0.12, 'triangle'), 90);
+}
+
+function tbBeerSVG() {
+    return `
+    <svg class="tb-event-svg" viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="tbBeerGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffd873"/>
+                <stop offset="100%" stop-color="#e29b1f"/>
+            </linearGradient>
+            <clipPath id="tbBeerClip"><rect x="20" y="34" width="64" height="92" rx="8"/></clipPath>
+        </defs>
+        <rect x="18" y="32" width="68" height="96" rx="10" fill="#0c1327" stroke="#2b2b2b" stroke-width="3"/>
+        <path d="M86 52 h16 a14 14 0 0 1 0 48 h-16" fill="none" stroke="#2b2b2b" stroke-width="4"/>
+        <g clip-path="url(#tbBeerClip)">
+            <rect class="tb-beer-liquid" x="20" y="46" width="64" height="80" fill="url(#tbBeerGrad)"/>
+            <rect x="34" y="46" width="4" height="80" fill="#fff2c2" opacity="0.35"/>
+            <rect x="54" y="46" width="3" height="80" fill="#fff2c2" opacity="0.25"/>
+            <rect x="68" y="46" width="4" height="80" fill="#fff2c2" opacity="0.3"/>
+            <path class="tb-beer-foam" d="M20 40 Q26 24 34 38 Q42 20 52 38 Q60 22 68 38 Q76 22 84 38 L84 50 L20 50 Z" fill="#fff8ea"/>
+        </g>
+    </svg>`;
+}
+function tbBeerSVGCalm() {
+    return `
+    <svg class="tb-event-svg" viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
+        <rect x="18" y="32" width="68" height="96" rx="10" fill="#0c1327" stroke="#0fbc7c" stroke-width="3"/>
+        <path d="M86 52 h16 a14 14 0 0 1 0 48 h-16" fill="none" stroke="#0fbc7c" stroke-width="4"/>
+        <rect x="20" y="100" width="64" height="26" fill="#e29b1f" opacity="0.5"/>
+        <path d="M20 40 Q26 24 34 38 Q42 20 52 38 Q60 22 68 38 Q76 22 84 38 L84 50 L20 50 Z" fill="#fff8ea" opacity="0.5"/>
+    </svg>`;
+}
+function tbShotSVG() {
+    return `
+    <svg class="tb-event-svg tb-shot-svg-tip" viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg">
+        <defs><clipPath id="tbShotClip2"><path d="M20 28 L100 28 L91 98 Q60 108 29 98 Z"/></clipPath></defs>
+        <path d="M20 28 L100 28 L91 98 Q60 108 29 98 Z" fill="none" stroke="#111" stroke-width="5"/>
+        <g clip-path="url(#tbShotClip2)">
+            <rect class="tb-shot-liquid2" x="20" y="30" width="80" height="70" fill="#f2a71b"/>
+        </g>
+        <rect x="38" y="34" width="6" height="55" fill="#fff" opacity="0.7"/>
+        <rect x="54" y="34" width="6" height="55" fill="#fff" opacity="0.5"/>
+    </svg>`;
+}
+function tbShotSVGCalm() {
+    return `
+    <svg class="tb-event-svg" viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 28 L100 28 L91 98 Q60 108 29 98 Z" fill="none" stroke="#0fbc7c" stroke-width="5"/>
+    </svg>`;
+}
+function tbJointSVG() {
+    return `
+    <svg class="tb-event-svg" viewBox="0 0 220 60" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="tbPaperGrad3" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#fbf8ee"/>
+                <stop offset="50%" stop-color="#e9e3d0"/>
+                <stop offset="100%" stop-color="#d6cfb8"/>
+            </linearGradient>
+            <radialGradient id="tbEmberGrad3" cx="35%" cy="35%" r="65%">
+                <stop offset="0%" stop-color="#fff6d0"/>
+                <stop offset="30%" stop-color="#ffb347"/>
+                <stop offset="65%" stop-color="#e2571c"/>
+                <stop offset="100%" stop-color="#7a2408"/>
+            </radialGradient>
+        </defs>
+        <g class="tb-joint-body-group3">
+            <path d="M14 30 Q4 30 14 23 L14 37 Q4 30 14 30 Z" fill="#efe9d8" stroke="#a89f86" stroke-width="1"/>
+            <rect x="14" y="22" width="160" height="16" rx="8" fill="url(#tbPaperGrad3)" stroke="#a89f86" stroke-width="1.2"/>
+            <line x1="45" y1="23.5" x2="45" y2="36.5" stroke="#bdb495" stroke-width="0.8" opacity="0.6"/>
+            <line x1="80" y1="23.5" x2="80" y2="36.5" stroke="#bdb495" stroke-width="0.8" opacity="0.6"/>
+            <line x1="115" y1="23.5" x2="115" y2="36.5" stroke="#bdb495" stroke-width="0.8" opacity="0.6"/>
+            <line x1="150" y1="23.5" x2="150" y2="36.5" stroke="#bdb495" stroke-width="0.8" opacity="0.6"/>
+        </g>
+        <g class="tb-joint-ember-group3">
+            <ellipse class="tb-joint-glow3" cx="182" cy="30" rx="19" ry="17" fill="#ff8a3d" opacity="0.28"/>
+            <circle cx="182" cy="30" r="11" fill="#3a2a20"/>
+            <circle cx="182" cy="30" r="9" fill="url(#tbEmberGrad3)"/>
+            <circle class="tb-joint-flicker3" cx="182" cy="30" r="5" fill="#fff2c2" opacity="0.7"/>
+            <circle class="tb-ash-fleck tb-f1" cx="188" cy="42" r="1.4" fill="#8a8a8a"/>
+            <circle class="tb-ash-fleck tb-f2" cx="179" cy="44" r="1" fill="#8a8a8a"/>
+            <g class="tb-joint-smoke2">
+                <path class="tb-smoke-path tb-s1" d="M182 15 q-5 -10 3 -18 q6 -7 -1 -16" fill="none" stroke="#d7dde5" stroke-width="2.4" stroke-linecap="round"/>
+                <path class="tb-smoke-path tb-s2" d="M190 17 q6 -9 -3 -17 q-6 -7 2 -15" fill="none" stroke="#d7dde5" stroke-width="1.8" stroke-linecap="round"/>
+            </g>
+        </g>
+    </svg>`;
+}
+function tbJointSVGCalm() {
+    return `
+    <svg class="tb-event-svg" viewBox="0 0 220 60" xmlns="http://www.w3.org/2000/svg">
+        <rect x="14" y="22" width="160" height="16" rx="8" fill="#efe9d8" stroke="#0fbc7c" stroke-width="1.2"/>
+        <ellipse cx="182" cy="30" rx="6" ry="5" fill="#a0aec0"/>
+    </svg>`;
+}
+
+function tbBeerModalHTML(name, msg) { return `<div class="tb-event-title">🍺 ${escapeHtml(name)} si dává pivo!</div>${tbBeerSVG()}<div class="tb-event-message tb-show" id="tbEventMessage">${escapeHtml(msg)}</div>`; }
+function tbBeerModalCalmHTML(name, msg) { return `<div class="tb-event-title">🍺 ${escapeHtml(name)} slaví střízlivost!</div>${tbBeerSVGCalm()}<div class="tb-event-message tb-show" id="tbEventMessage">${escapeHtml(msg)}</div>`; }
+function tbShotModalHTML(name, msg) { return `<div class="tb-event-title">🥃 ${escapeHtml(name)} si dává panáka!</div>${tbShotSVG()}<div class="tb-event-message tb-show" id="tbEventMessage">${escapeHtml(msg)}</div>`; }
+function tbShotModalCalmHTML(name, msg) { return `<div class="tb-event-title">🥃 ${escapeHtml(name)} nechal panáka být!</div>${tbShotSVGCalm()}<div class="tb-event-message tb-show" id="tbEventMessage">${escapeHtml(msg)}</div>`; }
+function tbJointModalHTML(name, msg) { return `<div class="tb-event-title">🍁 ${escapeHtml(name)} si zapaluje jointa!</div>${tbJointSVG()}<div class="tb-event-message tb-show" id="tbEventMessage">${escapeHtml(msg)}</div>`; }
+function tbJointModalCalmHTML(name, msg) { return `<div class="tb-event-title">🍁 ${escapeHtml(name)} to uhasil!</div>${tbJointSVGCalm()}<div class="tb-event-message tb-show" id="tbEventMessage">${escapeHtml(msg)}</div>`; }
+
+function tbQueueSubstanceEvent(type, player, before, after, amount) {
+    if (tbDraftInProgress) return;
+    tbPendingEvents.push({ type, player, before, after, amount });
+    if (tbBatchTimer) clearTimeout(tbBatchTimer);
+    tbBatchTimer = setTimeout(tbFlushBatch, TB_BATCH_WINDOW);
+}
+
+function tbFlushBatch() {
+    tbBatchTimer = null;
+    const events = tbPendingEvents;
+    tbPendingEvents = [];
+    if (events.length === 0) return;
+    tbEventQueue = tbEventQueue.then(async () => {
+        if (events.length === 1) {
+            await tbPlaySingleSubstanceEvent(events[0]);
+        } else {
+            await tbPlayBatchEvent(events);
+        }
+    });
+}
+
+async function tbPlayBatchEvent(events) {
+    const overlay = document.getElementById('tbEventOverlay');
+    const modal = document.getElementById('tbEventModal');
+    if(!overlay || !modal) return;
+
+    const counts = {};
+    events.forEach(e => counts[e.type] = (counts[e.type] || 0) + 1);
+    let domType = events[0].type, domCount = 0;
+    for (const t in counts) { if (counts[t] > domCount) { domCount = counts[t]; domType = t; } }
+
+    let svgHTML, animDuration, titleWord, collectiveMsgs;
+    if (domType === 'beers') { svgHTML = tbBeerSVG(); animDuration = 2600; titleWord = '🍺 Skupinová runda piva!'; collectiveMsgs = tbBeerCollectiveMsgs; }
+    else if (domType === 'shots') { svgHTML = tbShotSVG(); animDuration = 1300; titleWord = '🥃 Skupinová runda panáků!'; collectiveMsgs = tbShotCollectiveMsgs; }
+    else { svgHTML = tbJointSVG(); animDuration = 3400; titleWord = '🍁 Skupinové zapalování!'; collectiveMsgs = tbJointCollectiveMsgs; }
+
+    const uniqueNames = [...new Set(events.map(e => e.player.name))];
+    const msg = tbPick(collectiveMsgs).replace('{names}', tbJoinNamesCz(uniqueNames));
+
+    modal.innerHTML = `<div class="tb-event-title">${titleWord}</div>${svgHTML}<div class="tb-event-message tb-show" id="tbEventMessage">${escapeHtml(msg)}</div>`;
+    overlay.classList.add('tb-show');
+    tbSpeak(msg);
+
+    if (domType === 'beers') {
+        await tbDrinkWithGulps(animDuration, 5);
+    } else if (domType === 'shots') {
+        tbPlayClink();
+        await tbSleep(250);
+        tbPlayGulpSound();
+        await tbSleep(animDuration - 250);
+    } else {
+        tbPlaySizzle(animDuration / 1000);
+        await tbSleep(animDuration);
+    }
+    await tbSleep(700);
+
+    overlay.classList.remove('tb-show');
+    await tbSleep(320);
+}
+
+async function tbPlaySingleSubstanceEvent(ev) {
+    const { type, player, amount } = ev;
+    const overlay = document.getElementById('tbEventOverlay');
+    const modal = document.getElementById('tbEventModal');
+    if(!overlay || !modal) return;
+    const up = amount > 0;
+    let animDuration, msgPool;
+
+    if (type === 'beers') { animDuration = up ? 2600 : 500; msgPool = up ? tbBeerUpMsgs : tbBeerDownMsgs; }
+    else if (type === 'shots') { animDuration = up ? 1300 : 500; msgPool = up ? tbShotUpMsgs : tbShotDownMsgs; }
+    else { animDuration = up ? 3400 : 500; msgPool = up ? tbJointUpMsgs : tbJointDownMsgs; }
+
+    const msg = tbPick(msgPool).replace('{name}', player.name);
+    let html;
+    if (type === 'beers') html = up ? tbBeerModalHTML(player.name, msg) : tbBeerModalCalmHTML(player.name, msg);
+    else if (type === 'shots') html = up ? tbShotModalHTML(player.name, msg) : tbShotModalCalmHTML(player.name, msg);
+    else html = up ? tbJointModalHTML(player.name, msg) : tbJointModalCalmHTML(player.name, msg);
+
+    modal.innerHTML = html;
+    overlay.classList.add('tb-show');
+    tbSpeak(msg);
+
+    if (up && type === 'beers') {
+        await tbDrinkWithGulps(animDuration, 5);
+    } else if (up && type === 'shots') {
+        tbPlayClink();
+        await tbSleep(250);
+        tbPlayGulpSound();
+        await tbSleep(animDuration - 250);
+    } else if (up && type === 'joints') {
+        tbPlaySizzle(animDuration / 1000);
+        await tbSleep(animDuration);
+    } else {
+        await tbSleep(animDuration);
+    }
+    await tbSleep(700);
+
+    overlay.classList.remove('tb-show');
+    await tbSleep(320);
+}
+
+function tbUpdateSubstance(id, type, amount) {
+    const player = tbPlayers.find(p => p.id === id);
+    if (!player) return;
+    const before = tbCalculateCurrentSkill(player);
+    player[type] = Math.max(0, player[type] + amount);
+    const after = tbCalculateCurrentSkill(player);
+    tbRenderPlayers();
+
+    if (before !== after) {
+        tbQueueSubstanceEvent(type, player, before, after, amount);
+    }
+
+    if (document.querySelectorAll('#tbTeamsResult .tb-team-card').length > 0) {
+        tbRecalculateExistingTeams();
+    }
+}
+
+function tbRecalculateExistingTeams() {
+    const teamsDiv = document.getElementById('tbTeamsResult');
+    if(!teamsDiv) return;
+    const teamCards = teamsDiv.querySelectorAll('.tb-team-card');
+
+    teamCards.forEach(card => {
+        const teamHeader = card.querySelector('.tb-team-header');
+        const teamId = teamHeader.firstElementChild.innerText;
+        const playerRows = card.querySelectorAll('.tb-team-player');
+
+        let totalCurrentSkill = 0;
+        let totalBaseSkill = 0;
+
+        playerRows.forEach(row => {
+            const playerName = row.firstElementChild.innerText.replace(/^(👑|•)\s*/, '').trim();
+            const player = tbPlayers.find(p => p.name === playerName);
+            if (player) {
+                const current = tbCalculateCurrentSkill(player);
+                totalCurrentSkill += current;
+                totalBaseSkill += player.baseSkill;
+                const cell = row.querySelector('.tb-form-cell');
+                if (cell) {
+                    cell.innerHTML = `Forma: ${current} (🍺${player.beers} ${TB_SHOT_ICON}${player.shots} ${TB_JOINT_ICON}${player.joints})`;
+                }
+            }
+        });
+
+        let teamHandicap = totalBaseSkill - totalCurrentSkill;
+
+        teamHeader.innerHTML = `
+            <span>${escapeHtml(teamId)}</span>
+            <span style="font-size: 13px; color: #ff4d4d;">Handicap týmu: -${teamHandicap} b.</span>
+            <span>Celkový skill: ${totalCurrentSkill}</span>
+        `;
+    });
+}
+
+function tbRenderPlayers() {
+    const listDiv = document.getElementById('tbPlayersList');
+    if(!listDiv) return;
+    listDiv.innerHTML = '';
+    tbPlayers.forEach(p => {
+        const currentSkill = tbCalculateCurrentSkill(p);
+        listDiv.innerHTML += `
+            <div class="tb-player-item">
+                <div class="tb-player-info">
+                    <div class="tb-player-name">${escapeHtml(p.name)} <button type="button" class="tb-remove-btn" data-tb-remove="${p.id}">❌</button></div>
+                    <div class="tb-player-stats">Aktuální Skill: <strong>${currentSkill}</strong> / Základ: ${p.baseSkill}</div>
+                </div>
+                <div class="tb-substance-controls">
+                    <span class="tb-sub-count">🍺 ${p.beers}</span>
+                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|beers|1">+</button>
+                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|beers|-1">-</button>
+                    <span class="tb-sub-count">${TB_SHOT_ICON} ${p.shots}</span>
+                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|shots|1">+</button>
+                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|shots|-1">-</button>
+                    <span class="tb-sub-count">${TB_JOINT_ICON} ${p.joints}</span>
+                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|joints|1">+</button>
+                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|joints|-1">-</button>
+                </div>
+            </div>`;
+    });
+    listDiv.querySelectorAll('[data-tb-remove]').forEach(btn => {
+        btn.addEventListener('click', () => tbRemovePlayer(parseFloat(btn.dataset.tbRemove)));
+    });
+    listDiv.querySelectorAll('[data-tb-sub]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const [idStr, type, amountStr] = btn.dataset.tbSub.split('|');
+            tbUpdateSubstance(parseFloat(idStr), type, parseInt(amountStr,10));
+        });
+    });
+}
+
+function tbSlotModalHTML(teamId) {
+    return `
+        <button type="button" class="tb-modal-close-btn" id="tbCancelDraftBtn" title="Zavřít a zrušit losování">✕</button>
+        <div class="tb-event-title">🎰 Losování Týmu ${teamId}</div>
+        <div class="tb-slot-frame" id="tbSlotFrame">
+            <div class="tb-slot-title">MULTICAST</div>
+            <div class="tb-slot-subtitle">Ogre Magi rozhoduje o osudu týmu...</div>
+            <div class="tb-reels-row">
+                <div class="tb-reel-window" id="tbReelWin1"><div class="tb-reel-strip" id="tbReelStrip1"></div></div>
+                <div class="tb-reel-window" id="tbReelWin2"><div class="tb-reel-strip" id="tbReelStrip2"></div></div>
+                <div class="tb-reel-window" id="tbReelWin3"><div class="tb-reel-strip" id="tbReelStrip3"></div></div>
+            </div>
+            <div class="tb-reel-labels-row">
+                <div class="tb-reel-label">👑 Vůdce</div>
+                <div class="tb-reel-label">Člen 1</div>
+                <div class="tb-reel-label">Člen 2</div>
+            </div>
+            <div class="tb-lever-wrap" id="tbLeverWrap">
+                <div class="tb-lever-rod"></div>
+                <div class="tb-lever-knob"></div>
+                <div class="tb-lever-base"></div>
+            </div>
+        </div>
+        <div class="tb-slot-status-line" id="tbSlotStatus">Zatáhni za páku a vylosuj Tým ${teamId}!</div>
+        <div class="tb-results-list" id="tbResultsList"></div>
+        <div class="tb-slot-actions" id="tbSlotActions">
+            <button type="button" class="tb-btn-confirm" id="tbConfirmTeamsBtn">✅ Potvrdit týmy</button>
+            <button type="button" class="tb-btn-reroll" id="tbRerollTeamsBtn">🔄 Losovat znovu</button>
+        </div>`;
+}
+
+function tbBuildReelStrip(stripEl, pool, targetName, loops) {
+    const namesPool = pool.length ? pool : [targetName];
+    const preFiller = namesPool[Math.floor(Math.random() * namesPool.length)] || targetName;
+    const items = [preFiller, targetName];
+    for (let i = 0; i < loops; i++) { items.push(...namesPool); }
+    stripEl.innerHTML = items.map(n => `<div class="tb-reel-item"><span>${escapeHtml(n)}</span></div>`).join('');
+    const targetIndex = 1;
+    const startIndex = items.length - 1;
+    const startT = (1 - startIndex) * TB_REEL_ITEM_H;
+    stripEl.style.transform = `translateY(${startT}px)`;
+    return { targetIndex, startIndex };
+}
+
+function tbSpinReelPhysics(stripEl, targetIndex, startIndex, durationMs) {
+    return new Promise(resolve => {
+        const startT = (1 - startIndex) * TB_REEL_ITEM_H;
+        const finalT = (1 - targetIndex) * TB_REEL_ITEM_H;
+        const distance = finalT - startT;
+        stripEl.classList.add('tb-spinning');
+        const startTime = performance.now();
+        let lastTickStep = -1;
+        function frame(now) {
+            const t = Math.min((now - startTime) / durationMs, 1);
+            const eased = 1 - Math.pow(1 - t, 3);
+            const currentT = startT + eased * distance;
+            stripEl.style.transform = `translateY(${currentT}px)`;
+            const step = Math.floor((currentT - startT) / TB_REEL_ITEM_H);
+            if (step !== lastTickStep) { lastTickStep = step; tbPlayReelTick(); }
+            if (t < 1) {
+                requestAnimationFrame(frame);
+            } else {
+                stripEl.style.transform = `translateY(${finalT}px)`;
+                stripEl.classList.remove('tb-spinning');
+                const landedItem = stripEl.children[targetIndex];
+                if (landedItem) landedItem.classList.add('tb-landed');
+                resolve();
+            }
+        }
+        requestAnimationFrame(frame);
+    });
+}
+
+function tbStartConstantSpin(stripEl, pool) {
+    const namesPool = pool.length ? pool : ['???'];
+    const minUnitLen = 8;
+    let unit = [];
+    while (unit.length < minUnitLen) { unit.push(...tbShuffleArray(namesPool)); }
+    const items = [...unit, ...unit];
+    stripEl.innerHTML = items.map(n => `<div class="tb-reel-item"><span>${escapeHtml(n)}</span></div>`).join('');
+    stripEl.classList.add('tb-spinning');
+    const unitHeight = unit.length * TB_REEL_ITEM_H;
+    const speed = 0.62;
+    let pos = 0;
+    let last = performance.now();
+    let tickAcc = 0;
+    let running = true;
+    function frame(now) {
+        if (!running) return;
+        const dt = now - last; last = now;
+        pos = (pos + speed * dt) % unitHeight;
+        stripEl.style.transform = `translateY(${pos - unitHeight}px)`;
+        tickAcc += dt;
+        if (tickAcc > 90) { tickAcc = 0; tbPlayReelTick(); }
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    return { stop() { running = false; } };
+}
+
+function tbDecelerateAndLand(stripEl, pool, targetName, durationMs) {
+    const r = tbBuildReelStrip(stripEl, pool, targetName, 4);
+    return tbSpinReelPhysics(stripEl, r.targetIndex, r.startIndex, durationMs);
+}
+
+async function tbSpinCurrentTeam() {
+    const draft = tbCurrentDraft;
+    const team = draft.teams[draft.index];
+    const modal = document.getElementById('tbEventModal');
+    const lever = modal.querySelector('#tbLeverWrap');
+    const status = modal.querySelector('#tbSlotStatus');
+    lever.classList.add('tb-disabled', 'tb-lever-pulled');
+    status.textContent = 'Losuje se...';
+    tbPlayBeep(200, 0.1, 'sawtooth');
+    await tbSleep(280);
+    lever.classList.remove('tb-lever-pulled');
+
+    const remainingCol1 = draft.col1Players.slice(draft.index + 1).map(p => p.name);
+    const remainingCol2 = draft.col2Players.filter(p => p !== team.middle).map(p => p.name);
+    const remainingCol3 = draft.col3Players.filter(p => p !== team.weak).map(p => p.name);
+
+    const strip1 = modal.querySelector('#tbReelStrip1');
+    const strip2 = modal.querySelector('#tbReelStrip2');
+    const strip3 = modal.querySelector('#tbReelStrip3');
+
+    const spin1 = tbStartConstantSpin(strip1, remainingCol1);
+    const spin2 = tbStartConstantSpin(strip2, remainingCol2);
+    const spin3 = tbStartConstantSpin(strip3, remainingCol3);
+    await tbSleep(900);
+
+    spin1.stop();
+    await tbDecelerateAndLand(strip1, remainingCol1, team.leader.name, 1500);
+    if (tbDraftCancelled) { spin2.stop(); spin3.stop(); return; }
+    tbPlayLandSound(700);
+
+    spin2.stop();
+    await tbDecelerateAndLand(strip2, remainingCol2, team.middle ? team.middle.name : '—', 1500);
+    if (tbDraftCancelled) { spin3.stop(); return; }
+    tbPlayLandSound(600);
+
+    spin3.stop();
+    await tbDecelerateAndLand(strip3, remainingCol3, team.weak ? team.weak.name : '—', 1500);
+    if (tbDraftCancelled) return;
+    tbPlayLandSound(520);
+
+    const resultsList = modal.querySelector('#tbResultsList');
+    const names = [team.leader.name, team.middle && team.middle.name, team.weak && team.weak.name].filter(Boolean);
+    const line = document.createElement('div');
+    line.className = 'tb-result-entry';
+    line.textContent = `Tým ${team.id}: ${tbJoinNamesCz(names)}`;
+    resultsList.appendChild(line);
+    await tbSleep(500);
+
+    await tbAnimatePlayerIntoTeam(team.leader, team, true);
+    if (team.middle) await tbAnimatePlayerIntoTeam(team.middle, team, false);
+    if (team.weak) await tbAnimatePlayerIntoTeam(team.weak, team, false);
+
+    draft.index++;
+    if (draft.index < draft.teams.length) {
+        const nextTeam = draft.teams[draft.index];
+        modal.querySelector('.tb-event-title').textContent = `🎰 Losování Týmu ${nextTeam.id}`;
+        status.textContent = `Zatáhni za páku a vylosuj Tým ${nextTeam.id}!`;
+        lever.classList.remove('tb-disabled');
+    } else {
+        status.textContent = '🏆 Všechny týmy jsou vylosované!';
+        lever.classList.add('tb-disabled');
+        modal.querySelector('#tbSlotActions').style.display = 'flex';
+    }
+}
+
+function tbOnLeverClick() {
+    if (tbSpinBusy || !tbCurrentDraft) return;
+    const lever = document.querySelector('#tbLeverWrap');
+    if (lever && lever.classList.contains('tb-disabled')) return;
+    tbSpinBusy = true;
+    tbSpinCurrentTeam().finally(() => { tbSpinBusy = false; });
+}
+
+function tbCancelDraft() {
+    tbDraftCancelled = true;
+    const overlay = document.getElementById('tbEventOverlay');
+    if(overlay) overlay.classList.remove('tb-show');
+    tbCurrentDraft = null;
+    const btn = document.getElementById('tbGenerateBtn');
+    if(btn){ btn.disabled = false; btn.innerText = '⚡ GENEROVAT VYVÁŽENÉ TÝMY ⚡'; }
+    tbDraftInProgress = false;
+}
+
+function tbConfirmTeams() {
+    const overlay = document.getElementById('tbEventOverlay');
+    if(overlay) overlay.classList.remove('tb-show');
+    tbCurrentDraft = null;
+    const btn = document.getElementById('tbGenerateBtn');
+    if(btn){ btn.disabled = false; btn.innerText = '⚡ GENEROVAT VYVÁŽENÉ TÝMY ⚡'; }
+    tbDraftInProgress = false;
+}
+
+function tbRerollTeams() {
+    tbStartDraft();
+}
+
+async function tbAnimatePlayerIntoTeam(player, team, isLeader) {
+    const card = document.getElementById('tb-team-' + team.id);
+    if(!card) return;
+    const playersDiv = card.querySelector('.tb-team-players');
+    const row = document.createElement('div');
+    row.className = 'tb-team-player tb-player-enter' + (isLeader ? ' tb-leader-enter' : '');
+    row.innerHTML = `<span>${isLeader ? '👑 ' : '• '}${escapeHtml(player.name)}</span><span class="tb-form-cell">Forma: ${player.currentSkill} (🍺${player.beers} ${TB_SHOT_ICON}${player.shots} ${TB_JOINT_ICON}${player.joints})</span>`;
+    playersDiv.appendChild(row);
+    card.querySelector('.tb-team-header').innerHTML = `<span>Tým ${team.id}</span><span>Celkový skill: ${team.totalSkill}</span>`;
+    card.classList.add('tb-leader-glow');
+    tbPlayBeep(420, 0.1, 'sine');
+    await tbSleep(isLeader ? 400 : 250);
+    card.classList.remove('tb-leader-glow');
+}
+
+function tbGenerateTeams() {
+    if (tbPlayers.length < 3) { alert("Potřebuješ aspoň 3 hráče!"); return; }
+    if (tbDraftInProgress) return;
+    tbDraftInProgress = true;
+    tbStartDraft();
+}
+
+function tbStartDraft() {
+    tbDraftCancelled = false;
+    const btn = document.getElementById('tbGenerateBtn');
+    if(btn){ btn.disabled = true; btn.innerText = '🎰 Losování probíhá...'; }
+
+    const processedPlayers = tbPlayers.map(p => ({
+        ...p,
+        currentSkill: tbCalculateCurrentSkill(p)
+    })).sort((a, b) => b.currentSkill - a.currentSkill);
+
+    const numTeams = Math.ceil(processedPlayers.length / 3);
+
+    const col1Players = tbShuffleArray(processedPlayers.slice(0, numTeams));
+    const rest1 = processedPlayers.slice(numTeams);
+    const col2Players = tbShuffleArray(rest1.slice(0, numTeams));
+    const rest2 = rest1.slice(numTeams);
+    const col3Players = tbShuffleArray(rest2.slice(0, numTeams));
+
+    const teams = Array.from({ length: numTeams }, (_, i) => ({
+        id: i + 1,
+        leader: col1Players[i] || null,
+        middle: null,
+        weak: null,
+        totalSkill: 0
+    }));
+
+    col2Players.forEach((p, i) => { teams[numTeams - 1 - i].middle = p; });
+    col3Players.forEach((p, i) => { teams[i].weak = p; });
+
+    teams.forEach(t => {
+        t.totalSkill = (t.leader ? t.leader.currentSkill : 0) + (t.middle ? t.middle.currentSkill : 0) + (t.weak ? t.weak.currentSkill : 0);
+    });
+
+    const teamsDiv = document.getElementById('tbTeamsResult');
+    teamsDiv.innerHTML = '';
+    teams.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'tb-team-card tb-team-card-empty';
+        card.id = 'tb-team-' + t.id;
+        card.innerHTML = `<div class="tb-team-header"><span>Tým ${t.id}</span><span>Celkový skill: 0</span></div><div class="tb-team-players"></div>`;
+        teamsDiv.appendChild(card);
+    });
+
+    tbCurrentDraft = { teams, col1Players, col2Players, col3Players, index: 0 };
+
+    const overlay = document.getElementById('tbEventOverlay');
+    const modal = document.getElementById('tbEventModal');
+    modal.innerHTML = tbSlotModalHTML(teams[0].id);
+    document.getElementById('tbCancelDraftBtn').addEventListener('click', tbCancelDraft);
+    document.getElementById('tbLeverWrap').addEventListener('click', tbOnLeverClick);
+    const tbConfirmBtn = document.getElementById('tbConfirmTeamsBtn');
+    if(tbConfirmBtn) tbConfirmBtn.addEventListener('click', tbConfirmTeams);
+    const tbRerollBtn = document.getElementById('tbRerollTeamsBtn');
+    if(tbRerollBtn) tbRerollBtn.addEventListener('click', tbRerollTeams);
+    overlay.classList.add('tb-show');
+}
+
+function renderTeamDrawTool(container){
+  container.innerHTML = `
+    <button type="button" class="btn-ghost btn-sm" id="tb-back-btn">← Zpět na seznam turnajů</button>
+    <h1 class="headline tb-title" style="font-size:24px; margin-top:14px;">🎰 Losovačka týmů (3v3)</h1>
+    <label class="tb-sound-toggle">
+      <input type="checkbox" id="tbSoundToggle" checked> 🔊 Zvuky a hlášky
+    </label>
+    <div class="tb-voice-picker">
+      <select id="tbVoiceSelect"><option value="">Výchozí hlas</option></select>
+      <button type="button" class="tb-voice-test-btn" id="tbVoiceTestBtn">🔊 Test hlasu</button>
+    </div>
+
+    <div class="field" style="max-width:400px;">
+      <label>Vzít hráče z přihlášených na akci (nepovinné)</label>
+      <select id="tb-event-select">
+        <option value="">— vyber akci —</option>
+        ${events.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="tb-registrants-picker" style="margin-bottom:16px; max-width:400px;"></div>
+
+    <button type="button" class="tb-generate-btn" id="tbGenerateBtn">⚡ GENEROVAT VYVÁŽENÉ TÝMY ⚡</button>
+    <div class="tb-main-layout">
+      <div class="tb-box">
+        <h2>Hráči</h2>
+        <div class="tb-form-group">
+          <input type="text" id="tbPName" placeholder="Jméno hráče (např. Pepa)">
+          <input type="number" id="tbPSkill" placeholder="Skill (1-100)" min="1" max="100">
+          <button type="button" id="tbAddPlayerBtn">Přidat</button>
+        </div>
+        <div id="tbPlayersList"></div>
+      </div>
+      <div class="tb-box">
+        <h2>Výsledné Týmy</h2>
+        <div id="tbTeamsResult" class="tb-teams-grid"><p style="text-align:center; color:#718096;">Zatím nebyly vygenerovány žádné týmy. Přidej lidi a klikni na tlačítko nahoře.</p></div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('tb-back-btn').addEventListener('click', () => { turnajDrawToolOpen = false; renderTurnajPage(); });
+
+  document.getElementById('tbSoundToggle').addEventListener('change', (e) => { tbSoundEnabled = e.target.checked; });
+  document.getElementById('tbVoiceTestBtn').addEventListener('click', () => tbSpeak('Ahoj, takhle teď zním. Pepa si dává pivo a slibuje, že tohle bylo fakt poslední.'));
+  document.getElementById('tbVoiceSelect').addEventListener('change', (e) => { tbSelectedVoiceURI = e.target.value; });
+  tbPopulateVoiceList();
+
+  document.getElementById('tb-event-select').addEventListener('change', async (e) => {
+    const eventId = e.target.value;
+    const pickerBox = document.getElementById('tb-registrants-picker');
+    if(!eventId){ pickerBox.innerHTML = ''; return; }
+    pickerBox.innerHTML = '<div class="empty">Načítám přihlášené...</div>';
+    try{
+      const snap = await getDocs(collection(db,'events',eventId,'registrations'));
+      const regs = snap.docs.map(d=>d.data()).filter(r=>r.status!=='maybe' && r.nick).sort((a,b)=>(a.nick||'').localeCompare(b.nick||''));
+      if(regs.length === 0){ pickerBox.innerHTML = '<div class="empty">Na týhle akci zatím nikdo není přihlášený.</div>'; return; }
+      const rows = await Promise.all(regs.map(async r => {
+        const savedSkill = await tbLoadSkill(r.nick);
+        return { nick: r.nick, skill: savedSkill !== null ? savedSkill : 50 };
+      }));
+      pickerBox.innerHTML = `
+        <div class="tb-registrant-list">
+          ${rows.map((r,i) => `
+            <label class="tb-registrant-row">
+              <input type="checkbox" data-tb-reg-idx="${i}">
+              <span style="flex:1;">${escapeHtml(r.nick)}</span>
+              <input type="number" min="1" max="100" value="${r.skill}" data-tb-reg-skill-idx="${i}" style="width:60px;">
+            </label>
+          `).join('')}
+        </div>
+        <button type="button" class="btn-sm" id="tb-add-checked-btn" style="margin-top:10px;">+ Přidat zaškrtnuté do losování</button>
+      `;
+      document.getElementById('tb-add-checked-btn').addEventListener('click', () => {
+        rows.forEach((r, i) => {
+          const cb = pickerBox.querySelector(`[data-tb-reg-idx="${i}"]`);
+          if(cb && cb.checked){
+            const skillInput = pickerBox.querySelector(`[data-tb-reg-skill-idx="${i}"]`);
+            const skill = parseInt(skillInput.value,10) || 50;
+            tbAddPlayerObj(r.nick, skill);
+          }
+        });
+      });
+    }catch(err){ console.error(err); pickerBox.innerHTML = '<div class="empty">Nepovedlo se načíst.</div>'; }
+  });
+
+  document.getElementById('tbAddPlayerBtn').addEventListener('click', () => {
+    const nameInput = document.getElementById('tbPName');
+    const skillInput = document.getElementById('tbPSkill');
+    if (!nameInput.value || !skillInput.value) { alert('Vyplň jméno i skill!'); return; }
+    tbAddPlayerObj(nameInput.value.trim(), parseInt(skillInput.value,10));
+    nameInput.value = ''; skillInput.value = '';
+  });
+
+  document.getElementById('tbGenerateBtn').addEventListener('click', tbGenerateTeams);
+
+  const existingOverlay = document.getElementById('tbEventOverlay');
+  if(existingOverlay) existingOverlay.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'tb-event-overlay';
+  overlay.id = 'tbEventOverlay';
+  overlay.innerHTML = '<div class="tb-event-modal" id="tbEventModal"></div>';
+  document.body.appendChild(overlay);
+
+  tbRenderPlayers();
+}
+
 
 function isMemberElsewhere(teams, currentIdx, nick){
   return teams.some((tm,i) => i!==currentIdx && tm.members.includes(nick));
