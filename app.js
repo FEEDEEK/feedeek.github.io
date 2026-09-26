@@ -187,14 +187,18 @@ function applyRoute(){
 
   if(view === 'event' && id){
     currentTournamentId = null;
+    turnajDrawToolOpen = false;
     openEventDetail(id);
   }else if(view === 'turnaj'){
     currentTournamentId = id || null;
+    turnajDrawToolOpen = false;
     showView('turnaj');
     renderTurnajPage();
   }else if(view){
+    turnajDrawToolOpen = false;
     showView(view);
   }else{
+    turnajDrawToolOpen = false;
     showView('home');
   }
 }
