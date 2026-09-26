@@ -1931,9 +1931,78 @@ function tbPlayReelTick() {
         osc.start(t0); osc.stop(t0 + 0.04);
     } catch (e) { /* ticho */ }
 }
-function tbPlayLandSound(pitch) {
-    tbPlayBeep(pitch, 0.14, 'triangle');
-    setTimeout(() => tbPlayBeep(pitch * 1.5, 0.12, 'triangle'), 90);
+function tbPlayMulticastCharge(){
+    if (!tbSoundEnabled) return;
+    try{
+        tbEnsureAudio();
+        if(!tbAudioCtx) return;
+        const t0 = tbAudioCtx.currentTime;
+        const osc = tbAudioCtx.createOscillator();
+        const gain = tbAudioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(90, t0);
+        osc.frequency.exponentialRampToValueAtTime(520, t0 + 0.5);
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.09, t0 + 0.4);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+        osc.connect(gain); gain.connect(tbAudioCtx.destination);
+        osc.start(t0); osc.stop(t0 + 0.56);
+    }catch(e){ /* ticho */ }
+}
+
+// Elektrický "multicast" zásah - eskaluje s parametrem stage (1., 2., 3. zásah v jednom kole losování)
+function tbPlayMulticastZap(stage){
+    if (!tbSoundEnabled) return;
+    try{
+        tbEnsureAudio();
+        if(!tbAudioCtx) return;
+        const t0 = tbAudioCtx.currentTime;
+        const pitchMul = 1 + (stage - 1) * 0.28;
+
+        // elektrický sestupný "zzzap"
+        const zap = tbAudioCtx.createOscillator();
+        const zapGain = tbAudioCtx.createGain();
+        zap.type = 'sawtooth';
+        zap.frequency.setValueAtTime(1900 * pitchMul, t0);
+        zap.frequency.exponentialRampToValueAtTime(140 * pitchMul, t0 + 0.32);
+        zapGain.gain.setValueAtTime(0.0001, t0);
+        zapGain.gain.exponentialRampToValueAtTime(0.2, t0 + 0.018);
+        zapGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+        zap.connect(zapGain); zapGain.connect(tbAudioCtx.destination);
+        zap.start(t0); zap.stop(t0 + 0.33);
+
+        // magický "crackle" šum
+        const bufferSize = Math.floor(tbAudioCtx.sampleRate * 0.28);
+        const buffer = tbAudioCtx.createBuffer(1, bufferSize, tbAudioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) { data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2); }
+        const noise = tbAudioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = tbAudioCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 2200 * (pitchMul * 0.6 + 0.4);
+        const noiseGain = tbAudioCtx.createGain();
+        noiseGain.gain.setValueAtTime(0.13, t0);
+        noiseGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+        noise.connect(filter); filter.connect(noiseGain); noiseGain.connect(tbAudioCtx.destination);
+        noise.start(t0);
+
+        // hluboký magický "impact"
+        const boom = tbAudioCtx.createOscillator();
+        const boomGain = tbAudioCtx.createGain();
+        boom.type = 'sine';
+        boom.frequency.setValueAtTime(190 * pitchMul, t0);
+        boom.frequency.exponentialRampToValueAtTime(45 * pitchMul, t0 + 0.22);
+        boomGain.gain.setValueAtTime(0.0001, t0);
+        boomGain.gain.exponentialRampToValueAtTime(0.24, t0 + 0.012);
+        boomGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.26);
+        boom.connect(boomGain); boomGain.connect(tbAudioCtx.destination);
+        boom.start(t0); boom.stop(t0 + 0.27);
+
+        if(stage >= 3){
+            setTimeout(() => tbSpeak('Multicast!'), 80);
+        }
+    }catch(e){ /* ticho */ }
 }
 
 function tbBeerSVG() {
@@ -2341,7 +2410,7 @@ async function tbSpinCurrentTeam() {
     const status = modal.querySelector('#tbSlotStatus');
     lever.classList.add('tb-disabled', 'tb-lever-pulled');
     status.textContent = 'Losuje se...';
-    tbPlayBeep(200, 0.1, 'sawtooth');
+    tbPlayMulticastCharge();
     await tbSleep(280);
     lever.classList.remove('tb-lever-pulled');
 
@@ -2361,17 +2430,17 @@ async function tbSpinCurrentTeam() {
     spin1.stop();
     await tbDecelerateAndLand(strip1, remainingCol1, team.leader.name, 1500);
     if (tbDraftCancelled) { spin2.stop(); spin3.stop(); return; }
-    tbPlayLandSound(700);
+    tbPlayMulticastZap(1);
 
     spin2.stop();
     await tbDecelerateAndLand(strip2, remainingCol2, team.middle ? team.middle.name : '—', 1500);
     if (tbDraftCancelled) { spin3.stop(); return; }
-    tbPlayLandSound(600);
+    tbPlayMulticastZap(2);
 
     spin3.stop();
     await tbDecelerateAndLand(strip3, remainingCol3, team.weak ? team.weak.name : '—', 1500);
     if (tbDraftCancelled) return;
-    tbPlayLandSound(520);
+    tbPlayMulticastZap(3);
 
     const resultsList = modal.querySelector('#tbResultsList');
     const names = [team.leader.name, team.middle && team.middle.name, team.weak && team.weak.name].filter(Boolean);
