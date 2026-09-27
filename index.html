@@ -28,7 +28,7 @@
       <div class="nav-sep"></div>
       <a class="nav-item" data-view="turnaj">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 4h12M6 4v3a6 6 0 0 0 12 0V4M6 4H3v2a4 4 0 0 0 3 3.9M18 4h3v2a4 4 0 0 1-3 3.9M12 13v4M9 20h6M12 17v3"/></svg>
-        <span>Turnaje</span>
+        <span>Turnaj</span>
       </a>
       <div class="nav-sep"></div>
       <a class="nav-item" data-view="ucet">
@@ -137,9 +137,10 @@
 
         <div class="field tag-input-box">
           <label>🎮 Hry, které se budou hrát</label>
-          <div class="tag-input-row">
-            <input type="text" id="input-add-game" placeholder="Napiš hru (např. CS2)">
-            <button type="button" id="btn-add-game">Přidat</button>
+          <div class="tag-input-row" style="position:relative;">
+            <input type="text" id="input-add-game" placeholder="Napiš hru (např. CS2)" autocomplete="off">
+            <button type="button" id="btn-add-game">Přidat bez loga</button>
+            <div id="game-autocomplete-list" class="game-autocomplete-list" style="display:none;"></div>
           </div>
           <ul class="tag-chip-list" id="ev-games-list"></ul>
         </div>
