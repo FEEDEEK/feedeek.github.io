@@ -389,7 +389,7 @@ document.getElementById('input-add-game').addEventListener('input', (e) => {
           <span>${escapeHtml(r.name)}</span>
         </div>
       `).join('');
-      box.style.display = 'block';
+      box.style.display = 'grid';
       box.querySelectorAll('[data-pick-game]').forEach(item => {
         item.addEventListener('click', () => {
           currentEventGames.push({ name: item.dataset.pickGame, image: item.dataset.pickImage || '' });
@@ -777,6 +777,7 @@ function openEventDetail(eventId){
 }
 
 let currentSuggestions = [];
+let pendingSuggestionImage = '';
 let currentComments = [];
 let currentFoodComments = [];
 let currentPhotos = [];
@@ -1108,12 +1109,15 @@ function renderTabPrehled(ev){
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:28px;">
       <div>
         <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
-        <div class="chip-row" style="flex-direction:column; align-items:flex-start;">${games.length ? games.map(g=>`<span class="chip">${g.image ? `<img src="${g.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo">` : ''}${escapeHtml(g.name)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
+        <div class="chip-row">${games.length ? games.map(g=>`<span class="chip">${g.image ? `<img src="${g.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo">` : ''}${escapeHtml(g.name)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
       </div>
       <div>
         <div class="section-title" style="font-size:16px;">Chtěl by sis zahrát ještě něco jiného?</div>
-        <div class="field" style="display:flex; flex-direction:row; gap:8px; align-items:flex-end;">
-          <div style="flex:1;"><input type="text" id="suggestion-input" placeholder="Např. HALO"></div>
+        <div class="field" style="display:flex; flex-direction:row; gap:8px; align-items:flex-end; position:relative;">
+          <div style="flex:1; position:relative;">
+            <input type="text" id="suggestion-input" placeholder="Např. HALO" autocomplete="off">
+            <div id="sug-autocomplete-list" class="game-autocomplete-list" style="display:none;"></div>
+          </div>
           <button type="button" id="btn-add-suggestion" class="btn-sm">Přidat</button>
         </div>
         <div id="suggestions-list" style="margin-top:6px;"></div>
@@ -1144,9 +1148,48 @@ function renderTabPrehled(ev){
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'suggestions'), { text, author: currentNick, authorEmoji: currentEmoji, uid: currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'suggestions'), { text, image: pendingSuggestionImage, author: currentNick, authorEmoji: currentEmoji, uid: currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
       input.value = '';
+      pendingSuggestionImage = '';
+      document.getElementById('sug-autocomplete-list').style.display = 'none';
     }catch(err){ console.error(err); }
+  });
+
+  let sugSearchDebounce = null;
+  document.getElementById('suggestion-input').addEventListener('input', (e) => {
+    clearTimeout(sugSearchDebounce);
+    pendingSuggestionImage = '';
+    const q = e.target.value.trim();
+    const box = document.getElementById('sug-autocomplete-list');
+    if(q.length < 2){ box.style.display = 'none'; return; }
+    sugSearchDebounce = setTimeout(async () => {
+      try{
+        const res = await fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const results = data.items || [];
+        if(results.length === 0){ box.style.display = 'none'; return; }
+        box.innerHTML = results.map(r => `
+          <div class="game-autocomplete-item" data-pick-sug="${escapeHtml(r.name)}" data-pick-sug-image="${r.image ? r.image.replace(/"/g,'&quot;') : ''}">
+            ${r.image ? `<img src="${r.image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-autocomplete-noimg">🎮</div>'}
+            <span>${escapeHtml(r.name)}</span>
+          </div>
+        `).join('');
+        box.style.display = 'grid';
+        box.querySelectorAll('[data-pick-sug]').forEach(item => {
+          item.addEventListener('click', () => {
+            document.getElementById('suggestion-input').value = item.dataset.pickSug;
+            pendingSuggestionImage = item.dataset.pickSugImage || '';
+            box.style.display = 'none';
+          });
+        });
+      }catch(err){ console.error(err); box.style.display = 'none'; }
+    }, 400);
+  });
+  document.addEventListener('click', (e) => {
+    if(!e.target.closest('#suggestion-input') && !e.target.closest('#sug-autocomplete-list')){
+      const box = document.getElementById('sug-autocomplete-list');
+      if(box) box.style.display = 'none';
+    }
   });
 
   document.getElementById('btn-add-comment').addEventListener('click', async () => {
@@ -1174,7 +1217,7 @@ function renderSuggestions(ev){
     const canEdit = currentUser && (s.uid === currentUser.uid || hasPerm('akce'));
     return `
     <div class="suggestion-row" data-sug-row="${s.id}">
-      <span class="txt" data-sug-display="${s.id}">Hráč: ${authorLabel(s.author, s.authorEmoji)} — ${escapeHtml(s.text)}</span>
+      <span class="txt" data-sug-display="${s.id}">${s.image ? `<img src="${s.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo" style="margin-right:6px; vertical-align:middle;">` : ''}Hráč: ${authorLabel(s.author, s.authorEmoji)} — ${escapeHtml(s.text)}</span>
       <span class="sug-actions">
         <button type="button" class="like-btn ${liked?'liked':''}" data-sug-like="${s.id}" title="${escapeHtml(likers)}">♥ ${ (s.likes||[]).length }</button>
         ${canEdit ? `<button type="button" class="btn-ghost btn-sm" data-sug-edit="${s.id}">Upravit</button><button type="button" class="btn-ghost btn-sm" data-sug-delete="${s.id}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>` : ''}
