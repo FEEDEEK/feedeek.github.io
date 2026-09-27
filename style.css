@@ -85,9 +85,9 @@ body::before{
 h1.headline{ font-size:40px; font-weight:600; line-height:1.15; max-width:700px; }
 .lede{ color:var(--text-muted); font-size:16px; margin-top:14px; max-width:560px; line-height:1.6; }
 
-.home-hero-row{ display:flex; align-items:center; gap:40px; flex-wrap:wrap; }
+.home-hero-row{ display:flex; align-items:center; gap:40px; flex-wrap:wrap; margin-bottom:34px; }
 .home-hero-text{ flex:1; min-width:280px; }
-.home-hero-logo{ width:320px; height:320px; object-fit:cover; border-radius:50%; flex-shrink:0; filter:drop-shadow(0 4px 18px rgba(80,160,255,0.35)); }
+.home-hero-logo{ width:300px; height:300px; object-fit:contain; flex-shrink:0; filter:drop-shadow(0 4px 18px rgba(80,160,255,0.35)); }
 @media (max-width:900px){ .home-hero-logo{ width:200px; height:200px; } }
 @media (max-width:760px){ .home-hero-row{ flex-direction:column-reverse; gap:20px; } .home-hero-logo{ width:150px; height:150px; } }
 
