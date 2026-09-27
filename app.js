@@ -338,6 +338,7 @@ function renderHome(){
 // ==================== FORMULÁŘ AKCE: hry (tagy) ====================
 // Zdroj log her: Steam + IGDB kombinovaně (přes vlastní Cloud Run funkci, protože obě blokují přímé volání z prohlížeče)
 const STEAM_SEARCH_FUNCTION_URL = 'https://steam-game-search-632018940301.europe-west3.run.app';
+let gameLogoTargetIdx = null;
 
 function normalizeGame(g){
   return (typeof g === 'string') ? { name: g, image: '' } : g;
@@ -350,7 +351,7 @@ function renderFormGames(){
     const game = normalizeGame(rawGame);
     const li = document.createElement('li');
     li.className = 'tag-chip';
-    li.innerHTML = `${game.image ? `<img src="${game.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo">` : ''}<span>${escapeHtml(game.name)}</span><span class="x" data-remove-game="${idx}">×</span>`;
+    li.innerHTML = `${game.image ? `<img src="${game.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo">` : ''}<span>${escapeHtml(game.name)}</span>${!game.image ? `<span class="find-logo-btn" data-find-logo="${idx}" title="Najít logo">🔍</span>` : ''}<span class="x" data-remove-game="${idx}">×</span>`;
     list.appendChild(li);
   });
   list.querySelectorAll('[data-remove-game]').forEach(el => {
@@ -359,12 +360,29 @@ function renderFormGames(){
       renderFormGames();
     });
   });
+  list.querySelectorAll('[data-find-logo]').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.findLogo, 10);
+      gameLogoTargetIdx = idx;
+      const input = document.getElementById('input-add-game');
+      input.value = normalizeGame(currentEventGames[idx]).name;
+      input.focus();
+      input.dispatchEvent(new Event('input'));
+    });
+  });
 }
 
 document.getElementById('btn-add-game').addEventListener('click', () => {
   const input = document.getElementById('input-add-game');
   const val = input.value.trim();
   if(!val) return;
+  if(gameLogoTargetIdx !== null){
+    // hledání loga ke stávající hře bylo zrušeno - jen zavřít, nepřidávat duplicitně
+    gameLogoTargetIdx = null;
+    input.value = '';
+    document.getElementById('game-autocomplete-list').style.display = 'none';
+    return;
+  }
   currentEventGames.push({ name: val, image: '' });
   input.value = '';
   document.getElementById('game-autocomplete-list').style.display = 'none';
@@ -392,7 +410,12 @@ document.getElementById('input-add-game').addEventListener('input', (e) => {
       box.style.display = 'grid';
       box.querySelectorAll('[data-pick-game]').forEach(item => {
         item.addEventListener('click', () => {
-          currentEventGames.push({ name: item.dataset.pickGame, image: item.dataset.pickImage || '' });
+          if(gameLogoTargetIdx !== null){
+            currentEventGames[gameLogoTargetIdx] = { name: item.dataset.pickGame, image: item.dataset.pickImage || '' };
+            gameLogoTargetIdx = null;
+          }else{
+            currentEventGames.push({ name: item.dataset.pickGame, image: item.dataset.pickImage || '' });
+          }
           document.getElementById('input-add-game').value = '';
           box.style.display = 'none';
           renderFormGames();
@@ -470,6 +493,7 @@ function resetEventFormHelpers(){
   currentEventGames = [];
   currentEventFood = emptyFoodSchedule();
   currentEventDateOptions = [];
+  gameLogoTargetIdx = null;
   renderFormGames();
   renderFormFood();
   renderFormDateOptions();
@@ -1253,16 +1277,56 @@ function renderSuggestions(ev){
       const sug = currentSuggestions.find(s => s.id === sugId);
       const row = sugList.querySelector(`[data-sug-row="${sugId}"]`);
       const display = row.querySelector('[data-sug-display]');
+      let editPickedImage = sug.image || '';
       display.outerHTML = `
-        <span class="txt" style="display:flex; gap:6px;">
-          <input type="text" id="sug-edit-input-${sugId}" value="${escapeHtml(sug.text)}" style="flex:1; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 8px;">
+        <span class="txt" style="display:flex; gap:6px; position:relative;">
+          <div style="flex:1; position:relative;">
+            <input type="text" id="sug-edit-input-${sugId}" value="${escapeHtml(sug.text)}" autocomplete="off" style="width:100%; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 8px; box-sizing:border-box;">
+            <div id="sug-edit-autocomplete-${sugId}" class="game-autocomplete-list" style="display:none;"></div>
+          </div>
           <button type="button" class="btn-sm" data-sug-save="${sugId}">Uložit</button>
         </span>
       `;
+      const editInput = document.getElementById(`sug-edit-input-${sugId}`);
+      const editBox = document.getElementById(`sug-edit-autocomplete-${sugId}`);
+      let editSearchDebounce = null;
+      editInput.addEventListener('input', (e) => {
+        clearTimeout(editSearchDebounce);
+        editPickedImage = '';
+        const q = e.target.value.trim();
+        if(q.length < 2){ editBox.style.display = 'none'; return; }
+        editSearchDebounce = setTimeout(async () => {
+          try{
+            const res = await fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            const results = data.items || [];
+            if(results.length === 0){ editBox.style.display = 'none'; return; }
+            editBox.innerHTML = results.map(r => `
+              <div class="game-autocomplete-item" data-pick-edit-sug="${escapeHtml(r.name)}" data-pick-edit-sug-image="${r.image ? r.image.replace(/"/g,'&quot;') : ''}">
+                ${r.image ? `<img src="${r.image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-autocomplete-noimg">🎮</div>'}
+                <span>${escapeHtml(r.name)}</span>
+              </div>
+            `).join('');
+            editBox.style.display = 'grid';
+            editBox.querySelectorAll('[data-pick-edit-sug]').forEach(item => {
+              item.addEventListener('click', () => {
+                editInput.value = item.dataset.pickEditSug;
+                editPickedImage = item.dataset.pickEditSugImage || '';
+                editBox.style.display = 'none';
+              });
+            });
+          }catch(err){ console.error(err); editBox.style.display = 'none'; }
+        }, 400);
+      });
+      document.addEventListener('click', (e) => {
+        if(!e.target.closest(`#sug-edit-input-${sugId}`) && !e.target.closest(`#sug-edit-autocomplete-${sugId}`)){
+          editBox.style.display = 'none';
+        }
+      });
       row.querySelector(`[data-sug-save="${sugId}"]`).addEventListener('click', async () => {
-        const newText = document.getElementById(`sug-edit-input-${sugId}`).value.trim();
+        const newText = editInput.value.trim();
         if(!newText) return;
-        try{ await updateDoc(doc(db,'events',ev.id,'suggestions',sugId), { text: newText }); }
+        try{ await updateDoc(doc(db,'events',ev.id,'suggestions',sugId), { text: newText, image: editPickedImage }); }
         catch(err){ console.error(err); }
       });
     });
