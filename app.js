@@ -336,7 +336,7 @@ function renderHome(){
 }
 
 // ==================== FORMULÁŘ AKCE: hry (tagy) ====================
-// Zdroj log her: Steam (přes vlastní Cloud Run funkci, protože Steam blokuje přímé volání z prohlížeče)
+// Zdroj log her: Steam + IGDB kombinovaně (přes vlastní Cloud Run funkci, protože obě blokují přímé volání z prohlížeče)
 const STEAM_SEARCH_FUNCTION_URL = 'https://steam-game-search-632018940301.europe-west3.run.app';
 
 function normalizeGame(g){
@@ -384,8 +384,8 @@ document.getElementById('input-add-game').addEventListener('input', (e) => {
       const results = data.items || [];
       if(results.length === 0){ box.style.display = 'none'; return; }
       box.innerHTML = results.map(r => `
-        <div class="game-autocomplete-item" data-pick-game="${escapeHtml(r.name)}" data-pick-image="${r.tiny_image ? r.tiny_image.replace(/"/g,'&quot;') : ''}">
-          ${r.tiny_image ? `<img src="${r.tiny_image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-autocomplete-noimg">🎮</div>'}
+        <div class="game-autocomplete-item" data-pick-game="${escapeHtml(r.name)}" data-pick-image="${r.image ? r.image.replace(/"/g,'&quot;') : ''}">
+          ${r.image ? `<img src="${r.image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-autocomplete-noimg">🎮</div>'}
           <span>${escapeHtml(r.name)}</span>
         </div>
       `).join('');
