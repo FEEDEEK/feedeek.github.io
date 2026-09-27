@@ -3934,9 +3934,10 @@ function updateAuthUI(){
     document.getElementById('account-email-display').textContent = currentUser.email || '';
     document.getElementById('account-phone-display').textContent = currentPhone || '—';
     document.getElementById('account-emoji-display').textContent = currentEmoji || '—';
-    document.getElementById('account-avatar-display').textContent = currentAvatar ? '' : '—';
-    document.getElementById('account-avatar-preview').style.display = currentAvatar ? 'block' : 'none';
-    document.getElementById('account-avatar-preview').src = currentAvatar || '';
+    document.getElementById('account-avatar-big').style.display = currentAvatar ? 'block' : 'none';
+    document.getElementById('account-avatar-big').src = currentAvatar || '';
+    document.getElementById('account-avatar-placeholder').style.display = currentAvatar ? 'none' : 'flex';
+    document.getElementById('btn-remove-avatar').style.display = currentAvatar ? 'inline-flex' : 'none';
     document.getElementById('reauth-password-field').style.display = hasPasswordProvider(currentUser) ? 'block' : 'none';
     document.getElementById('password-row').style.display = hasPasswordProvider(currentUser) ? 'flex' : 'none';
     navLabel.textContent = 'Účet';
