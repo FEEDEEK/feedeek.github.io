@@ -259,6 +259,17 @@
         <div style="margin-top:28px; max-width:480px;">
           <div class="section-title" style="font-size:16px;">Účet</div>
 
+          <div style="text-align:center; margin-bottom:26px;">
+            <div class="account-avatar-big-wrap">
+              <img id="account-avatar-big" src="" alt="" style="display:none;">
+              <div id="account-avatar-placeholder" class="account-avatar-placeholder">🙂</div>
+            </div>
+            <label for="new-avatar-input" class="btn-sm account-avatar-upload-label">📤 Nahrát fotku</label>
+            <input type="file" id="new-avatar-input" accept="image/*" style="display:none;">
+            <div><button type="button" class="btn-ghost btn-sm" id="btn-remove-avatar" style="margin-top:8px; display:none;">Odebrat fotku</button></div>
+            <div id="avatar-change-msg" class="small-msg"></div>
+          </div>
+
           <div class="account-row">
             <div class="account-row-label">Přezdívka</div>
             <div class="account-row-value" id="account-nick-display">—</div>
@@ -300,25 +311,6 @@
               <button type="button" class="btn-ghost" id="btn-cancel-phone">Zrušit</button>
             </div>
             <div id="phone-change-msg" class="small-msg"></div>
-          </form>
-
-          <div class="account-row">
-            <div class="account-row-label">Fotka</div>
-            <div class="account-row-value" style="display:flex; align-items:center; gap:10px;">
-              <img id="account-avatar-preview" src="" alt="" style="display:none; width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid var(--gold-dim);">
-              <span id="account-avatar-display">—</span>
-            </div>
-            <button type="button" class="btn-ghost btn-sm" id="btn-toggle-avatar">Změnit</button>
-          </div>
-          <form class="panel" id="form-change-avatar" style="display:none;">
-            <div class="field"><label>Vyber fotku ze zařízení</label><input type="file" id="new-avatar-input" accept="image/*"></div>
-            <small style="display:block; margin-top:-8px; margin-bottom:10px; color:var(--text-muted);">Zobrazí se místo emotikonu u tvého jména napříč celou appkou (max 5 MB).</small>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <button type="button" id="btn-upload-avatar">Nahrát</button>
-              <button type="button" class="btn-ghost" id="btn-remove-avatar">Odebrat fotku</button>
-              <button type="button" class="btn-ghost" id="btn-cancel-avatar">Zrušit</button>
-            </div>
-            <div id="avatar-change-msg" class="small-msg"></div>
           </form>
 
           <div class="account-row">
