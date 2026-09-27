@@ -336,8 +336,8 @@ function renderHome(){
 }
 
 // ==================== FORMULÁŘ AKCE: hry (tagy) ====================
-// Zdroj log her: RAWG.io (zdarma, potřeba vlastní API klíč z rawg.io/apidocs)
-const RAWG_API_KEY = ''; // <-- sem vlož svůj klíč z https://rawg.io/apidocs
+// Zdroj log her: Steam (přes vlastní Cloud Run funkci, protože Steam blokuje přímé volání z prohlížeče)
+const STEAM_SEARCH_FUNCTION_URL = 'https://steam-game-search-632018940301.europe-west3.run.app';
 
 function normalizeGame(g){
   return (typeof g === 'string') ? { name: g, image: '' } : g;
@@ -376,16 +376,16 @@ document.getElementById('input-add-game').addEventListener('input', (e) => {
   clearTimeout(gameSearchDebounce);
   const q = e.target.value.trim();
   const box = document.getElementById('game-autocomplete-list');
-  if(!RAWG_API_KEY || q.length < 2){ box.style.display = 'none'; return; }
+  if(!STEAM_SEARCH_FUNCTION_URL || q.length < 2){ box.style.display = 'none'; return; }
   gameSearchDebounce = setTimeout(async () => {
     try{
-      const res = await fetch(`https://api.rawg.io/api/games?key=${RAWG_API_KEY}&search=${encodeURIComponent(q)}&page_size=6`);
+      const res = await fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`);
       const data = await res.json();
-      const results = data.results || [];
+      const results = data.items || [];
       if(results.length === 0){ box.style.display = 'none'; return; }
       box.innerHTML = results.map(r => `
-        <div class="game-autocomplete-item" data-pick-game="${escapeHtml(r.name)}" data-pick-image="${r.background_image ? r.background_image.replace(/"/g,'&quot;') : ''}">
-          ${r.background_image ? `<img src="${r.background_image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-autocomplete-noimg">🎮</div>'}
+        <div class="game-autocomplete-item" data-pick-game="${escapeHtml(r.name)}" data-pick-image="${r.tiny_image ? r.tiny_image.replace(/"/g,'&quot;') : ''}">
+          ${r.tiny_image ? `<img src="${r.tiny_image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-autocomplete-noimg">🎮</div>'}
           <span>${escapeHtml(r.name)}</span>
         </div>
       `).join('');
