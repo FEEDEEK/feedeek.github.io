@@ -1109,7 +1109,7 @@ function renderTabPrehled(ev){
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:28px;">
       <div>
         <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
-        <div class="chip-row">${games.length ? games.map(g=>`<span class="chip">${g.image ? `<img src="${g.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo">` : ''}${escapeHtml(g.name)}</span>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
+        <div class="game-display-grid">${games.length ? games.map(g=>`<div class="game-display-card">${g.image ? `<img src="${g.image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-display-noimg">🎮</div>'}<span>${escapeHtml(g.name)}</span></div>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
       </div>
       <div>
         <div class="section-title" style="font-size:16px;">Chtěl by sis zahrát ještě něco jiného?</div>
