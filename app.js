@@ -3388,14 +3388,42 @@ function renderTabFoto(ev){
   const box = document.getElementById('tab-foto');
   box.innerHTML = `
     <div class="section-title" style="font-size:16px;">Foto</div>
-    <p class="lede" style="margin-top:0;">Vlož odkaz na fotku nebo video (např. z Google Photos, Imgur, YouTube...). Adresu ověříme, než se přidá.</p>
+    <p class="lede" style="margin-top:0;">Nahraj fotky nebo videa přímo ze zařízení (jde vybrat víc najednou), nebo vlož odkaz (např. z YouTube).</p>
     <div class="photo-add-row">
-      <div class="field" style="flex:1;"><label>URL fotky nebo videa</label><input type="url" id="photo-url-input" placeholder="https://..."></div>
-      <button type="button" id="btn-add-photo" class="btn-sm">Přidat</button>
+      <div class="field" style="flex:1;"><label>Nahrát ze zařízení</label><input type="file" id="photo-file-input" accept="image/*,video/*" multiple></div>
+      <button type="button" id="btn-upload-photo" class="btn-sm">Nahrát</button>
+    </div>
+    <div class="photo-add-row">
+      <div class="field" style="flex:1;"><label>Nebo vlož odkaz (URL)</label><input type="url" id="photo-url-input" placeholder="https://..."></div>
+      <button type="button" id="btn-add-photo" class="btn-sm">Přidat odkaz</button>
     </div>
     <div class="photo-upload-progress" id="photo-add-msg"></div>
     <div class="photo-grid" id="photo-grid"></div>
   `;
+
+  document.getElementById('btn-upload-photo').addEventListener('click', async () => {
+    if(!currentUser || !currentNick){ showView('ucet'); return; }
+    const fileInput = document.getElementById('photo-file-input');
+    const msg = document.getElementById('photo-add-msg');
+    const files = Array.from(fileInput.files || []);
+    if(files.length === 0){ msg.textContent = 'Nejdřív vyber aspoň jeden soubor.'; return; }
+    const tooBig = files.find(f => f.size > 15 * 1024 * 1024);
+    if(tooBig){ msg.textContent = `Soubor "${tooBig.name}" je moc velký (max 15 MB).`; return; }
+    for(let i = 0; i < files.length; i++){
+      const file = files[i];
+      msg.textContent = `Nahrávám ${i+1}/${files.length}…`;
+      try{
+        const kind = file.type.startsWith('video/') ? 'video' : 'image';
+        const safeName = `${Date.now()}-${i}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+        const fileRef = ref(storage, `event-photos/${ev.id}/${safeName}`);
+        await uploadBytes(fileRef, file);
+        const url = await getDownloadURL(fileRef);
+        await addDoc(collection(db,'events',ev.id,'photos'), { url, kind, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, ts: new Date().toISOString() });
+      }catch(err){ console.error(err); msg.textContent = `Nahrání souboru "${file.name}" se nepovedlo.`; return; }
+    }
+    fileInput.value = '';
+    msg.textContent = '';
+  });
 
   document.getElementById('btn-add-photo').addEventListener('click', async () => {
     if(!currentUser || !currentNick){ showView('ucet'); return; }
@@ -3612,27 +3640,12 @@ document.getElementById('form-change-nick').addEventListener('submit', async (e)
   }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se — zkus to prosím znovu.'; }
 });
 
-// ---- Profilová fotka (avatar): nahrání přes Storage ----
-document.getElementById('btn-toggle-avatar').addEventListener('click', () => {
-  const form = document.getElementById('form-change-avatar');
-  const opening = form.style.display === 'none';
-  closeAllAccountPanels();
-  if(opening){
-    document.getElementById('new-avatar-input').value = '';
-    document.getElementById('avatar-change-msg').textContent = '';
-    form.style.display = 'flex';
-  }
-});
-document.getElementById('btn-cancel-avatar').addEventListener('click', () => {
-  document.getElementById('form-change-avatar').style.display = 'none';
-});
-document.getElementById('btn-upload-avatar').addEventListener('click', async () => {
+// ---- Profilová fotka (avatar): nahrání přes Storage, rovnou po výběru souboru ----
+document.getElementById('new-avatar-input').addEventListener('change', async (e) => {
   const msg = document.getElementById('avatar-change-msg');
-  const fileInput = document.getElementById('new-avatar-input');
-  const file = fileInput.files[0];
-  if(!currentUser) return;
-  if(!file){ msg.textContent = 'Nejdřív vyber soubor.'; return; }
-  if(file.size > 5 * 1024 * 1024){ msg.textContent = 'Soubor je moc velký (max 5 MB).'; return; }
+  const file = e.target.files[0];
+  if(!currentUser || !file) return;
+  if(file.size > 5 * 1024 * 1024){ msg.textContent = 'Soubor je moc velký (max 5 MB).'; e.target.value = ''; return; }
   msg.textContent = 'Nahrávám...';
   try{
     const fileRef = ref(storage, `avatars/${currentUser.uid}`);
@@ -3640,16 +3653,17 @@ document.getElementById('btn-upload-avatar').addEventListener('click', async () 
     const url = await getDownloadURL(fileRef);
     await updateDoc(doc(db,'users',currentUser.uid), { avatar: url });
     currentAvatar = url;
-    document.getElementById('form-change-avatar').style.display = 'none';
+    msg.textContent = 'Hotovo!';
+    setTimeout(() => { msg.textContent = ''; }, 1500);
     updateAuthUI();
   }catch(err){ console.error(err); msg.textContent = 'Nahrání se nepovedlo — zkus to prosím znovu.'; }
+  e.target.value = '';
 });
 document.getElementById('btn-remove-avatar').addEventListener('click', async () => {
   if(!currentUser) return;
   try{
     await updateDoc(doc(db,'users',currentUser.uid), { avatar: '' });
     currentAvatar = '';
-    document.getElementById('form-change-avatar').style.display = 'none';
     updateAuthUI();
   }catch(err){ console.error(err); }
 });
@@ -3777,7 +3791,6 @@ function closeAllAccountPanels(){
   document.getElementById('form-change-email').style.display = 'none';
   document.getElementById('form-change-phone').style.display = 'none';
   document.getElementById('form-change-emoji').style.display = 'none';
-  document.getElementById('form-change-avatar').style.display = 'none';
   document.getElementById('pw-reset-panel').style.display = 'none';
 }
 
