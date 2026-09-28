@@ -1819,7 +1819,11 @@ function openNewTournamentForm(existing){
     if(!name) return;
     let teams = [], skills = {};
     if(tbDraw.teams){
-      teams = tbDraw.teams.map((t, i) => ({ name: (t.name || '').trim() || `Tým ${i+1}`, members: t.members, emblem: '' }));
+      teams = tbDraw.teams.map((t, i) => {
+        const team = { name: (t.name || '').trim() || `Tým ${i+1}`, members: t.members, emblem: t.emblem || '' };
+        if(t.color) team.color = t.color;
+        return team;
+      });
       tbDraw.players.forEach(p => { skills[tbKey(p.name)] = p.baseSkill; });
     }else{
       const count = Math.max(2, parseInt(document.getElementById('tb-team-count').value, 10) || 4);
@@ -2527,16 +2531,56 @@ function tbRenderDrawnTeams(){
   if(!box) return;
   if(!tbDraw.teams){ box.innerHTML = ''; return; }
   const skillOf = n => (tbDraw.players.find(p => p.name === n) || {}).baseSkill || 0;
-  box.innerHTML = `<div class="section-title" style="font-size:15px; margin-top:18px;">Vylosované týmy — názvy můžeš přepsat</div>
+  box.innerHTML = `<div class="section-title" style="font-size:15px; margin-top:18px;">Vylosované týmy — název, znak a barvu můžeš změnit</div>
     <div class="tb-drawn-grid">` + tbDraw.teams.map((tm, i) => `
       <div class="tb-drawn-team">
-        <input type="text" class="tb-drawn-name" data-tb-tname="${i}" value="${escapeHtml(tm.name)}">
+        <div class="tb-drawn-head">
+          <button type="button" class="team-style-btn" data-dt-toggle="${i}" style="border-color:${tm.color || 'var(--line)'};">
+            <span style="color:${tm.color || 'inherit'};">${tm.emblem || '🚩'}</span>
+          </button>
+          <input type="text" class="tb-drawn-name" data-tb-tname="${i}" value="${escapeHtml(tm.name)}" style="${tm.color ? `color:${tm.color};` : ''}">
+          <div class="team-style-panel" data-dt-panel="${i}" style="display:none;">
+            <div class="team-style-panel-label">Logo</div>
+            <div class="chip-row">
+              ${TEAM_EMBLEMS.map(em => `<span class="chip" data-dt-emblem="${i}" data-val="${em}" style="cursor:pointer; font-size:15px; ${tm.emblem === em ? 'border-color:var(--gold); color:var(--gold);' : ''}">${em}</span>`).join('')}
+            </div>
+            <div class="team-style-panel-label">Barva</div>
+            <div class="chip-row">
+              ${TEAM_COLORS.map(c => `<span class="color-swatch ${tm.color === c ? 'active' : ''}" data-dt-color="${i}" data-val="${c}" style="background:${c};"></span>`).join('')}
+            </div>
+          </div>
+        </div>
         ${tm.members.map(n => `<div class="tb-drawn-member"><span>${escapeHtml(n)}</span><span>${skillOf(n)}</span></div>`).join('')}
         <div class="tb-drawn-total">Σ ${tm.members.reduce((a, n) => a + skillOf(n), 0)}</div>
       </div>`).join('') + `</div>`;
   box.querySelectorAll('[data-tb-tname]').forEach(inp => inp.addEventListener('input', () => {
     tbDraw.teams[parseInt(inp.dataset.tbTname, 10)].name = inp.value;
   }));
+  box.querySelectorAll('[data-dt-toggle]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const i = btn.dataset.dtToggle;
+    box.querySelectorAll('[data-dt-panel]').forEach(p => {
+      p.style.display = (p.dataset.dtPanel === i && p.style.display === 'none') ? 'flex' : 'none';
+    });
+  }));
+  box.querySelectorAll('[data-dt-emblem]').forEach(el => el.addEventListener('click', () => {
+    const tm = tbDraw.teams[parseInt(el.dataset.dtEmblem, 10)];
+    tm.emblem = (tm.emblem === el.dataset.val) ? '' : el.dataset.val;
+    tbRenderDrawnTeams();
+  }));
+  box.querySelectorAll('[data-dt-color]').forEach(el => el.addEventListener('click', () => {
+    const tm = tbDraw.teams[parseInt(el.dataset.dtColor, 10)];
+    tm.color = (tm.color === el.dataset.val) ? '' : el.dataset.val;
+    tbRenderDrawnTeams();
+  }));
+}
+if(!window.__tbDtOutside){
+  window.__tbDtOutside = true;
+  document.addEventListener('click', (e) => {
+    if(!e.target.closest('[data-dt-panel]') && !e.target.closest('[data-dt-toggle]')){
+      document.querySelectorAll('[data-dt-panel]').forEach(p => { p.style.display = 'none'; });
+    }
+  });
 }
 function tbStartDrawFromForm(){
   const size = tbTeamSizeVal();
