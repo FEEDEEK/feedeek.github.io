@@ -1793,11 +1793,12 @@ async function tbLoadSkill(name){
   }catch(err){ return null; }
 }
 
-function tbAddPlayerObj(name, baseSkill){
+function tbAddPlayerObj(name, baseSkill, opts){
+  opts = opts || {};
   if(tbPlayers.some(p => p.name.toLowerCase() === name.toLowerCase())){ return; }
-  tbPlayers.push({ id: Date.now()+Math.random(), name, baseSkill, beers:0, shots:0, joints:0 });
-  tbSaveSkill(name, baseSkill);
-  tbRenderPlayers();
+  tbPlayers.push({ id: Date.now()+Math.random(), name, baseSkill, beers:0, shots:0, joints:0, fromEvent: !!opts.fromEvent });
+  if(opts.persist !== false) tbSaveSkill(name, baseSkill);
+  if(!opts.silent) tbRenderPlayers();
 }
 
 function tbRemovePlayer(id) {
@@ -2402,7 +2403,7 @@ function tbRenderPlayers() {
             <div class="tb-player-item">
                 <div class="tb-player-info">
                     <div class="tb-player-name">${escapeHtml(p.name)} <button type="button" class="tb-remove-btn" data-tb-remove="${p.id}">❌</button></div>
-                    <div class="tb-player-stats">Aktuální Skill: <strong>${currentSkill}</strong> / Základ: ${p.baseSkill}</div>
+                    <div class="tb-player-stats">Aktuální Skill: <strong>${currentSkill}</strong> / Základ: <input type="number" class="tb-skill-input" min="1" max="100" value="${p.baseSkill}" data-tb-skill="${p.id}"></div>
                 </div>
                 <div class="tb-substance-controls">
                     <span class="tb-sub-count">🍺 ${p.beers}</span>
@@ -2416,6 +2417,17 @@ function tbRenderPlayers() {
                     <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|joints|-1">-</button>
                 </div>
             </div>`;
+    });
+    listDiv.querySelectorAll('[data-tb-skill]').forEach(inp => {
+        inp.addEventListener('change', () => {
+            const pl = tbPlayers.find(x => x.id === parseFloat(inp.dataset.tbSkill));
+            const v = Math.min(100, Math.max(1, parseInt(inp.value,10) || 50));
+            if(!pl) return;
+            pl.baseSkill = v;
+            tbSaveSkill(pl.name, v);
+            tbRenderPlayers();
+            if(document.querySelectorAll('#tbTeamsResult .tb-team-card').length > 0) tbRecalculateExistingTeams();
+        });
     });
     listDiv.querySelectorAll('[data-tb-remove]').forEach(btn => {
         btn.addEventListener('click', () => tbRemovePlayer(parseFloat(btn.dataset.tbRemove)));
@@ -2715,19 +2727,14 @@ function renderTeamDrawTool(container){
     <label class="tb-sound-toggle">
       <input type="checkbox" id="tbSoundToggle" checked> 🔊 Zvuky a hlášky
     </label>
-    <div class="tb-voice-picker">
-      <select id="tbVoiceSelect"><option value="">Výchozí hlas</option></select>
-      <button type="button" class="tb-voice-test-btn" id="tbVoiceTestBtn">🔊 Test hlasu</button>
-    </div>
-
-    <div class="field" style="max-width:400px;">
-      <label>Vzít hráče z přihlášených na akci (nepovinné)</label>
+    <div class="field" style="max-width:400px; margin-top:14px;">
+      <label>Akce (hráči se přidají automaticky)</label>
       <select id="tb-event-select">
         <option value="">— vyber akci —</option>
         ${events.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}
       </select>
     </div>
-    <div id="tb-registrants-picker" style="margin-bottom:16px; max-width:400px;"></div>
+    <div id="tb-event-msg" style="margin-bottom:16px; font-size:13px; color:var(--text-muted);"></div>
 
     <button type="button" class="tb-generate-btn" id="tbGenerateBtn">⚡ GENEROVAT VYVÁŽENÉ TÝMY ⚡</button>
     <div class="tb-main-layout">
@@ -2735,7 +2742,7 @@ function renderTeamDrawTool(container){
         <h2>Hráči</h2>
         <div class="tb-form-group">
           <input type="text" id="tbPName" placeholder="Jméno hráče (např. Pepa)">
-          <input type="number" id="tbPSkill" placeholder="Skill (1-100)" min="1" max="100">
+          <input type="number" id="tbPSkill" placeholder="Skill (výchozí 50)" min="1" max="100">
           <button type="button" id="tbAddPlayerBtn">Přidat</button>
         </div>
         <div id="tbPlayersList"></div>
@@ -2750,53 +2757,32 @@ function renderTeamDrawTool(container){
   document.getElementById('tb-back-btn').addEventListener('click', () => { turnajDrawToolOpen = false; renderTurnajPage(); });
 
   document.getElementById('tbSoundToggle').addEventListener('change', (e) => { tbSoundEnabled = e.target.checked; });
-  document.getElementById('tbVoiceTestBtn').addEventListener('click', () => tbSpeak('Ahoj, takhle teď zním. Pepa si dává pivo a slibuje, že tohle bylo fakt poslední.'));
-  document.getElementById('tbVoiceSelect').addEventListener('change', (e) => { tbSelectedVoiceURI = e.target.value; });
-  tbPopulateVoiceList();
-
   document.getElementById('tb-event-select').addEventListener('change', async (e) => {
     const eventId = e.target.value;
-    const pickerBox = document.getElementById('tb-registrants-picker');
-    if(!eventId){ pickerBox.innerHTML = ''; return; }
-    pickerBox.innerHTML = '<div class="empty">Načítám přihlášené...</div>';
+    const msgBox = document.getElementById('tb-event-msg');
+    tbPlayers = tbPlayers.filter(p => !p.fromEvent);
+    if(!eventId){ msgBox.textContent = ''; tbRenderPlayers(); return; }
+    msgBox.textContent = 'Načítám přihlášené...';
     try{
       const snap = await getDocs(collection(db,'events',eventId,'registrations'));
       const regs = snap.docs.map(d=>d.data()).filter(r=>r.status!=='maybe' && r.nick).sort((a,b)=>(a.nick||'').localeCompare(b.nick||''));
-      if(regs.length === 0){ pickerBox.innerHTML = '<div class="empty">Na týhle akci zatím nikdo není přihlášený.</div>'; return; }
+      if(regs.length === 0){ msgBox.textContent = 'Na téhle akci zatím nikdo není přihlášený.'; tbRenderPlayers(); return; }
       const rows = await Promise.all(regs.map(async r => {
-        const savedSkill = await tbLoadSkill(r.nick);
-        return { nick: r.nick, skill: savedSkill !== null ? savedSkill : 50 };
+        const saved = await tbLoadSkill(r.nick);
+        return { nick: r.nick, skill: saved !== null ? saved : 50, hasSaved: saved !== null };
       }));
-      pickerBox.innerHTML = `
-        <div class="tb-registrant-list">
-          ${rows.map((r,i) => `
-            <label class="tb-registrant-row">
-              <input type="checkbox" data-tb-reg-idx="${i}">
-              <span style="flex:1;">${escapeHtml(r.nick)}</span>
-              <input type="number" min="1" max="100" value="${r.skill}" data-tb-reg-skill-idx="${i}" style="width:60px;">
-            </label>
-          `).join('')}
-        </div>
-        <button type="button" class="btn-sm" id="tb-add-checked-btn" style="margin-top:10px;">+ Přidat zaškrtnuté do losování</button>
-      `;
-      document.getElementById('tb-add-checked-btn').addEventListener('click', () => {
-        rows.forEach((r, i) => {
-          const cb = pickerBox.querySelector(`[data-tb-reg-idx="${i}"]`);
-          if(cb && cb.checked){
-            const skillInput = pickerBox.querySelector(`[data-tb-reg-skill-idx="${i}"]`);
-            const skill = parseInt(skillInput.value,10) || 50;
-            tbAddPlayerObj(r.nick, skill);
-          }
-        });
-      });
-    }catch(err){ console.error(err); pickerBox.innerHTML = '<div class="empty">Nepovedlo se načíst.</div>'; }
+      rows.forEach(r => tbAddPlayerObj(r.nick, r.skill, { fromEvent:true, persist:false, silent:true }));
+      tbRenderPlayers();
+      msgBox.textContent = `Přidáno ${rows.length} hráčů z akce.`;
+    }catch(err){ console.error(err); msgBox.textContent = 'Nepovedlo se načíst.'; }
   });
 
   document.getElementById('tbAddPlayerBtn').addEventListener('click', () => {
     const nameInput = document.getElementById('tbPName');
     const skillInput = document.getElementById('tbPSkill');
-    if (!nameInput.value || !skillInput.value) { alert('Vyplň jméno i skill!'); return; }
-    tbAddPlayerObj(nameInput.value.trim(), parseInt(skillInput.value,10));
+    if (!nameInput.value.trim()) { alert('Vyplň jméno hráče!'); return; }
+    const skill = Math.min(100, Math.max(1, parseInt(skillInput.value,10) || 50));
+    tbAddPlayerObj(nameInput.value.trim(), skill);
     nameInput.value = ''; skillInput.value = '';
   });
 
