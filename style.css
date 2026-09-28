@@ -317,19 +317,42 @@ form.panel, .panel{
 .bracket-champion-banner{ margin-top:20px; padding:18px 24px; background:linear-gradient(90deg, rgba(201,162,75,0.15), transparent); border:1px solid var(--gold); text-align:center; font-family:'Cinzel', serif; font-size:18px; color:var(--gold); }
 
 .bracket-round-podium{ min-width:320px; max-width:400px; }
-.podium-wrap{ display:flex; align-items:flex-end; justify-content:center; gap:10px; width:100%; }
-.podium-wrap-big{ gap:18px; max-width:420px; margin:20px auto; }
-.podium-wrap-big .podium-team{ font-size:18px; }
-.podium-wrap-big .aegis-gold{ width:130px; }
-.podium-wrap-big .aegis-silver{ width:96px; }
-.podium-wrap-big .aegis-bronze{ width:78px; }
-.podium-step{ flex:0 1 130px; text-align:center; }
-.podium-team{ font-size:16px; font-weight:700; margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.aegis-holder{ display:flex; align-items:flex-end; justify-content:center; }
-.aegis-img{ height:auto; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)); }
-.aegis-gold{ width:88px; }
-.aegis-silver{ width:66px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) grayscale(0.85) brightness(1.15) contrast(0.95); }
-.aegis-bronze{ width:56px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) sepia(0.55) saturate(2.2) hue-rotate(-28deg) brightness(0.85); }
+.podium-wrap{ display:flex; align-items:flex-end; justify-content:center; gap:22px; width:100%; flex-wrap:wrap; }
+.podium-wrap-big{ gap:30px; max-width:640px; margin:26px auto; }
+.podium-wrap-big .podium-team{ font-size:22px; }
+.podium-wrap-big .aegis-gold{ width:190px; }
+.podium-wrap-big .aegis-silver{ width:142px; }
+.podium-wrap-big .aegis-bronze{ width:116px; }
+.podium-wrap-big .podium-trophy{ width:26px; height:28px; }
+.podium-step{ flex:0 1 190px; text-align:center; }
+.podium-team{ font-size:19px; font-weight:800; margin-bottom:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; justify-content:center; gap:6px; color:#e8e3d8; }
+.podium-trophy{ width:19px; height:20px; flex-shrink:0; }
+.podium-trophy-gold{ color:#f0c94e; filter:drop-shadow(0 0 4px rgba(240,201,76,.7)); }
+.podium-trophy-silver{ color:#c9c9d4; filter:drop-shadow(0 0 4px rgba(201,201,212,.6)); }
+.podium-trophy-bronze{ color:#c9834a; filter:drop-shadow(0 0 4px rgba(201,131,74,.6)); }
+.podium-members{ display:flex; flex-direction:column; gap:2px; margin-top:8px; font-size:12.5px; color:var(--text-muted); }
+.podium-wrap-big .podium-members{ font-size:14px; margin-top:12px; }
+.podium-captain{ color:#f0c94e; font-weight:700; }
+.aegis-holder{ display:flex; align-items:flex-end; justify-content:center; position:relative; }
+.aegis-img{ height:auto; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)); position:relative; z-index:2; }
+.aegis-gold{ width:130px; }
+.aegis-silver{ width:98px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) grayscale(0.85) brightness(1.15) contrast(0.95); }
+.aegis-bronze{ width:82px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) sepia(0.55) saturate(2.2) hue-rotate(-28deg) brightness(0.85); }
+
+.aegis-glow{ position:absolute; left:50%; bottom:8%; width:80%; padding-top:80%; transform:translateX(-50%); border-radius:50%; z-index:1; filter:blur(14px); animation:aegisPulse 2.6s ease-in-out infinite; }
+.aegis-glow-gold{ background:radial-gradient(circle, rgba(240,201,76,.55) 0%, transparent 70%); }
+.aegis-glow-silver{ background:radial-gradient(circle, rgba(201,201,212,.4) 0%, transparent 70%); }
+.aegis-glow-bronze{ background:radial-gradient(circle, rgba(201,131,74,.4) 0%, transparent 70%); }
+@keyframes aegisPulse{ 0%,100%{ opacity:.55; transform:translateX(-50%) scale(0.94); } 50%{ opacity:1; transform:translateX(-50%) scale(1.06); } }
+
+.aegis-sparks{ position:absolute; inset:-14% -14% 0 -14%; z-index:3; pointer-events:none; }
+.aegis-sparks::before, .aegis-sparks::after{
+  content:'✦'; position:absolute; color:#fff6d0; text-shadow:0 0 6px #f0c94e; font-size:13px;
+  animation:aegisSpark 1.8s ease-in-out infinite;
+}
+.aegis-sparks::before{ left:6%; top:14%; animation-delay:.1s; }
+.aegis-sparks::after{ right:6%; top:22%; font-size:10px; animation-delay:.7s; }
+@keyframes aegisSpark{ 0%,100%{ opacity:0; transform:translateY(0) scale(0.6); } 45%{ opacity:1; transform:translateY(-6px) scale(1.1); } }
 
 .bracket-match-exhibition{ opacity:.7; }
 .bracket-exhibition-label{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
@@ -631,6 +654,7 @@ textarea.discussion-input{ padding-right:34px; }
 .ttp-total b{ color:var(--gold); font-size:15px; }
 .ttp-player{ display:flex; align-items:center; gap:8px; font-size:13px; padding:2px 0; }
 .ttp-name{ flex:1; white-space:nowrap; }
+.ttp-captain{ color:#f0c94e; font-weight:800; }
 .ttp-skill{ color:var(--gold); font-weight:600; white-space:nowrap; }
 .ttp-hc{ color:#ff6b6b; font-style:normal; margin-left:5px; font-size:12px; }
 .ttp-drinks{ font-size:11px; color:var(--text-muted); display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
@@ -639,34 +663,34 @@ textarea.discussion-input{ padding-right:34px; }
 .dota-btn{
   position:relative; padding:12px 24px 12px 46px; cursor:pointer; font-family:inherit; font-weight:700; font-size:13px;
   letter-spacing:.09em; text-transform:uppercase; color:#f2c94c;
-  background:linear-gradient(180deg,#3d2514 0%,#1b0f08 100%);
-  border:2px solid #c88a1e; border-radius:3px;
-  box-shadow:0 0 0 1px #2a1808, inset 0 0 14px rgba(242,201,76,.18), 0 4px 16px rgba(0,0,0,.6);
+  background:linear-gradient(180deg,#4a1414 0%,#1c0808 100%);
+  border:2px solid #8b2020; border-radius:3px;
+  box-shadow:0 0 0 1px #2a0808, inset 0 0 14px rgba(220,50,50,.22), 0 4px 16px rgba(0,0,0,.6);
   text-shadow:0 0 8px rgba(242,201,76,.5);
   transition:box-shadow .2s, transform .15s;
 }
 .dota-btn::before{
   content:''; position:absolute; left:17px; top:50%; width:14px; height:14px; transform:translateY(-50%) rotate(45deg);
-  background:radial-gradient(circle at 30% 30%,#ffe9a0,#c88a1e 60%,#6b4a1e); border:1px solid #2a1808;
-  box-shadow:0 0 9px rgba(242,201,76,.75);
+  background:radial-gradient(circle at 30% 30%,#ffb0a0,#c82020 60%,#4a0808); border:1px solid #2a0808;
+  box-shadow:0 0 9px rgba(220,50,50,.8);
 }
 .dota-btn::after{
-  content:''; position:absolute; inset:3px; border:1px solid rgba(242,201,76,.28); pointer-events:none;
+  content:''; position:absolute; inset:3px; border:1px solid rgba(220,50,50,.32); pointer-events:none;
 }
-.dota-btn:hover{ transform:translateY(-1px); box-shadow:0 0 0 1px #2a1808, inset 0 0 18px rgba(242,201,76,.32), 0 0 22px rgba(242,201,76,.35), 0 4px 16px rgba(0,0,0,.6); }
+.dota-btn:hover{ transform:translateY(-1px); box-shadow:0 0 0 1px #2a0808, inset 0 0 18px rgba(220,50,50,.38), 0 0 22px rgba(220,50,50,.4), 0 4px 16px rgba(0,0,0,.6); }
 
-.tb-drink-overlay{ position:fixed; inset:0; z-index:1500; background:rgba(5,4,3,.82); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:18px; }
+.tb-drink-overlay{ position:fixed; inset:0; z-index:1500; background:rgba(6,3,3,.85); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:18px; }
 .tb-drink-modal{
   position:relative; width:860px; max-width:100%; max-height:90vh; display:flex; flex-direction:column;
-  background:linear-gradient(160deg,#241510,#100a07); border:2px solid #c88a1e; border-radius:12px;
-  box-shadow:0 0 40px rgba(242,201,76,.22), inset 0 0 30px rgba(0,0,0,.5); padding:24px 26px;
+  background:linear-gradient(160deg,#241012,#140708); border:2px solid #8b2020; border-radius:12px;
+  box-shadow:0 0 40px rgba(220,50,50,.25), inset 0 0 30px rgba(0,0,0,.5); padding:24px 26px;
 }
-.tb-drink-title{ color:#f2c94c; font-size:22px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; text-shadow:0 0 10px rgba(242,201,76,.45); }
-.tb-drink-sub{ color:#b89b6a; font-size:13px; margin:4px 0 14px; }
+.tb-drink-title{ color:#e05050; font-size:22px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; text-shadow:0 0 10px rgba(220,50,50,.5); }
+.tb-drink-sub{ color:#b08a8a; font-size:13px; margin:4px 0 14px; }
 .tb-drink-body{ overflow-y:auto; padding-right:6px; }
 .tb-drink-team{ margin-bottom:16px; }
-.tb-drink-teamname{ color:#f2c94c; font-weight:700; border-bottom:1px solid #6b4a1e; padding-bottom:4px; margin-bottom:6px; }
-.tb-drink-row{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #2c1c12; color:#e8dcc8; font-size:14px; }
+.tb-drink-teamname{ color:#f2c94c; font-weight:700; border-bottom:1px solid #6b2c2c; padding-bottom:4px; margin-bottom:6px; }
+.tb-drink-row{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #2c1414; color:#e8dcc8; font-size:14px; }
 .tb-drink-name{ flex:1; min-width:120px; font-weight:600; }
 .tb-drink-skill{ font-size:12px; color:#b89b6a; display:flex; align-items:center; gap:5px; }
 .tb-drink-skill input{ width:54px; padding:3px 6px; background:#241713; color:#f0e6d2; border:1px solid #6b4a1e; border-radius:4px; }
