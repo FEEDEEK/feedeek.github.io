@@ -359,7 +359,14 @@
         <div class="field"><label>Role / popisek</label><input type="text" id="ct-role" placeholder="Hlavní organizátor, Vrchní kuchař, Hlavní hulič..."></div>
         <div class="field"><label>Kontakt (e-mail / telefon)</label><input type="text" id="ct-contact" placeholder="jmeno@email.cz nebo +420..."></div>
         <div class="field"><label>Emotikon nebo krátký popisek (nepovinné)</label><input type="text" id="ct-emoji" placeholder="🎮" maxlength="4" style="max-width:80px;"></div>
-        <div class="field"><label>URL fotky (nepovinné)</label><input type="url" id="ct-photo" placeholder="https://..."></div>
+        <div class="field">
+          <label>URL fotky (nepovinné)</label>
+          <div style="display:flex; gap:8px;">
+            <input type="url" id="ct-photo" placeholder="https://..." style="flex:1;">
+            <button type="button" class="btn-ghost btn-sm" id="btn-fetch-contact-avatar" style="white-space:nowrap;">🔗 Načíst podle jména</button>
+          </div>
+          <small>Pokud se jméno kontaktu shoduje s přezdívkou zaregistrovaného uživatele, načte se jeho nahraná profilová fotka.</small>
+        </div>
         <div style="display:flex; gap:10px;">
           <button type="submit" id="btn-save-contact">Uložit</button>
           <button type="button" class="btn-ghost" id="btn-cancel-contact">Zrušit</button>
