@@ -691,7 +691,8 @@ textarea.discussion-input{ padding-right:34px; }
 .tb-draw-remove{ background:transparent; border:1px solid var(--crimson); color:var(--crimson); cursor:pointer; padding:2px 8px; }
 .tb-drawn-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; margin-top:8px; }
 .tb-drawn-team{ background:var(--bg-panel-2); border:1px solid var(--line); border-top:2px solid var(--gold-dim); padding:10px 12px; }
-.tb-drawn-name{ width:100%; background:var(--bg-void); border:1px solid var(--line); color:var(--gold); font-weight:700; padding:5px 8px; margin-bottom:6px; font-family:inherit; }
+.tb-drawn-head{ display:flex; gap:8px; align-items:center; margin-bottom:8px; position:relative; }
+.tb-drawn-name{ flex:1; min-width:0; background:var(--bg-void); border:1px solid var(--line); color:var(--gold); font-weight:700; padding:6px 8px; font-family:inherit; }
 .tb-drawn-member{ display:flex; justify-content:space-between; font-size:13px; padding:2px 0; }
 .tb-drawn-total{ text-align:right; font-size:12px; color:var(--text-muted); margin-top:4px; border-top:1px solid var(--line); padding-top:4px; }
 
