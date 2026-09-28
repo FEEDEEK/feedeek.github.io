@@ -622,3 +622,95 @@ textarea.discussion-input{ padding-right:34px; }
 .tb-s2{ animation-delay:0.6s; }
 @keyframes tbSmokeRise{ 0%{ transform:translateY(0) scale(0.6); opacity:0; } 15%{ opacity:0.7; } 100%{ transform:translateY(-30px) scale(1.3); opacity:0; } }
 .tb-skill-input{ width:56px; padding:2px 6px; background:#241713; color:#f0e6d2; border:1px solid #6b4a1e; border-radius:4px; font-size:12px; }
+
+/* ==================== TURNAJ: týmy nad pavoukem, handicap, projektor ==================== */
+.tourney-teams-panel{ display:flex; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+.ttp-card{ background:var(--bg-panel); border:1px solid var(--line); border-top:2px solid var(--gold-dim); padding:10px 14px; min-width:190px; }
+.ttp-head{ display:flex; justify-content:space-between; align-items:baseline; gap:14px; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:6px; font-weight:700; }
+.ttp-total{ font-size:12px; color:var(--text-muted); font-weight:500; white-space:nowrap; }
+.ttp-total b{ color:var(--gold); font-size:15px; }
+.ttp-player{ display:flex; align-items:center; gap:8px; font-size:13px; padding:2px 0; }
+.ttp-name{ flex:1; white-space:nowrap; }
+.ttp-skill{ color:var(--gold); font-weight:600; white-space:nowrap; }
+.ttp-hc{ color:#ff6b6b; font-style:normal; margin-left:5px; font-size:12px; }
+.ttp-drinks{ font-size:11px; color:var(--text-muted); display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+
+.tourney-corner-actions{ align-items:center; flex-wrap:wrap; justify-content:flex-end; max-width:90vw; }
+.dota-btn{
+  position:relative; padding:12px 24px 12px 46px; cursor:pointer; font-family:inherit; font-weight:700; font-size:13px;
+  letter-spacing:.09em; text-transform:uppercase; color:#f2c94c;
+  background:linear-gradient(180deg,#3d2514 0%,#1b0f08 100%);
+  border:2px solid #c88a1e; border-radius:3px;
+  box-shadow:0 0 0 1px #2a1808, inset 0 0 14px rgba(242,201,76,.18), 0 4px 16px rgba(0,0,0,.6);
+  text-shadow:0 0 8px rgba(242,201,76,.5);
+  transition:box-shadow .2s, transform .15s;
+}
+.dota-btn::before{
+  content:''; position:absolute; left:17px; top:50%; width:14px; height:14px; transform:translateY(-50%) rotate(45deg);
+  background:radial-gradient(circle at 30% 30%,#ffe9a0,#c88a1e 60%,#6b4a1e); border:1px solid #2a1808;
+  box-shadow:0 0 9px rgba(242,201,76,.75);
+}
+.dota-btn::after{
+  content:''; position:absolute; inset:3px; border:1px solid rgba(242,201,76,.28); pointer-events:none;
+}
+.dota-btn:hover{ transform:translateY(-1px); box-shadow:0 0 0 1px #2a1808, inset 0 0 18px rgba(242,201,76,.32), 0 0 22px rgba(242,201,76,.35), 0 4px 16px rgba(0,0,0,.6); }
+
+.tb-drink-overlay{ position:fixed; inset:0; z-index:1500; background:rgba(5,4,3,.82); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:18px; }
+.tb-drink-modal{
+  position:relative; width:860px; max-width:100%; max-height:90vh; display:flex; flex-direction:column;
+  background:linear-gradient(160deg,#241510,#100a07); border:2px solid #c88a1e; border-radius:12px;
+  box-shadow:0 0 40px rgba(242,201,76,.22), inset 0 0 30px rgba(0,0,0,.5); padding:24px 26px;
+}
+.tb-drink-title{ color:#f2c94c; font-size:22px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; text-shadow:0 0 10px rgba(242,201,76,.45); }
+.tb-drink-sub{ color:#b89b6a; font-size:13px; margin:4px 0 14px; }
+.tb-drink-body{ overflow-y:auto; padding-right:6px; }
+.tb-drink-team{ margin-bottom:16px; }
+.tb-drink-teamname{ color:#f2c94c; font-weight:700; border-bottom:1px solid #6b4a1e; padding-bottom:4px; margin-bottom:6px; }
+.tb-drink-row{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #2c1c12; color:#e8dcc8; font-size:14px; }
+.tb-drink-name{ flex:1; min-width:120px; font-weight:600; }
+.tb-drink-skill{ font-size:12px; color:#b89b6a; display:flex; align-items:center; gap:5px; }
+.tb-drink-skill input{ width:54px; padding:3px 6px; background:#241713; color:#f0e6d2; border:1px solid #6b4a1e; border-radius:4px; }
+.tb-drink-eff{ min-width:70px; font-size:13px; color:#b89b6a; }
+.tb-drink-eff b{ color:#f2c94c; }
+.tb-drink-eff em{ color:#ff6b6b; font-style:normal; }
+.tb-drink-ctl{ display:inline-flex; align-items:center; gap:5px; }
+.tb-drink-ctl b{ min-width:18px; text-align:center; color:#f0e6d2; }
+.tb-drink-ico{ display:inline-flex; align-items:center; width:20px; }
+
+.tb-form-row{ display:flex; gap:14px; }
+.tb-form-row .field{ flex:1; }
+.tb-draw-section{ border-top:1px solid var(--line); padding-top:14px; }
+.tb-draw-addrow{ display:flex; gap:8px; margin:10px 0; }
+.tb-draw-addrow input{ background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:8px 10px; font-family:inherit; font-size:14px; }
+.tb-draw-addrow input[type="text"]{ flex:2; }
+.tb-draw-addrow input[type="number"]{ flex:1; max-width:120px; }
+.tb-draw-player{ display:flex; align-items:center; gap:12px; padding:6px 0; border-bottom:1px solid var(--line); font-size:14px; }
+.tb-draw-name{ flex:1; }
+.tb-draw-skill{ font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
+.tb-draw-skill input{ width:60px; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:3px 6px; }
+.tb-draw-remove{ background:transparent; border:1px solid var(--crimson); color:var(--crimson); cursor:pointer; padding:2px 8px; }
+.tb-drawn-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; margin-top:8px; }
+.tb-drawn-team{ background:var(--bg-panel-2); border:1px solid var(--line); border-top:2px solid var(--gold-dim); padding:10px 12px; }
+.tb-drawn-name{ width:100%; background:var(--bg-void); border:1px solid var(--line); color:var(--gold); font-weight:700; padding:5px 8px; margin-bottom:6px; font-family:inherit; }
+.tb-drawn-member{ display:flex; justify-content:space-between; font-size:13px; padding:2px 0; }
+.tb-drawn-total{ text-align:right; font-size:12px; color:var(--text-muted); margin-top:4px; border-top:1px solid var(--line); padding-top:4px; }
+
+.tb-slot-compact .tb-reel-item span{ font-size:12.5px; }
+
+.tb-unlock-sound{
+  position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:2500; cursor:pointer;
+  padding:14px 26px; font-size:16px; font-weight:700; color:#1a1005; border:none; border-radius:6px;
+  background:linear-gradient(135deg,#f2c94c,#c88a1e); box-shadow:0 0 26px rgba(242,201,76,.6);
+  animation:tbUnlockPulse 1.6s ease-in-out infinite;
+}
+@keyframes tbUnlockPulse{ 0%,100%{ box-shadow:0 0 14px rgba(242,201,76,.4); } 50%{ box-shadow:0 0 34px rgba(242,201,76,.85); } }
+
+/* projektorový režim: jen turnaj, bez menu */
+body.projector-mode .topbar, body.projector-mode .dev-banner{ display:none; }
+body.projector-mode .main{ padding:16px 24px 20px; }
+body.projector-mode .tourney-corner-actions{ display:none; }
+body.projector-mode .ttp-card{ font-size:1.12em; }
+@media (max-width:760px){
+  .tb-form-row{ flex-direction:column; gap:0; }
+  .tb-drink-row{ gap:8px; }
+}
