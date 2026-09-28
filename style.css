@@ -318,7 +318,7 @@ form.panel, .panel{
 
 .bracket-round-podium{ min-width:320px; max-width:400px; }
 .podium-wrap{ display:flex; align-items:flex-end; justify-content:center; gap:22px; width:100%; flex-wrap:wrap; }
-.podium-wrap-big{ gap:30px; max-width:640px; margin:26px auto; }
+.podium-wrap-big{ gap:24px; max-width:100%; margin:26px auto; flex-wrap:nowrap; }
 .podium-wrap-big .podium-team{ font-size:22px; }
 .podium-wrap-big .aegis-gold{ width:190px; }
 .podium-wrap-big .aegis-silver{ width:142px; }
@@ -370,7 +370,7 @@ form.panel, .panel{
 .score-modal{ background:var(--bg-panel); border:1px solid var(--gold-dim); padding:24px; width:280px; display:flex; flex-direction:column; gap:12px; }
 .score-modal .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .score-modal input{ width:60px; text-align:center; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:6px; }
-.result-modal{ width:460px; max-width:90vw; }
+.result-modal{ width:720px; max-width:94vw; }
 .team-editor-modal{ width:920px; max-width:94vw; max-height:85vh; overflow-y:auto; }
 
 /* ---- Jídlo: checkboxy ---- */
