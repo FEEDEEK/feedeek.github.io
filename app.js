@@ -1568,6 +1568,34 @@ onSnapshot(collection(db, 'tournaments'), (snap) => {
 });
 
 function teamName(t, idx){ return t.teams[idx] ? t.teams[idx].name : `Tým ${idx+1}`; }
+function teamObj(t, idx){ return t.teams[idx] || { name: `Tým ${idx+1}`, members:[] }; }
+function teamCaptain(t, tm){
+  let best = null, bestSkill = -1;
+  (tm.members || []).forEach(n => {
+    const s = tbEffectiveStats(t, n);
+    const base = s.base === null ? 0 : s.base;
+    if(base > bestSkill){ bestSkill = base; best = n; }
+  });
+  return best;
+}
+function teamMembersHtml(t, tm){
+  if(!(tm.members || []).length) return '';
+  const capt = teamCaptain(t, tm);
+  return `<div class="podium-members">${tm.members.map(n => n === capt
+    ? `<span class="podium-captain">👑 ${escapeHtml(n)}</span>`
+    : `<span>${escapeHtml(n)}</span>`).join('')}</div>`;
+}
+function trophySvg(rank){
+  const cls = rank === 1 ? 'gold' : rank === 2 ? 'silver' : 'bronze';
+  return `<svg class="podium-trophy podium-trophy-${cls}" viewBox="0 0 24 26" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 3h12v4a6 6 0 0 1-6 6 6 6 0 0 1-6-6V3Z" fill="currentColor" stroke="#241f14" stroke-width="1"/>
+    <path d="M6 4H3a3 3 0 0 0 3 5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <path d="M18 4h3a3 3 0 0 1-3 5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <rect x="10.5" y="13" width="3" height="4" fill="currentColor"/>
+    <path d="M7 20h10l-1.4-3H8.4L7 20Z" fill="currentColor" stroke="#241f14" stroke-width="1"/>
+    <text x="12" y="9.5" font-size="7" font-weight="800" text-anchor="middle" fill="#241f14">${rank}</text>
+  </svg>`;
+}
 
 // ---- Horní stránka "Turnaj" (celostránkové zobrazení, správa) ----
 function renderTurnajPage(){
@@ -1618,7 +1646,7 @@ function renderTurnajPage(){
         const drinkBtn = document.createElement('button');
         drinkBtn.type = 'button';
         drinkBtn.className = 'dota-btn';
-        drinkBtn.textContent = 'Handicap · pití';
+        drinkBtn.textContent = 'Handicap';
         drinkBtn.addEventListener('click', () => openTbDrinkModal(t));
         cornerActions.appendChild(drinkBtn);
       }
@@ -2943,12 +2971,14 @@ function renderTourneyTeamsPanel(t, box){
     if(!teams.some(tm => (tm.members || []).length)){ box.innerHTML = ''; return; }
     box.innerHTML = teams.map((tm, i) => {
         let sumEff = 0, sumHc = 0, any = false;
+        const capt = teamCaptain(t, tm);
         const rows = (tm.members || []).map(n => {
             const s = tbEffectiveStats(t, n);
             if(s.eff !== null){ any = true; sumEff += s.eff; sumHc += s.handicap; }
             const dr = (s.beers || s.shots || s.joints)
                 ? `<span class="ttp-drinks">${s.beers ? `🍺${s.beers} ` : ''}${s.shots ? `${TB_SHOT_ICON}${s.shots} ` : ''}${s.joints ? `${TB_JOINT_ICON}${s.joints}` : ''}</span>` : '';
-            return `<div class="ttp-player"><span class="ttp-name">${escapeHtml(n)}</span>${dr}<span class="ttp-skill">${s.base !== null ? s.base : '–'}${s.handicap > 0 ? `<em class="ttp-hc">−${s.handicap}</em>` : ''}</span></div>`;
+            const isCapt = n === capt;
+            return `<div class="ttp-player"><span class="ttp-name ${isCapt ? 'ttp-captain' : ''}">${isCapt ? '👑 ' : ''}${escapeHtml(n)}</span>${dr}<span class="ttp-skill">${s.base !== null ? s.base : '–'}${s.handicap > 0 ? `<em class="ttp-hc">−${s.handicap}</em>` : ''}</span></div>`;
         }).join('');
         const nameStyle = tm.color ? `style="color:${tm.color};"` : '';
         return `<div class="ttp-card">
@@ -3262,15 +3292,28 @@ function buildPodiumHtml(t, swiss, big){
   const p3 = swiss.placements.find(p=>p.rank===3);
   const rest = swiss.placements.filter(p=>p.rank>3);
   const aegisImg = (rankClass) => `<img src="AEGIS.png" alt="" class="aegis-img ${rankClass}">`;
+  const step = (p, idx, rankClass, rank) => {
+    const tm = teamObj(t, p.team);
+    const nameStyle = tm.color ? `style="color:${tm.color};"` : '';
+    return `<div class="podium-step podium-${rank}">
+      <div class="podium-team" ${nameStyle}>${trophySvg(rank)}${tm.emblem ? escapeHtml(tm.emblem) + ' ' : ''}${escapeHtml(teamName(t,p.team))}</div>
+      <div class="aegis-holder"><div class="aegis-glow aegis-glow-${rankClass}"></div>${rank===1?'<div class="aegis-sparks"></div>':''}${aegisImg('aegis-'+rankClass)}</div>
+      ${teamMembersHtml(t, tm)}
+    </div>`;
+  };
   let html = `<div class="podium-wrap ${big?'podium-wrap-big':''}">`;
-  if(p2) html += `<div class="podium-step podium-2"><div class="podium-team">${escapeHtml(teamName(t,p2.team))}</div><div class="aegis-holder">${aegisImg('aegis-silver')}</div></div>`;
-  if(p1) html += `<div class="podium-step podium-1"><div class="podium-team">${escapeHtml(teamName(t,p1.team))}</div><div class="aegis-holder">${aegisImg('aegis-gold')}</div></div>`;
-  if(p3) html += `<div class="podium-step podium-3"><div class="podium-team">${escapeHtml(teamName(t,p3.team))}</div><div class="aegis-holder">${aegisImg('aegis-bronze')}</div></div>`;
+  if(p2) html += step(p2, 2, 'silver', 2);
+  if(p1) html += step(p1, 1, 'gold', 1);
+  if(p3) html += step(p3, 3, 'bronze', 3);
   html += `</div>`;
   if(rest.length > 0){
     html += rest.map(p => {
       const isFourth = p.rank === 4;
-      return `<div class="bracket-slot" style="margin-top:8px;"><span>${isFourth ? '🥔' : (p.rank+'.')} ${escapeHtml(teamName(t,p.team))}</span></div>`;
+      const tm = teamObj(t, p.team);
+      return `<div class="bracket-slot" style="margin-top:8px; flex-direction:column; align-items:flex-start;">
+        <span>${isFourth ? '🥔' : (p.rank+'.')} ${tm.emblem ? escapeHtml(tm.emblem) + ' ' : ''}<span ${tm.color?`style=\"color:${tm.color};\"`:''}>${escapeHtml(teamName(t,p.team))}</span></span>
+        ${teamMembersHtml(t, tm)}
+      </div>`;
     }).join('');
   }
   return html;
