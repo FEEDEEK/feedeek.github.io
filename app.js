@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, getDocFromServer, getDocs, setDoc,
-  updateDoc, deleteDoc, arrayUnion, arrayRemove
+  updateDoc, deleteDoc, arrayUnion, arrayRemove, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
@@ -193,22 +193,22 @@ function applyRoute(){
   closeEventForm();
   closeContactForm();
   const raw = location.hash.replace(/^#/, '');
-  const [view, id] = raw.split('/');
+  const [view, id, sub] = raw.split('/');
+  turnajProjectorMode = (view === 'turnaj' && !!id && sub === 'projektor');
+  document.body.classList.toggle('projector-mode', turnajProjectorMode);
+  if(!turnajProjectorMode) document.querySelectorAll('.tb-unlock-sound').forEach(b => b.remove());
+  if(view !== 'turnaj'){ tbStopLive(); tbCloseDrinkModal(); }
 
   if(view === 'event' && id){
     currentTournamentId = null;
-    turnajDrawToolOpen = false;
     openEventDetail(id);
   }else if(view === 'turnaj'){
     currentTournamentId = id || null;
-    turnajDrawToolOpen = false;
     showView('turnaj');
     renderTurnajPage();
   }else if(view){
-    turnajDrawToolOpen = false;
     showView(view);
   }else{
-    turnajDrawToolOpen = false;
     showView('home');
   }
 }
@@ -1553,7 +1553,7 @@ function renderTabJidlo(ev){
 // ---- Turnaj: samostatná kolekce, propojená s konkrétní akcí přes eventId ----
 let allTournaments = [];
 let currentTournamentId = null;
-let turnajDrawToolOpen = false;
+let turnajProjectorMode = false;
 const TEAM_EMBLEMS = ['🛡️','⚔️','🐺','🦅','🔥','💀','👑','🌙','⭐','🐉','🦁','🍀','🐍','🦂','⚡','🎯'];
 const TEAM_COLORS = ['#e8e3d8','#c9a24b','#8b2635','#2f8f8f','#4a90d9','#9b59b6','#e67e22','#2ecc71','#e84393','#95a5a6'];
 
@@ -1574,10 +1574,8 @@ function renderTurnajPage(){
   const box = document.getElementById('view-turnaj-content');
   if(!box) return;
 
-  if(turnajDrawToolOpen){
-    renderTeamDrawTool(box);
-    return;
-  }
+  document.querySelectorAll('.tb-unlock-sound').forEach(b => b.remove());
+  tbRefreshDrinkModal();
 
   if(currentTournamentId){
     const t = allTournaments.find(x => x.id === currentTournamentId);
@@ -1585,6 +1583,7 @@ function renderTurnajPage(){
     const ev = events.find(x => x.id === t.eventId);
     const swissPreview = computeSwissTournament(t);
     box.innerHTML = `
+      <div class="tourney-teams-panel" id="tourney-teams-panel"></div>
       <div class="tourney-main-row">
         <div class="tourney-bracket-col">
           <div class="bracket-scale-wrap" id="turnaj-detail-body"></div>
@@ -1602,7 +1601,37 @@ function renderTurnajPage(){
     `;
 
     const cornerActions = document.getElementById('tourney-corner-actions');
-    if(hasPerm('turnaj')){
+    if(location.hash.startsWith('#turnaj')) tbEnsureLive(t.id);
+    renderTourneyTeamsPanel(t, document.getElementById('tourney-teams-panel'));
+
+    if(turnajProjectorMode){
+      if(!tbSoundUnlocked){
+        const unlock = document.createElement('button');
+        unlock.type = 'button';
+        unlock.className = 'tb-unlock-sound';
+        unlock.textContent = '🔊 Klikni pro zapnutí zvuku';
+        unlock.addEventListener('click', () => { tbUnlockSound(); unlock.remove(); });
+        document.body.appendChild(unlock);
+      }
+    }else{
+      if(hasPerm('turnaj')){
+        const drinkBtn = document.createElement('button');
+        drinkBtn.type = 'button';
+        drinkBtn.className = 'dota-btn';
+        drinkBtn.textContent = 'Handicap · pití';
+        drinkBtn.addEventListener('click', () => openTbDrinkModal(t));
+        cornerActions.appendChild(drinkBtn);
+      }
+      const projBtn = document.createElement('button');
+      projBtn.type = 'button';
+      projBtn.className = 'btn-ghost btn-sm';
+      projBtn.textContent = '📺 Projektor';
+      projBtn.title = 'Otevře turnaj v samostatném okně pro promítání (aktualizuje se samo)';
+      projBtn.addEventListener('click', () => window.open(`${location.origin}${location.pathname}#turnaj/${t.id}/projektor`, '_blank'));
+      cornerActions.appendChild(projBtn);
+    }
+
+    if(hasPerm('turnaj') && !turnajProjectorMode){
       const toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
       toggleBtn.className = 'btn-ghost btn-sm';
@@ -1639,14 +1668,11 @@ function renderTurnajPage(){
   }
 
   // seznam turnajů
+  tbStopLive();
   let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaj</h1></div><div style="display:flex; gap:10px;">`;
-  html += hasPerm('turnaj') ? `<button type="button" class="btn-ghost" id="btn-open-draw-tool">🎰 Losovačka týmů</button>` : '';
   html += hasPerm('turnaj') ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
   html += `</div></div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
   box.innerHTML = html;
-
-  const drawToolBtn = document.getElementById('btn-open-draw-tool');
-  if(drawToolBtn) drawToolBtn.addEventListener('click', () => { turnajDrawToolOpen = true; renderTurnajPage(); });
 
   const newBtn = document.getElementById('btn-new-tourney-page');
   if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm());
@@ -1705,20 +1731,125 @@ function renderTurnajPage(){
 }
 
 function openNewTournamentForm(existing){
+  if(existing){ openEditTournamentForm(existing); return; }
   const slot = document.getElementById('turnaj-form-slot');
   const evOptions = [...events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
-  const isEdit = !!existing;
+  tbDraw = { players: [], teams: null };
+  slot.innerHTML = `
+    <form class="panel" id="form-new-tourney" style="max-width:940px;">
+      <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" required></div>
+      <div class="field"><label>Akce (hráči se načtou automaticky)</label><select id="new-tourney-event">
+        <option value="">— bez přiřazené akce —</option>
+        ${evOptions.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}${e.dateEnd < todayIso() ? ' (proběhlo)' : ''}</option>`).join('')}
+      </select><small id="tb-event-msg"></small></div>
+      <div class="tb-form-row">
+        <div class="field"><label>Hráčů v týmu</label><input type="number" id="tb-team-size" min="1" max="6" value="3"></div>
+        <div class="field"><label>Počet týmů</label><input type="number" id="tb-team-count" min="2" placeholder="auto"></div>
+      </div>
+      <div class="field"><label>URL obrázku turnaje (nepovinné)</label><input type="url" id="new-tourney-image"></div>
+
+      <div class="tb-draw-section">
+        <div class="section-title" style="font-size:15px;">Hráči do losování</div>
+        <div class="tb-draw-addrow">
+          <input type="text" id="tb-add-name" placeholder="Přidat hráče ručně (jméno)">
+          <input type="number" id="tb-add-skill" min="1" max="100" placeholder="Skill (50)">
+          <button type="button" class="btn-sm" id="tb-add-btn">Přidat</button>
+        </div>
+        <div id="tb-draw-players"></div>
+        <button type="button" class="btn-ghost" id="tb-draw-btn" style="margin-top:12px;">🎰 Losovat týmy</button>
+        <small style="display:block; margin-top:6px; color:var(--text-muted);">Losování je nepovinné — bez něj se vytvoří prázdné týmy a hráče do nich přidáš přes "Upravit týmy".</small>
+      </div>
+      <div id="tb-drawn-teams"></div>
+
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <button type="submit">Vytvořit turnaj</button>
+        <button type="button" class="btn-ghost" id="btn-cancel-new-tourney">Zrušit</button>
+      </div>
+    </form>
+  `;
+  slot.scrollIntoView({ behavior:'smooth', block:'start' });
+  tbRenderDrawPlayers();
+
+  document.getElementById('btn-cancel-new-tourney').addEventListener('click', () => { slot.innerHTML = ''; tbDraw = { players: [], teams: null }; });
+  document.getElementById('tb-team-size').addEventListener('input', () => { tbUpdateTeamCountHint(); tbInvalidateDraw(); });
+  document.getElementById('tb-team-count').addEventListener('input', () => tbInvalidateDraw());
+
+  document.getElementById('new-tourney-event').addEventListener('change', async (e) => {
+    const eventId = e.target.value;
+    const msg = document.getElementById('tb-event-msg');
+    tbDraw.players = tbDraw.players.filter(p => !p.fromEvent);
+    tbInvalidateDraw();
+    if(!eventId){ msg.textContent = ''; tbRenderDrawPlayers(); return; }
+    msg.textContent = 'Načítám přihlášené...';
+    try{
+      const snap = await getDocs(collection(db,'events',eventId,'registrations'));
+      const regs = snap.docs.map(d=>d.data()).filter(r => r.status !== 'maybe' && r.nick).sort((a,b)=>(a.nick||'').localeCompare(b.nick||''));
+      const rows = await Promise.all(regs.map(async r => {
+        const saved = await tbLoadSkill(r.nick);
+        return { nick: r.nick, skill: saved !== null ? saved : 50 };
+      }));
+      rows.forEach(r => tbAddDrawPlayer(r.nick, r.skill, { fromEvent:true, persist:false }));
+      tbRenderDrawPlayers();
+      msg.textContent = rows.length ? `Načteno ${rows.length} hráčů, kteří určitě jedou.` : 'Na téhle akci zatím nikdo určitě nejede.';
+    }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se načíst přihlášené.'; }
+  });
+
+  document.getElementById('tb-add-btn').addEventListener('click', () => {
+    const nameInput = document.getElementById('tb-add-name');
+    const skillInput = document.getElementById('tb-add-skill');
+    const name = nameInput.value.trim();
+    if(!name){ alert('Vyplň jméno hráče.'); return; }
+    const skill = Math.min(100, Math.max(1, parseInt(skillInput.value, 10) || 50));
+    tbAddDrawPlayer(name, skill);
+    nameInput.value = ''; skillInput.value = '';
+    tbRenderDrawPlayers();
+    tbInvalidateDraw();
+  });
+  document.getElementById('tb-add-name').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('tb-add-btn').click(); }
+  });
+
+  document.getElementById('tb-draw-btn').addEventListener('click', tbStartDrawFromForm);
+
+  document.getElementById('form-new-tourney').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('new-tourney-name').value.trim();
+    const eventId = document.getElementById('new-tourney-event').value;
+    const imageUrl = document.getElementById('new-tourney-image').value.trim();
+    if(!name) return;
+    let teams = [], skills = {};
+    if(tbDraw.teams){
+      teams = tbDraw.teams.map((t, i) => ({ name: (t.name || '').trim() || `Tým ${i+1}`, members: t.members, emblem: '' }));
+      tbDraw.players.forEach(p => { skills[tbKey(p.name)] = p.baseSkill; });
+    }else{
+      const count = Math.max(2, parseInt(document.getElementById('tb-team-count').value, 10) || 4);
+      for(let i = 0; i < count; i++) teams.push({ name: `Tým ${i+1}`, members: [], emblem: '' });
+    }
+    try{
+      const docRef = await addDoc(collection(db,'tournaments'), {
+        name, eventId, teams, results:{}, swissResults:{}, imageUrl,
+        skills, drinks:{}, teamSize: tbTeamSizeVal(), createdAt: new Date().toISOString()
+      });
+      slot.innerHTML = '';
+      tbDraw = { players: [], teams: null };
+      setRoute('#turnaj/' + docRef.id);
+    }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
+  });
+}
+
+function openEditTournamentForm(existing){
+  const slot = document.getElementById('turnaj-form-slot');
+  const evOptions = [...events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
   slot.innerHTML = `
     <form class="panel" id="form-new-tourney">
-      <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" value="${isEdit?escapeHtml(existing.name):''}" required></div>
+      <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" value="${escapeHtml(existing.name)}" required></div>
       <div class="field"><label>Akce (nepovinné)</label><select id="new-tourney-event">
         <option value="">— bez přiřazené akce —</option>
-        ${evOptions.map(e=>`<option value="${e.id}" ${isEdit && existing.eventId===e.id?'selected':''}>${escapeHtml(e.name)}${e.dateEnd < todayIso() ? ' (proběhlo)' : ''}</option>`).join('')}
+        ${evOptions.map(e=>`<option value="${e.id}" ${existing.eventId===e.id?'selected':''}>${escapeHtml(e.name)}${e.dateEnd < todayIso() ? ' (proběhlo)' : ''}</option>`).join('')}
       </select></div>
-      ${isEdit ? '' : `<div class="field"><label>Počet týmů</label><input type="number" id="new-tourney-count" min="2" value="4"></div>`}
-      <div class="field"><label>URL obrázku turnaje (nepovinné)</label><input type="url" id="new-tourney-image" value="${isEdit?escapeHtml(existing.imageUrl||''):''}"></div>
+      <div class="field"><label>URL obrázku turnaje (nepovinné)</label><input type="url" id="new-tourney-image" value="${escapeHtml(existing.imageUrl||'')}"></div>
       <div style="display:flex; gap:10px;">
-        <button type="submit">${isEdit ? 'Uložit změny' : 'Vytvořit'}</button>
+        <button type="submit">Uložit změny</button>
         <button type="button" class="btn-ghost" id="btn-cancel-new-tourney">Zrušit</button>
       </div>
     </form>
@@ -1732,15 +1863,7 @@ function openNewTournamentForm(existing){
     const imageUrl = document.getElementById('new-tourney-image').value.trim();
     if(!name) return;
     try{
-      if(isEdit){
-        await updateDoc(doc(db,'tournaments',existing.id), { name, eventId, imageUrl });
-      }else{
-        const count = Math.max(2, parseInt(document.getElementById('new-tourney-count').value,10)||2);
-        const teams = [];
-        for(let i=0;i<count;i++) teams.push({ name:`Tým ${i+1}`, members:[], emblem:'' });
-        const docRef = await addDoc(collection(db,'tournaments'), { name, eventId, teams, results:{}, swissResults:{}, imageUrl, createdAt: new Date().toISOString() });
-        currentTournamentId = docRef.id;
-      }
+      await updateDoc(doc(db,'tournaments',existing.id), { name, eventId, imageUrl });
       slot.innerHTML = '';
       renderTurnajPage();
     }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
@@ -1748,7 +1871,6 @@ function openNewTournamentForm(existing){
 }
 
 // ==================== LOSOVAČKA TÝMŮ (výherní automat) ====================
-let tbPlayers = [];
 let tbSoundEnabled = true;
 let tbAudioCtx = null;
 let tbDraftInProgress = false;
@@ -1793,17 +1915,31 @@ async function tbLoadSkill(name){
   }catch(err){ return null; }
 }
 
-function tbAddPlayerObj(name, baseSkill, opts){
-  opts = opts || {};
-  if(tbPlayers.some(p => p.name.toLowerCase() === name.toLowerCase())){ return; }
-  tbPlayers.push({ id: Date.now()+Math.random(), name, baseSkill, beers:0, shots:0, joints:0, fromEvent: !!opts.fromEvent });
-  if(opts.persist !== false) tbSaveSkill(name, baseSkill);
-  if(!opts.silent) tbRenderPlayers();
+function tbKey(name){
+  return String(name).split('').map(ch => /[A-Za-z0-9]/.test(ch) ? ch : '_' + ch.charCodeAt(0).toString(16) + '_').join('');
+}
+function tbGetPlayerStats(t, name){
+  const k = tbKey(name);
+  const base = (t.skills && typeof t.skills[k] === 'number') ? t.skills[k] : null;
+  const d = (t.drinks && t.drinks[k]) || {};
+  return { base, beers: d.beers || 0, shots: d.shots || 0, joints: d.joints || 0 };
+}
+function tbEffectiveStats(t, name){
+  const s = tbGetPlayerStats(t, name);
+  if(s.base === null) return { ...s, eff: null, handicap: 0 };
+  const eff = tbCalculateCurrentSkill({ baseSkill: s.base, beers: s.beers, shots: s.shots, joints: s.joints });
+  return { ...s, eff, handicap: Math.max(0, s.base - eff) };
 }
 
-function tbRemovePlayer(id) {
-    tbPlayers = tbPlayers.filter(p => p.id !== id);
-    tbRenderPlayers();
+// Hráči v losování při zakládání turnaje
+let tbDraw = { players: [], teams: null };
+let tbDrawSeq = 1;
+let tbSoundUnlocked = false;
+function tbAddDrawPlayer(name, baseSkill, opts){
+  opts = opts || {};
+  if(tbDraw.players.some(p => p.name.toLowerCase() === name.toLowerCase())) return;
+  tbDraw.players.push({ id: tbDrawSeq++, name, baseSkill, fromEvent: !!opts.fromEvent });
+  if(opts.persist !== false) tbSaveSkill(name, baseSkill);
 }
 
 const tbBeerUpMsgs = [
@@ -1923,6 +2059,7 @@ function tbEnsureAudio() {
         const Ctx = window.AudioContext || window.webkitAudioContext;
         if (Ctx) tbAudioCtx = new Ctx();
     }
+    if (tbAudioCtx && tbAudioCtx.state === 'suspended') { tbAudioCtx.resume().catch(() => {}); }
 }
 function tbPlayBeep(freq, dur, type) {
     if (!tbSoundEnabled) return;
@@ -2083,7 +2220,7 @@ function tbPlayMulticastCharge(){
 }
 
 // Elektrický "multicast" zásah - eskaluje s parametrem stage (1., 2., 3. zásah v jednom kole losování)
-function tbPlayMulticastZap(stage){
+function tbPlayMulticastZap(stage, announce){
     if (!tbSoundEnabled) return;
     try{
         tbEnsureAudio();
@@ -2131,7 +2268,7 @@ function tbPlayMulticastZap(stage){
         boom.connect(boomGain); boomGain.connect(tbAudioCtx.destination);
         boom.start(t0); boom.stop(t0 + 0.27);
 
-        if(stage >= 3){
+        if(announce){
             setTimeout(() => tbSpeak('Multicast!'), 80);
         }
     }catch(e){ /* ticho */ }
@@ -2339,136 +2476,130 @@ async function tbPlaySingleSubstanceEvent(ev) {
     await tbSleep(320);
 }
 
-function tbUpdateSubstance(id, type, amount) {
-    const player = tbPlayers.find(p => p.id === id);
-    if (!player) return;
-    const before = tbCalculateCurrentSkill(player);
-    player[type] = Math.max(0, player[type] + amount);
-    const after = tbCalculateCurrentSkill(player);
-    tbRenderPlayers();
-
-    if (before !== after) {
-        tbQueueSubstanceEvent(type, player, before, after, amount);
+// ---------- Losování týmů: formulář nového turnaje ----------
+function tbInvalidateDraw(){
+  tbDraw.teams = null;
+  const box = document.getElementById('tb-drawn-teams');
+  if(box) box.innerHTML = '';
+}
+function tbTeamSizeVal(){
+  const el = document.getElementById('tb-team-size');
+  const v = el ? parseInt(el.value, 10) : 3;
+  return Math.min(6, Math.max(1, v || 3));
+}
+function tbAutoTeamCount(){
+  return Math.max(1, Math.ceil(tbDraw.players.length / tbTeamSizeVal()));
+}
+function tbUpdateTeamCountHint(){
+  const inp = document.getElementById('tb-team-count');
+  if(inp) inp.placeholder = `auto (${tbAutoTeamCount()})`;
+}
+function tbRenderDrawPlayers(){
+  const listDiv = document.getElementById('tb-draw-players');
+  if(!listDiv) return;
+  if(tbDraw.players.length === 0){
+    listDiv.innerHTML = '<div class="empty">Zatím žádní hráči. Vyber akci, nebo někoho přidej ručně.</div>';
+  }else{
+    listDiv.innerHTML = tbDraw.players.map(p => `
+      <div class="tb-draw-player">
+        <span class="tb-draw-name">${escapeHtml(p.name)}</span>
+        <label class="tb-draw-skill">Skill <input type="number" min="1" max="100" value="${p.baseSkill}" data-tb-dskill="${p.id}"></label>
+        <button type="button" class="tb-draw-remove" data-tb-dremove="${p.id}" title="Odebrat">✕</button>
+      </div>`).join('');
+  }
+  listDiv.querySelectorAll('[data-tb-dskill]').forEach(inp => inp.addEventListener('change', () => {
+    const pl = tbDraw.players.find(x => String(x.id) === inp.dataset.tbDskill);
+    if(!pl) return;
+    pl.baseSkill = Math.min(100, Math.max(1, parseInt(inp.value, 10) || 50));
+    inp.value = pl.baseSkill;
+    tbSaveSkill(pl.name, pl.baseSkill);
+    tbInvalidateDraw();
+  }));
+  listDiv.querySelectorAll('[data-tb-dremove]').forEach(btn => btn.addEventListener('click', () => {
+    tbDraw.players = tbDraw.players.filter(x => String(x.id) !== btn.dataset.tbDremove);
+    tbRenderDrawPlayers();
+    tbInvalidateDraw();
+  }));
+  tbUpdateTeamCountHint();
+}
+function tbRenderDrawnTeams(){
+  const box = document.getElementById('tb-drawn-teams');
+  if(!box) return;
+  if(!tbDraw.teams){ box.innerHTML = ''; return; }
+  const skillOf = n => (tbDraw.players.find(p => p.name === n) || {}).baseSkill || 0;
+  box.innerHTML = `<div class="section-title" style="font-size:15px; margin-top:18px;">Vylosované týmy — názvy můžeš přepsat</div>
+    <div class="tb-drawn-grid">` + tbDraw.teams.map((tm, i) => `
+      <div class="tb-drawn-team">
+        <input type="text" class="tb-drawn-name" data-tb-tname="${i}" value="${escapeHtml(tm.name)}">
+        ${tm.members.map(n => `<div class="tb-drawn-member"><span>${escapeHtml(n)}</span><span>${skillOf(n)}</span></div>`).join('')}
+        <div class="tb-drawn-total">Σ ${tm.members.reduce((a, n) => a + skillOf(n), 0)}</div>
+      </div>`).join('') + `</div>`;
+  box.querySelectorAll('[data-tb-tname]').forEach(inp => inp.addEventListener('input', () => {
+    tbDraw.teams[parseInt(inp.dataset.tbTname, 10)].name = inp.value;
+  }));
+}
+function tbStartDrawFromForm(){
+  const size = tbTeamSizeVal();
+  const P = tbDraw.players.length;
+  const minTeams = Math.ceil(P / size);
+  const numTeams = parseInt(document.getElementById('tb-team-count').value, 10) || minTeams;
+  if(P < 2){ alert('Přidej aspoň 2 hráče.'); return; }
+  if(numTeams < 2){ alert('Turnaj potřebuje aspoň 2 týmy — zvyš počet týmů.'); return; }
+  if(numTeams < minTeams){ alert(`Na ${P} hráčů po ${size} potřebuješ aspoň ${minTeams} týmů.`); return; }
+  if(numTeams > P){ alert('Týmů je víc než hráčů.'); return; }
+  tbStartDraft({
+    players: tbDraw.players.map(p => ({ name: p.name, baseSkill: p.baseSkill })),
+    teamSize: size,
+    numTeams,
+    onConfirm: (teams) => {
+      tbDraw.players.forEach(p => tbSaveSkill(p.name, p.baseSkill));
+      tbDraw.teams = teams.map((t, i) => ({ name: `Tým ${i+1}`, members: t.members }));
+      tbRenderDrawnTeams();
     }
-
-    if (document.querySelectorAll('#tbTeamsResult .tb-team-card').length > 0) {
-        tbRecalculateExistingTeams();
-    }
+  });
 }
 
-function tbRecalculateExistingTeams() {
-    const teamsDiv = document.getElementById('tbTeamsResult');
-    if(!teamsDiv) return;
-    const teamCards = teamsDiv.querySelectorAll('.tb-team-card');
-
-    teamCards.forEach(card => {
-        const teamHeader = card.querySelector('.tb-team-header');
-        const teamId = teamHeader.firstElementChild.innerText;
-        const playerRows = card.querySelectorAll('.tb-team-player');
-
-        let totalCurrentSkill = 0;
-        let totalBaseSkill = 0;
-
-        playerRows.forEach(row => {
-            const playerName = row.firstElementChild.innerText.replace(/^(👑|•)\s*/, '').trim();
-            const player = tbPlayers.find(p => p.name === playerName);
-            if (player) {
-                const current = tbCalculateCurrentSkill(player);
-                totalCurrentSkill += current;
-                totalBaseSkill += player.baseSkill;
-                const cell = row.querySelector('.tb-form-cell');
-                if (cell) {
-                    cell.innerHTML = `Forma: ${current} (🍺${player.beers} ${TB_SHOT_ICON}${player.shots} ${TB_JOINT_ICON}${player.joints})`;
-                }
-            }
-        });
-
-        let teamHandicap = totalBaseSkill - totalCurrentSkill;
-
-        teamHeader.innerHTML = `
-            <span>${escapeHtml(teamId)}</span>
-            <span style="font-size: 13px; color: #ff4d4d;">Handicap týmu: -${teamHandicap} b.</span>
-            <span>Celkový skill: ${totalCurrentSkill}</span>
-        `;
-    });
+// ---------- Losovací automat (N válců = hráčů v týmu) ----------
+function tbEnsureOverlay(){
+  let overlay = document.getElementById('tbEventOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.className = 'tb-event-overlay';
+    overlay.id = 'tbEventOverlay';
+    overlay.innerHTML = '<div class="tb-event-modal" id="tbEventModal"></div>';
+    document.body.appendChild(overlay);
+  }
+  return overlay;
 }
 
-function tbRenderPlayers() {
-    const listDiv = document.getElementById('tbPlayersList');
-    if(!listDiv) return;
-    listDiv.innerHTML = '';
-    tbPlayers.forEach(p => {
-        const currentSkill = tbCalculateCurrentSkill(p);
-        listDiv.innerHTML += `
-            <div class="tb-player-item">
-                <div class="tb-player-info">
-                    <div class="tb-player-name">${escapeHtml(p.name)} <button type="button" class="tb-remove-btn" data-tb-remove="${p.id}">❌</button></div>
-                    <div class="tb-player-stats">Aktuální Skill: <strong>${currentSkill}</strong> / Základ: <input type="number" class="tb-skill-input" min="1" max="100" value="${p.baseSkill}" data-tb-skill="${p.id}"></div>
-                </div>
-                <div class="tb-substance-controls">
-                    <span class="tb-sub-count">🍺 ${p.beers}</span>
-                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|beers|1">+</button>
-                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|beers|-1">-</button>
-                    <span class="tb-sub-count">${TB_SHOT_ICON} ${p.shots}</span>
-                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|shots|1">+</button>
-                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|shots|-1">-</button>
-                    <span class="tb-sub-count">${TB_JOINT_ICON} ${p.joints}</span>
-                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|joints|1">+</button>
-                    <button type="button" class="tb-sub-btn" data-tb-sub="${p.id}|joints|-1">-</button>
-                </div>
-            </div>`;
-    });
-    listDiv.querySelectorAll('[data-tb-skill]').forEach(inp => {
-        inp.addEventListener('change', () => {
-            const pl = tbPlayers.find(x => x.id === parseFloat(inp.dataset.tbSkill));
-            const v = Math.min(100, Math.max(1, parseInt(inp.value,10) || 50));
-            if(!pl) return;
-            pl.baseSkill = v;
-            tbSaveSkill(pl.name, v);
-            tbRenderPlayers();
-            if(document.querySelectorAll('#tbTeamsResult .tb-team-card').length > 0) tbRecalculateExistingTeams();
-        });
-    });
-    listDiv.querySelectorAll('[data-tb-remove]').forEach(btn => {
-        btn.addEventListener('click', () => tbRemovePlayer(parseFloat(btn.dataset.tbRemove)));
-    });
-    listDiv.querySelectorAll('[data-tb-sub]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const [idStr, type, amountStr] = btn.dataset.tbSub.split('|');
-            tbUpdateSubstance(parseFloat(idStr), type, parseInt(amountStr,10));
-        });
-    });
-}
-
-function tbSlotModalHTML(teamId) {
-    return `
-        <button type="button" class="tb-modal-close-btn" id="tbCancelDraftBtn" title="Zavřít a zrušit losování">✕</button>
-        <div class="tb-event-title">🎰 Losování Týmu ${teamId}</div>
-        <div class="tb-slot-frame" id="tbSlotFrame">
-            <div class="tb-slot-title">MULTICAST</div>
-            <div class="tb-slot-subtitle">Ogre Magi rozhoduje o osudu týmu...</div>
-            <div class="tb-reels-row">
-                <div class="tb-reel-window" id="tbReelWin1"><div class="tb-reel-strip" id="tbReelStrip1"></div></div>
-                <div class="tb-reel-window" id="tbReelWin2"><div class="tb-reel-strip" id="tbReelStrip2"></div></div>
-                <div class="tb-reel-window" id="tbReelWin3"><div class="tb-reel-strip" id="tbReelStrip3"></div></div>
-            </div>
-            <div class="tb-reel-labels-row">
-                <div class="tb-reel-label">👑 Vůdce</div>
-                <div class="tb-reel-label">Člen 1</div>
-                <div class="tb-reel-label">Člen 2</div>
-            </div>
-            <div class="tb-lever-wrap" id="tbLeverWrap">
-                <div class="tb-lever-rod"></div>
-                <div class="tb-lever-knob"></div>
-                <div class="tb-lever-base"></div>
-            </div>
+function tbSlotModalHTML(teamId, N){
+  const avail = N > 3 ? 540 : 424;
+  const w = Math.min(122, Math.floor((avail - 14 * (N - 1)) / N));
+  let reels = '', labels = '';
+  for(let k = 0; k < N; k++){
+    reels += `<div class="tb-reel-window" style="width:${w}px;"><div class="tb-reel-strip" id="tbReelStrip${k+1}"></div></div>`;
+    labels += `<div class="tb-reel-label" style="width:${w}px;">${k === 0 ? '👑 Vůdce' : 'Člen ' + k}</div>`;
+  }
+  return `
+    <button type="button" class="tb-modal-close-btn" id="tbCancelDraftBtn" title="Zavřít a zrušit losování">✕</button>
+    <div class="tb-event-title">🎰 Losování Týmu ${teamId}</div>
+    <div class="tb-slot-frame ${N > 4 ? 'tb-slot-compact' : ''}" id="tbSlotFrame" style="${N > 3 ? 'max-width:none;' : ''}">
+        <div class="tb-slot-title">MULTICAST</div>
+        <div class="tb-slot-subtitle">Ogre Magi rozhoduje o osudu týmu...</div>
+        <div class="tb-reels-row">${reels}</div>
+        <div class="tb-reel-labels-row">${labels}</div>
+        <div class="tb-lever-wrap" id="tbLeverWrap">
+            <div class="tb-lever-rod"></div>
+            <div class="tb-lever-knob"></div>
+            <div class="tb-lever-base"></div>
         </div>
-        <div class="tb-slot-status-line" id="tbSlotStatus">Zatáhni za páku a vylosuj Tým ${teamId}!</div>
-        <div class="tb-results-list" id="tbResultsList"></div>
-        <div class="tb-slot-actions" id="tbSlotActions">
-            <button type="button" class="tb-btn-confirm" id="tbConfirmTeamsBtn">✅ Potvrdit týmy</button>
-            <button type="button" class="tb-btn-reroll" id="tbRerollTeamsBtn">🔄 Losovat znovu</button>
-        </div>`;
+    </div>
+    <div class="tb-slot-status-line" id="tbSlotStatus">Zatáhni za páku a vylosuj Tým ${teamId}!</div>
+    <div class="tb-results-list" id="tbResultsList"></div>
+    <div class="tb-slot-actions" id="tbSlotActions">
+        <button type="button" class="tb-btn-confirm" id="tbConfirmTeamsBtn">✅ Potvrdit týmy</button>
+        <button type="button" class="tb-btn-reroll" id="tbRerollTeamsBtn">🔄 Losovat znovu</button>
+    </div>`;
 }
 
 function tbBuildReelStrip(stripEl, pool, targetName, loops) {
@@ -2547,7 +2678,9 @@ function tbDecelerateAndLand(stripEl, pool, targetName, durationMs) {
 
 async function tbSpinCurrentTeam() {
     const draft = tbCurrentDraft;
+    if(!draft) return;
     const team = draft.teams[draft.index];
+    const N = draft.N;
     const modal = document.getElementById('tbEventModal');
     const lever = modal.querySelector('#tbLeverWrap');
     const status = modal.querySelector('#tbSlotStatus');
@@ -2557,53 +2690,38 @@ async function tbSpinCurrentTeam() {
     await tbSleep(280);
     lever.classList.remove('tb-lever-pulled');
 
-    const remainingCol1 = draft.col1Players.slice(draft.index + 1).map(p => p.name);
-    const remainingCol2 = draft.col2Players.filter(p => p !== team.middle).map(p => p.name);
-    const remainingCol3 = draft.col3Players.filter(p => p !== team.weak).map(p => p.name);
-
-    const strip1 = modal.querySelector('#tbReelStrip1');
-    const strip2 = modal.querySelector('#tbReelStrip2');
-    const strip3 = modal.querySelector('#tbReelStrip3');
-
-    const spin1 = tbStartConstantSpin(strip1, remainingCol1);
-    const spin2 = tbStartConstantSpin(strip2, remainingCol2);
-    const spin3 = tbStartConstantSpin(strip3, remainingCol3);
+    const placed = new Set();
+    draft.teams.slice(0, draft.index).forEach(tm => tm.members.forEach(m => { if(m) placed.add(m.name); }));
+    const strips = [], pools = [];
+    for(let k = 0; k < N; k++){
+        strips.push(modal.querySelector('#tbReelStrip' + (k + 1)));
+        pools.push(draft.tiers[k].filter(p => !placed.has(p.name) && p !== team.members[k]).map(p => p.name));
+    }
+    const spins = strips.map((s, k) => tbStartConstantSpin(s, pools[k]));
     await tbSleep(900);
 
-    spin1.stop();
-    await tbDecelerateAndLand(strip1, remainingCol1, team.leader.name, 1500);
-    if (tbDraftCancelled) { spin2.stop(); spin3.stop(); return; }
-    tbPlayMulticastZap(1);
+    for(let k = 0; k < N; k++){
+        spins[k].stop();
+        const target = team.members[k] ? team.members[k].name : '—';
+        await tbDecelerateAndLand(strips[k], pools[k], target, 1500);
+        if(tbDraftCancelled){ for(let j = k + 1; j < N; j++) spins[j].stop(); return; }
+        tbPlayMulticastZap(k + 1, k === N - 1 && N > 1);
+    }
 
-    spin2.stop();
-    await tbDecelerateAndLand(strip2, remainingCol2, team.middle ? team.middle.name : '—', 1500);
-    if (tbDraftCancelled) { spin3.stop(); return; }
-    tbPlayMulticastZap(2);
-
-    spin3.stop();
-    await tbDecelerateAndLand(strip3, remainingCol3, team.weak ? team.weak.name : '—', 1500);
-    if (tbDraftCancelled) return;
-    tbPlayMulticastZap(3);
-
-    const resultsList = modal.querySelector('#tbResultsList');
-    const names = [team.leader.name, team.middle && team.middle.name, team.weak && team.weak.name].filter(Boolean);
+    const names = team.members.filter(Boolean).map(m => m.name);
     const line = document.createElement('div');
     line.className = 'tb-result-entry';
     line.textContent = `Tým ${team.id}: ${tbJoinNamesCz(names)}`;
-    resultsList.appendChild(line);
-    await tbSleep(500);
-
-    await tbAnimatePlayerIntoTeam(team.leader, team, true);
-    if (team.middle) await tbAnimatePlayerIntoTeam(team.middle, team, false);
-    if (team.weak) await tbAnimatePlayerIntoTeam(team.weak, team, false);
+    modal.querySelector('#tbResultsList').appendChild(line);
+    await tbSleep(700);
 
     draft.index++;
-    if (draft.index < draft.teams.length) {
+    if(draft.index < draft.teams.length){
         const nextTeam = draft.teams[draft.index];
         modal.querySelector('.tb-event-title').textContent = `🎰 Losování Týmu ${nextTeam.id}`;
         status.textContent = `Zatáhni za páku a vylosuj Tým ${nextTeam.id}!`;
         lever.classList.remove('tb-disabled');
-    } else {
+    }else{
         status.textContent = '🏆 Všechny týmy jsou vylosované!';
         lever.classList.add('tb-disabled');
         modal.querySelector('#tbSlotActions').style.display = 'flex';
@@ -2618,187 +2736,197 @@ function tbOnLeverClick() {
     tbSpinCurrentTeam().finally(() => { tbSpinBusy = false; });
 }
 
+function tbCloseOverlay(){
+    const overlay = document.getElementById('tbEventOverlay');
+    if(overlay) overlay.classList.remove('tb-show');
+}
 function tbCancelDraft() {
     tbDraftCancelled = true;
-    const overlay = document.getElementById('tbEventOverlay');
-    if(overlay) overlay.classList.remove('tb-show');
+    tbCloseOverlay();
     tbCurrentDraft = null;
-    const btn = document.getElementById('tbGenerateBtn');
-    if(btn){ btn.disabled = false; btn.innerText = '⚡ GENEROVAT VYVÁŽENÉ TÝMY ⚡'; }
     tbDraftInProgress = false;
 }
-
 function tbConfirmTeams() {
-    const overlay = document.getElementById('tbEventOverlay');
-    if(overlay) overlay.classList.remove('tb-show');
+    const draft = tbCurrentDraft;
+    if(!draft) return;
+    const teams = draft.teams.map(t => ({ members: t.members.filter(Boolean).map(m => m.name) }));
+    const cb = draft.cfg.onConfirm;
+    tbCloseOverlay();
     tbCurrentDraft = null;
-    const btn = document.getElementById('tbGenerateBtn');
-    if(btn){ btn.disabled = false; btn.innerText = '⚡ GENEROVAT VYVÁŽENÉ TÝMY ⚡'; }
     tbDraftInProgress = false;
+    if(cb) cb(teams);
 }
-
 function tbRerollTeams() {
-    tbStartDraft();
+    if(tbCurrentDraft) tbStartDraft(tbCurrentDraft.cfg);
 }
 
-async function tbAnimatePlayerIntoTeam(player, team, isLeader) {
-    const card = document.getElementById('tb-team-' + team.id);
-    if(!card) return;
-    const playersDiv = card.querySelector('.tb-team-players');
-    const row = document.createElement('div');
-    row.className = 'tb-team-player tb-player-enter' + (isLeader ? ' tb-leader-enter' : '');
-    row.innerHTML = `<span>${isLeader ? '👑 ' : '• '}${escapeHtml(player.name)}</span><span class="tb-form-cell">Forma: ${player.currentSkill} (🍺${player.beers} ${TB_SHOT_ICON}${player.shots} ${TB_JOINT_ICON}${player.joints})</span>`;
-    playersDiv.appendChild(row);
-    card.querySelector('.tb-team-header').innerHTML = `<span>Tým ${team.id}</span><span>Celkový skill: ${team.totalSkill}</span>`;
-    card.classList.add('tb-leader-glow');
-    tbPlayBeep(420, 0.1, 'sine');
-    await tbSleep(isLeader ? 400 : 250);
-    card.classList.remove('tb-leader-glow');
-}
-
-function tbGenerateTeams() {
-    if (tbPlayers.length < 3) { alert("Potřebuješ aspoň 3 hráče!"); return; }
-    if (tbDraftInProgress) return;
-    tbDraftInProgress = true;
-    tbStartDraft();
-}
-
-function tbStartDraft() {
+function tbStartDraft(cfg) {
     tbDraftCancelled = false;
-    const btn = document.getElementById('tbGenerateBtn');
-    if(btn){ btn.disabled = true; btn.innerText = '🎰 Losování probíhá...'; }
+    tbDraftInProgress = true;
+    const N = cfg.teamSize, T = cfg.numTeams;
+    const sorted = cfg.players.map(p => ({ name: p.name, currentSkill: p.baseSkill })).sort((a, b) => b.currentSkill - a.currentSkill);
 
-    const processedPlayers = tbPlayers.map(p => ({
-        ...p,
-        currentSkill: tbCalculateCurrentSkill(p)
-    })).sort((a, b) => b.currentSkill - a.currentSkill);
+    // hadí rozdělení: vrstva k = k-tá nejsilnější skupina hráčů, ve vrstvách se pořadí zamíchá
+    const tiers = [];
+    for(let k = 0; k < N; k++) tiers.push(tbShuffleArray(sorted.slice(k * T, (k + 1) * T)));
+    const teams = Array.from({ length: T }, (_, i) => ({ id: i + 1, members: Array(N).fill(null) }));
+    tiers.forEach((tier, k) => tier.forEach((p, i) => { teams[(k % 2 === 0) ? i : (T - 1 - i)].members[k] = p; }));
 
-    const numTeams = Math.ceil(processedPlayers.length / 3);
-
-    const col1Players = tbShuffleArray(processedPlayers.slice(0, numTeams));
-    const rest1 = processedPlayers.slice(numTeams);
-    const col2Players = tbShuffleArray(rest1.slice(0, numTeams));
-    const rest2 = rest1.slice(numTeams);
-    const col3Players = tbShuffleArray(rest2.slice(0, numTeams));
-
-    const teams = Array.from({ length: numTeams }, (_, i) => ({
-        id: i + 1,
-        leader: col1Players[i] || null,
-        middle: null,
-        weak: null,
-        totalSkill: 0
-    }));
-
-    col2Players.forEach((p, i) => { teams[numTeams - 1 - i].middle = p; });
-    col3Players.forEach((p, i) => { teams[i].weak = p; });
-
-    teams.forEach(t => {
-        t.totalSkill = (t.leader ? t.leader.currentSkill : 0) + (t.middle ? t.middle.currentSkill : 0) + (t.weak ? t.weak.currentSkill : 0);
-    });
-
-    const teamsDiv = document.getElementById('tbTeamsResult');
-    teamsDiv.innerHTML = '';
-    teams.forEach(t => {
-        const card = document.createElement('div');
-        card.className = 'tb-team-card tb-team-card-empty';
-        card.id = 'tb-team-' + t.id;
-        card.innerHTML = `<div class="tb-team-header"><span>Tým ${t.id}</span><span>Celkový skill: 0</span></div><div class="tb-team-players"></div>`;
-        teamsDiv.appendChild(card);
-    });
-
-    tbCurrentDraft = { teams, col1Players, col2Players, col3Players, index: 0 };
-
-    const overlay = document.getElementById('tbEventOverlay');
+    tbCurrentDraft = { teams, tiers, N, T, index: 0, cfg };
+    const overlay = tbEnsureOverlay();
     const modal = document.getElementById('tbEventModal');
-    modal.innerHTML = tbSlotModalHTML(teams[0].id);
+    modal.innerHTML = tbSlotModalHTML(1, N);
     document.getElementById('tbCancelDraftBtn').addEventListener('click', tbCancelDraft);
     document.getElementById('tbLeverWrap').addEventListener('click', tbOnLeverClick);
-    const tbConfirmBtn = document.getElementById('tbConfirmTeamsBtn');
-    if(tbConfirmBtn) tbConfirmBtn.addEventListener('click', tbConfirmTeams);
-    const tbRerollBtn = document.getElementById('tbRerollTeamsBtn');
-    if(tbRerollBtn) tbRerollBtn.addEventListener('click', tbRerollTeams);
+    document.getElementById('tbConfirmTeamsBtn').addEventListener('click', tbConfirmTeams);
+    document.getElementById('tbRerollTeamsBtn').addEventListener('click', tbRerollTeams);
     overlay.classList.add('tb-show');
 }
 
-function renderTeamDrawTool(container){
-  container.innerHTML = `
-    <button type="button" class="btn-ghost btn-sm" id="tb-back-btn">← Zpět na seznam turnajů</button>
-    <h1 class="headline tb-title" style="font-size:24px; margin-top:14px;">🎰 Losovačka týmů (3v3)</h1>
-    <label class="tb-sound-toggle">
-      <input type="checkbox" id="tbSoundToggle" checked> 🔊 Zvuky a hlášky
-    </label>
-    <div class="field" style="max-width:400px; margin-top:14px;">
-      <label>Akce (hráči se přidají automaticky)</label>
-      <select id="tb-event-select">
-        <option value="">— vyber akci —</option>
-        ${events.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}
-      </select>
-    </div>
-    <div id="tb-event-msg" style="margin-bottom:16px; font-size:13px; color:var(--text-muted);"></div>
-
-    <button type="button" class="tb-generate-btn" id="tbGenerateBtn">⚡ GENEROVAT VYVÁŽENÉ TÝMY ⚡</button>
-    <div class="tb-main-layout">
-      <div class="tb-box">
-        <h2>Hráči</h2>
-        <div class="tb-form-group">
-          <input type="text" id="tbPName" placeholder="Jméno hráče (např. Pepa)">
-          <input type="number" id="tbPSkill" placeholder="Skill (výchozí 50)" min="1" max="100">
-          <button type="button" id="tbAddPlayerBtn">Přidat</button>
-        </div>
-        <div id="tbPlayersList"></div>
-      </div>
-      <div class="tb-box">
-        <h2>Výsledné Týmy</h2>
-        <div id="tbTeamsResult" class="tb-teams-grid"><p style="text-align:center; color:#718096;">Zatím nebyly vygenerovány žádné týmy. Přidej lidi a klikni na tlačítko nahoře.</p></div>
-      </div>
-    </div>
-  `;
-
-  document.getElementById('tb-back-btn').addEventListener('click', () => { turnajDrawToolOpen = false; renderTurnajPage(); });
-
-  document.getElementById('tbSoundToggle').addEventListener('change', (e) => { tbSoundEnabled = e.target.checked; });
-  document.getElementById('tb-event-select').addEventListener('change', async (e) => {
-    const eventId = e.target.value;
-    const msgBox = document.getElementById('tb-event-msg');
-    tbPlayers = tbPlayers.filter(p => !p.fromEvent);
-    if(!eventId){ msgBox.textContent = ''; tbRenderPlayers(); return; }
-    msgBox.textContent = 'Načítám přihlášené...';
-    try{
-      const snap = await getDocs(collection(db,'events',eventId,'registrations'));
-      const regs = snap.docs.map(d=>d.data()).filter(r=>r.status!=='maybe' && r.nick).sort((a,b)=>(a.nick||'').localeCompare(b.nick||''));
-      if(regs.length === 0){ msgBox.textContent = 'Na téhle akci zatím nikdo není přihlášený.'; tbRenderPlayers(); return; }
-      const rows = await Promise.all(regs.map(async r => {
-        const saved = await tbLoadSkill(r.nick);
-        return { nick: r.nick, skill: saved !== null ? saved : 50, hasSaved: saved !== null };
-      }));
-      rows.forEach(r => tbAddPlayerObj(r.nick, r.skill, { fromEvent:true, persist:false, silent:true }));
-      tbRenderPlayers();
-      msgBox.textContent = `Přidáno ${rows.length} hráčů z akce.`;
-    }catch(err){ console.error(err); msgBox.textContent = 'Nepovedlo se načíst.'; }
-  });
-
-  document.getElementById('tbAddPlayerBtn').addEventListener('click', () => {
-    const nameInput = document.getElementById('tbPName');
-    const skillInput = document.getElementById('tbPSkill');
-    if (!nameInput.value.trim()) { alert('Vyplň jméno hráče!'); return; }
-    const skill = Math.min(100, Math.max(1, parseInt(skillInput.value,10) || 50));
-    tbAddPlayerObj(nameInput.value.trim(), skill);
-    nameInput.value = ''; skillInput.value = '';
-  });
-
-  document.getElementById('tbGenerateBtn').addEventListener('click', tbGenerateTeams);
-
-  const existingOverlay = document.getElementById('tbEventOverlay');
-  if(existingOverlay) existingOverlay.remove();
-  const overlay = document.createElement('div');
-  overlay.className = 'tb-event-overlay';
-  overlay.id = 'tbEventOverlay';
-  overlay.innerHTML = '<div class="tb-event-modal" id="tbEventModal"></div>';
-  document.body.appendChild(overlay);
-
-  tbRenderPlayers();
+// ---------- Živé události (pití) + pomocné funkce turnaje ----------
+let tbLiveUnsub = null, tbLiveTid = null;
+function tbStopLive(){
+    if(tbLiveUnsub){ tbLiveUnsub(); tbLiveUnsub = null; }
+    tbLiveTid = null;
+}
+function tbEnsureLive(tid){
+    if(tbLiveTid === tid) return;
+    tbStopLive();
+    tbLiveTid = tid;
+    tbEnsureOverlay();
+    let ready = false;
+    tbLiveUnsub = onSnapshot(collection(db, 'tournaments', tid, 'drinkEvents'), (snap) => {
+        if(!ready){ if(!snap.metadata.fromCache) ready = true; return; } // staré události se nepřehrávají
+        snap.docChanges().forEach(ch => {
+            if(ch.type !== 'added') return;
+            const d = ch.doc.data();
+            if(!d || !d.name) return;
+            tbQueueSubstanceEvent(d.type, { name: d.name }, 0, 0, d.amount || 1);
+        });
+    }, (err) => console.error('Živé události:', err));
 }
 
+async function tbDrinkChange(tid, name, type, delta){
+    if(!hasPerm('turnaj')) return;
+    const t = allTournaments.find(x => x.id === tid);
+    if(!t) return;
+    const cur = tbGetPlayerStats(t, name)[type] || 0;
+    if(delta < 0 && cur <= 0) return;
+    try{
+        await updateDoc(doc(db, 'tournaments', tid), { [`drinks.${tbKey(name)}.${type}`]: increment(delta) });
+    }catch(err){ console.error(err); alert('Uložení se nepovedlo.'); return; }
+    try{
+        await addDoc(collection(db, 'tournaments', tid, 'drinkEvents'), { type, name, amount: delta, by: currentNick || '', ts: new Date().toISOString() });
+    }catch(err){ console.error(err); alert('Počet se uložil, ale animaci se nepodařilo poslat ostatním — zkontroluj pravidla Firestore pro drinkEvents.'); }
+}
+async function tbSetSkill(tid, name, raw){
+    if(!hasPerm('turnaj')) return;
+    const v = Math.min(100, Math.max(1, parseInt(raw, 10) || 50));
+    try{
+        await updateDoc(doc(db, 'tournaments', tid), { [`skills.${tbKey(name)}`]: v });
+        tbSaveSkill(name, v);
+    }catch(err){ console.error(err); }
+}
+
+// ---------- Okno "Handicap" (Dota styl) ----------
+let tbDrinkModalTid = null;
+function tbCloseDrinkModal(){
+    tbDrinkModalTid = null;
+    const o = document.getElementById('tbDrinkOverlay');
+    if(o) o.remove();
+}
+function openTbDrinkModal(t){
+    tbDrinkModalTid = t.id;
+    tbRenderDrinkModal();
+}
+function tbRefreshDrinkModal(){
+    if(tbDrinkModalTid) tbRenderDrinkModal();
+}
+function tbRenderDrinkModal(){
+    const t = allTournaments.find(x => x.id === tbDrinkModalTid);
+    if(!t){ tbCloseDrinkModal(); return; }
+    let overlay = document.getElementById('tbDrinkOverlay');
+    if(!overlay){
+        overlay = document.createElement('div');
+        overlay.id = 'tbDrinkOverlay';
+        overlay.className = 'tb-drink-overlay';
+        overlay.addEventListener('click', (e) => { if(e.target === overlay) tbCloseDrinkModal(); });
+        document.body.appendChild(overlay);
+    }
+    const prev = overlay.querySelector('.tb-drink-body');
+    const prevScroll = prev ? prev.scrollTop : 0;
+    const ctrl = (icon, type, n) => `<span class="tb-drink-ctl"><span class="tb-drink-ico">${icon}</span><button type="button" class="tb-sub-btn" data-tbd="${type}|-1">−</button><b>${n}</b><button type="button" class="tb-sub-btn" data-tbd="${type}|1">+</button></span>`;
+    const body = (t.teams || []).map((tm, i) => {
+        const members = tm.members || [];
+        if(!members.length) return '';
+        return `<div class="tb-drink-team">
+            <div class="tb-drink-teamname">${tm.emblem ? escapeHtml(tm.emblem) + ' ' : ''}${escapeHtml(tm.name || `Tým ${i+1}`)}</div>
+            ${members.map(n => {
+                const s = tbEffectiveStats(t, n);
+                return `<div class="tb-drink-row" data-tbd-name="${escapeHtml(n)}">
+                    <div class="tb-drink-name">${escapeHtml(n)}</div>
+                    <label class="tb-drink-skill">Skill <input type="number" min="1" max="100" placeholder="50" value="${s.base === null ? '' : s.base}" data-tbd-skill></label>
+                    <div class="tb-drink-eff">${s.eff !== null ? `→ <b>${s.eff}</b>${s.handicap > 0 ? ` <em>−${s.handicap}</em>` : ''}` : ''}</div>
+                    ${ctrl('🍺', 'beers', s.beers)}${ctrl(TB_SHOT_ICON, 'shots', s.shots)}${ctrl(TB_JOINT_ICON, 'joints', s.joints)}
+                </div>`;
+            }).join('')}
+        </div>`;
+    }).join('') || '<div class="empty" style="color:#b89b6a;">Turnaj zatím nemá žádné hráče v týmech.</div>';
+    overlay.innerHTML = `<div class="tb-drink-modal">
+        <button type="button" class="tb-modal-close-btn" data-tbd-close>✕</button>
+        <div class="tb-drink-title">Handicap turnaje</div>
+        <div class="tb-drink-sub">Každé pivo, panák a joint snižuje skill hráče. Všichni na stránce turnaje to uvidí.</div>
+        <div class="tb-drink-body">${body}</div>
+    </div>`;
+    const nb = overlay.querySelector('.tb-drink-body');
+    if(nb) nb.scrollTop = prevScroll;
+    overlay.querySelector('[data-tbd-close]').addEventListener('click', tbCloseDrinkModal);
+    overlay.querySelectorAll('.tb-drink-row').forEach(row => {
+        const name = row.dataset.tbdName;
+        row.querySelectorAll('[data-tbd]').forEach(btn => btn.addEventListener('click', () => {
+            const [type, d] = btn.dataset.tbd.split('|');
+            tbDrinkChange(t.id, name, type, parseInt(d, 10));
+        }));
+        const sk = row.querySelector('[data-tbd-skill]');
+        sk.addEventListener('change', () => tbSetSkill(t.id, name, sk.value));
+    });
+}
+
+// ---------- Týmy nad pavoukem ----------
+function renderTourneyTeamsPanel(t, box){
+    if(!box) return;
+    const teams = t.teams || [];
+    if(!teams.some(tm => (tm.members || []).length)){ box.innerHTML = ''; return; }
+    box.innerHTML = teams.map((tm, i) => {
+        let sumEff = 0, sumHc = 0, any = false;
+        const rows = (tm.members || []).map(n => {
+            const s = tbEffectiveStats(t, n);
+            if(s.eff !== null){ any = true; sumEff += s.eff; sumHc += s.handicap; }
+            const dr = (s.beers || s.shots || s.joints)
+                ? `<span class="ttp-drinks">${s.beers ? `🍺${s.beers} ` : ''}${s.shots ? `${TB_SHOT_ICON}${s.shots} ` : ''}${s.joints ? `${TB_JOINT_ICON}${s.joints}` : ''}</span>` : '';
+            return `<div class="ttp-player"><span class="ttp-name">${escapeHtml(n)}</span>${dr}<span class="ttp-skill">${s.base !== null ? s.base : '–'}${s.handicap > 0 ? `<em class="ttp-hc">−${s.handicap}</em>` : ''}</span></div>`;
+        }).join('');
+        const nameStyle = tm.color ? `style="color:${tm.color};"` : '';
+        return `<div class="ttp-card">
+            <div class="ttp-head"><span ${nameStyle}>${tm.emblem ? escapeHtml(tm.emblem) + ' ' : ''}${escapeHtml(tm.name || `Tým ${i+1}`)}</span>${any ? `<span class="ttp-total"><b>${sumEff}</b>${sumHc > 0 ? ` <em class="ttp-hc">−${sumHc}</em>` : ''}</span>` : ''}</div>
+            ${rows}
+        </div>`;
+    }).join('');
+}
+
+function tbUnlockSound(){
+    tbSoundUnlocked = true;
+    tbSoundEnabled = true;
+    try{ tbEnsureAudio(); if(tbAudioCtx && tbAudioCtx.state === 'suspended') tbAudioCtx.resume(); }catch(e){}
+    try{
+        if('speechSynthesis' in window){
+            const u = new SpeechSynthesisUtterance('Zvuk zapnut');
+            u.lang = 'cs-CZ';
+            speechSynthesis.speak(u);
+        }
+    }catch(e){}
+    tbPlayBeep(880, 0.12, 'triangle');
+}
 
 function isMemberElsewhere(teams, currentIdx, nick){
   return teams.some((tm,i) => i!==currentIdx && tm.members.includes(nick));
@@ -3228,8 +3356,8 @@ function renderSwissMatchBox(t, resultField, m, compact){
   const labelA = teamName(t, m.teamA), labelB = teamName(t, m.teamB);
   const emblemA = teamAObj?.emblem ? teamAObj.emblem+' ' : '';
   const emblemB = teamBObj?.emblem ? teamBObj.emblem+' ' : '';
-  const membersA = (teamAObj?.members||[]).join(' · ');
-  const membersB = (teamBObj?.members||[]).join(' · ');
+  const membersA = '';
+  const membersB = '';
   const curA = m.result ? m.result.a : 0;
   const curB = m.result ? m.result.b : 0;
   const colorA = teamAObj?.color ? `style="color:${teamAObj.color};"` : '';
