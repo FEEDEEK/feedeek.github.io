@@ -215,6 +215,7 @@ function applyRoute(){
 window.addEventListener('hashchange', applyRoute);
 
 let initialRouteApplied = false;
+let initialAuthSettled = false;
 function tryInitialRoute(){
   if(initialRouteApplied) return;
   if(location.hash.startsWith('#event/')){
@@ -917,7 +918,8 @@ function renderDateVoteBlock(ev){
     <p class="lede" style="margin-top:0; font-size:12px;">Můžeš hlasovat pro víc termínů, které ti vyhovují.</p>
     ${ev.dateVoteDeadline ? `<p class="lede" style="margin-top:0; font-size:13px;">Hlasování otevřené do ${fmtDate(ev.dateVoteDeadline)}.</p>` : ''}
     ${options.map((opt, idx) => {
-      const voterNicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => currentRegistrationsMap[uid]?.nick || '(neznámý)');
+      const voteNickMap = ev.dateVoteNicks || {};
+      const voterNicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => voteNickMap[uid] || currentRegistrationsMap[uid]?.nick || '(neznámý)');
       const isMine = myVotes.includes(idx);
       const countTitle = hasPerm('akce') ? (voterNicks.length ? voterNicks.join('\n') : 'Zatím nikdo') : '';
       return `
@@ -936,7 +938,7 @@ function renderDateVoteBlock(ev){
       const idx = parseInt(btn.dataset.voteDate,10);
       const mine = votesOf(currentUser.uid);
       const newVotes = mine.includes(idx) ? mine.filter(i=>i!==idx) : [...mine, idx];
-      try{ await updateDoc(doc(db,'events',ev.id), { [`dateVotes.${currentUser.uid}`]: newVotes }); }
+      try{ await updateDoc(doc(db,'events',ev.id), { [`dateVotes.${currentUser.uid}`]: newVotes, [`dateVoteNicks.${currentUser.uid}`]: currentNick || '' }); }
       catch(err){ console.error(err); }
     });
   });
@@ -4240,6 +4242,14 @@ onAuthStateChanged(auth, async (user) => {
     }
   }else{
     updateAuthUI();
+  }
+  // Přihlášení se ověřuje na pozadí a stránka se mohla vykreslit dřív, než bylo hotovo
+  // (např. tlačítka podle práv). Jakmile ověření poprvé doběhne, aktuální pohled se
+  // znovu vykreslí, ať odpovídá skutečným právům. Dál už se to nedělá, aby to při
+  // pozdějším přihlášení/odhlášení neresetovalo rozpracovaný pohled (otevřenou záložku apod.).
+  if(!initialAuthSettled){
+    initialAuthSettled = true;
+    applyRoute();
   }
 });
 
