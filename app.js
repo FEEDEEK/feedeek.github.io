@@ -304,6 +304,20 @@ function startEditContact(c){
   formContact.style.display = 'flex';
   formContact.scrollIntoView({ behavior:'smooth', block:'start' });
 }
+document.getElementById('btn-fetch-contact-avatar').addEventListener('click', async () => {
+  const nameInput = document.getElementById('ct-name');
+  const photoInput = document.getElementById('ct-photo');
+  const name = nameInput.value.trim();
+  if(!name){ alert('Nejdřív vyplň jméno kontaktu.'); return; }
+  try{
+    const unameSnap = await getDoc(usernameDocRef(name));
+    if(!unameSnap.exists()){ alert('Žádný registrovaný uživatel s touhle přezdívkou nebyl nalezen.'); return; }
+    const uid = unameSnap.data().uid;
+    const userSnap = await getDoc(doc(db,'users',uid));
+    if(!userSnap.exists() || !userSnap.data().avatar){ alert('Tenhle uživatel nemá nahranou žádnou profilovou fotku.'); return; }
+    photoInput.value = userSnap.data().avatar;
+  }catch(err){ console.error(err); alert('Nepovedlo se načíst.'); }
+});
 formContact.addEventListener('submit', async (e) => {
   e.preventDefault();
   const payload = {
