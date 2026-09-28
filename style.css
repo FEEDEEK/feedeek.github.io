@@ -621,3 +621,4 @@ textarea.discussion-input{ padding-right:34px; }
 .tb-smoke-path{ opacity:0; animation:tbSmokeRise 2.4s ease-out infinite; }
 .tb-s2{ animation-delay:0.6s; }
 @keyframes tbSmokeRise{ 0%{ transform:translateY(0) scale(0.6); opacity:0; } 15%{ opacity:0.7; } 100%{ transform:translateY(-30px) scale(1.3); opacity:0; } }
+.tb-skill-input{ width:56px; padding:2px 6px; background:#241713; color:#f0e6d2; border:1px solid #6b4a1e; border-radius:4px; font-size:12px; }
