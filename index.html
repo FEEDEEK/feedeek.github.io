@@ -189,27 +189,29 @@
     <section class="view" id="view-event">
       <div class="detail-grid">
         <div class="detail-col-center">
-          <div class="ed-header" id="ed-header">
-            <div class="ed-header-inner">
-              <div class="ed-header-left-col">
-                <div class="map-embed ed-header-map" id="ed-map"></div>
-                <div class="tab-switch" id="ed-tabs">
-                  <button type="button" class="tab-btn active" data-tab="prehled">Přehled</button>
-                  <button type="button" class="tab-btn" data-tab="rozvrh">Rozvrh</button>
-                  <button type="button" class="tab-btn" data-tab="jidlo">Jídlo</button>
-                  <button type="button" class="tab-btn" data-tab="turnaj">Turnaj</button>
-                  <button type="button" class="tab-btn" data-tab="foto">Foto</button>
-                </div>
+          <div class="ed-top-row">
+            <div class="ed-header-left-col">
+              <div class="map-embed ed-header-map" id="ed-map"></div>
+              <div class="tab-switch" id="ed-tabs">
+                <button type="button" class="tab-btn active" data-tab="prehled">Přehled</button>
+                <button type="button" class="tab-btn" data-tab="rozvrh">Rozvrh</button>
+                <button type="button" class="tab-btn" data-tab="jidlo">Jídlo</button>
+                <button type="button" class="tab-btn" data-tab="turnaj">Turnaj</button>
+                <button type="button" class="tab-btn" data-tab="foto">Foto</button>
               </div>
-              <div class="ed-header-main" id="ed-header-main">
-                <h1 class="headline" id="ed-title" style="font-size:32px;">—</h1>
-                <p class="lede" id="ed-meta"></p>
-                <p class="lede" id="ed-desc"></p>
-                <div class="rsvp-box" id="ed-rsvp" style="margin-top:16px;"></div>
-              </div>
-              <div id="ed-datevote"></div>
             </div>
-            <div class="ed-fee-corner" id="ed-entryfee"></div>
+            <div class="ed-header" id="ed-header">
+              <div class="ed-header-inner">
+                <div class="ed-header-main" id="ed-header-main">
+                  <h1 class="headline" id="ed-title" style="font-size:32px;">—</h1>
+                  <p class="lede" id="ed-meta"></p>
+                  <p class="lede" id="ed-desc"></p>
+                  <div class="rsvp-box" id="ed-rsvp" style="margin-top:16px;"></div>
+                </div>
+                <div id="ed-datevote"></div>
+              </div>
+              <div class="ed-fee-corner" id="ed-entryfee"></div>
+            </div>
           </div>
           <div class="tab-panel" id="tab-prehled"></div>
           <div class="tab-panel" id="tab-rozvrh" style="display:none;"></div>
