@@ -744,3 +744,54 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
   .tb-form-row{ flex-direction:column; gap:0; }
   .tb-drink-row{ gap:8px; }
 }
+
+.tourney-mode-btn{ flex:1; min-width:220px; text-align:left; background:var(--bg-panel-2); border:1px solid var(--line); padding:16px; cursor:pointer; color:var(--text); display:flex; flex-direction:column; gap:6px; }
+.tourney-mode-btn:hover{ border-color:var(--gold-dim); }
+.tourney-mode-btn b{ font-size:15px; color:var(--gold); }
+.tourney-mode-btn span{ font-size:12.5px; color:var(--text-muted); line-height:1.4; }
+
+.tourney-signup-badge{ background:var(--teal); color:#06251f; font-weight:700; }
+.signup-list{ display:flex; flex-direction:column; gap:8px; margin:14px 0; max-width:520px; }
+.signup-row{ display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--bg-panel-2); border:1px solid var(--line); }
+.signup-row span{ flex:1; }
+.signup-row .x{ color:var(--crimson); cursor:pointer; font-weight:700; }
+
+.format-choice-row{ display:flex; gap:12px; flex-wrap:wrap; margin:14px 0; }
+.format-choice-btn{ flex:1; min-width:200px; text-align:left; background:var(--bg-panel-2); border:1px solid var(--line); padding:14px; cursor:pointer; color:var(--text); }
+.format-choice-btn.active{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold); }
+.format-choice-btn b{ display:block; color:var(--gold); margin-bottom:4px; }
+.format-choice-btn span{ font-size:12px; color:var(--text-muted); }
+
+.ffa-rounds-table{ width:100%; border-collapse:collapse; margin:14px 0; font-size:13px; }
+.ffa-rounds-table th, .ffa-rounds-table td{ border:1px solid var(--line); padding:6px 10px; text-align:center; }
+.ffa-rounds-table th{ background:var(--bg-panel-2); color:var(--gold); font-weight:600; }
+.ffa-rounds-table td:first-child, .ffa-rounds-table th:first-child{ text-align:left; }
+.ffa-rounds-table input{ width:56px; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:3px 4px; text-align:center; }
+.ffa-total{ font-weight:800; color:var(--gold); }
+
+.trophy-podium-img{ position:relative; display:inline-block; }
+.trophy-podium-img img{ display:block; }
+.trophy-podium-label{ position:absolute; left:50%; bottom:9%; transform:translateX(-50%); width:64%; text-align:center; font-weight:800; color:#1a1005; line-height:1.05; }
+.trophy-podium-label .tp-rank{ display:block; font-size:0.85em; }
+.trophy-podium-label .tp-name{ display:block; font-size:0.72em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.trophy-img{ height:auto; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)); }
+.trophy-gold{ width:92px; }
+.trophy-silver{ width:74px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) grayscale(0.85) brightness(1.15) contrast(0.95); }
+.trophy-bronze{ width:64px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) sepia(0.55) saturate(2.2) hue-rotate(-28deg) brightness(0.85); }
+.podium-wrap-big .trophy-gold{ width:160px; }
+.podium-wrap-big .trophy-silver{ width:126px; }
+.podium-wrap-big .trophy-bronze{ width:108px; }
+.trophy-podium-label{ font-size:11px; }
+.podium-wrap-big .trophy-podium-label{ font-size:15px; }
+
+.podium-avatar{ width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-dim); margin:0 auto 6px; display:block; }
+.podium-avatar-blank{ display:flex; align-items:center; justify-content:center; font-size:22px; background:var(--bg-panel-2); }
+.podium-wrap-big .podium-avatar{ width:80px; height:80px; }
+
+.tbg-filters{ display:flex; gap:16px; flex-wrap:wrap; margin-bottom:10px; font-size:13px; color:#e8dcc8; }
+.tbg-filters label{ display:flex; align-items:center; gap:5px; cursor:pointer; }
+.tbg-players{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:14px; font-size:12.5px; border-top:1px solid #6b2c2c; padding-top:10px; }
+.tbg-players label{ display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:600; }
+.tbg-svg{ width:100%; height:auto; background:#150a0a; border:1px solid #3a281a; }
+.tbg-legend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; font-size:12px; }
