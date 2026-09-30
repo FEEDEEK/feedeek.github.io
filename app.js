@@ -2421,11 +2421,15 @@ function tbFlushBatch() {
     const events = tbPendingEvents;
     tbPendingEvents = [];
     if (events.length === 0) return;
+    // Seskupit podle typu (piva / panáky / jointy) a přehrát postupně, každý typ se svou vlastní hláškou
+    const byType = {};
+    events.forEach(e => { (byType[e.type] = byType[e.type] || []).push(e); });
+    const order = ['beers', 'shots', 'joints'].filter(ty => byType[ty] && byType[ty].length);
     tbEventQueue = tbEventQueue.then(async () => {
-        if (events.length === 1) {
-            await tbPlaySingleSubstanceEvent(events[0]);
-        } else {
-            await tbPlayBatchEvent(events);
+        for (const ty of order) {
+            const group = byType[ty];
+            if (group.length === 1) await tbPlaySingleSubstanceEvent(group[0]);
+            else await tbPlayBatchEvent(group);
         }
     });
 }
@@ -2441,9 +2445,9 @@ async function tbPlayBatchEvent(events) {
     for (const t in counts) { if (counts[t] > domCount) { domCount = counts[t]; domType = t; } }
 
     let svgHTML, animDuration, titleWord, collectiveMsgs;
-    if (domType === 'beers') { svgHTML = tbBeerSVG(); animDuration = 2600; titleWord = '🍺 Skupinová runda piva!'; collectiveMsgs = tbBeerCollectiveMsgs; }
-    else if (domType === 'shots') { svgHTML = tbShotSVG(); animDuration = 1300; titleWord = '🥃 Skupinová runda panáků!'; collectiveMsgs = tbShotCollectiveMsgs; }
-    else { svgHTML = tbJointSVG(); animDuration = 3400; titleWord = '🍁 Skupinové zapalování!'; collectiveMsgs = tbJointCollectiveMsgs; }
+    if (domType === 'beers') { svgHTML = tbBeerSVG(); animDuration = 4400; titleWord = '🍺 Skupinová runda piva!'; collectiveMsgs = tbBeerCollectiveMsgs; }
+    else if (domType === 'shots') { svgHTML = tbShotSVG(); animDuration = 2200; titleWord = '🥃 Skupinová runda panáků!'; collectiveMsgs = tbShotCollectiveMsgs; }
+    else { svgHTML = tbJointSVG(); animDuration = 5600; titleWord = '🍁 Skupinové zapalování!'; collectiveMsgs = tbJointCollectiveMsgs; }
 
     const uniqueNames = [...new Set(events.map(e => e.player.name))];
     const msg = tbPick(collectiveMsgs).replace('{names}', tbJoinNamesCz(uniqueNames));
@@ -2477,9 +2481,9 @@ async function tbPlaySingleSubstanceEvent(ev) {
     const up = amount > 0;
     let animDuration, msgPool;
 
-    if (type === 'beers') { animDuration = up ? 2600 : 500; msgPool = up ? tbBeerUpMsgs : tbBeerDownMsgs; }
-    else if (type === 'shots') { animDuration = up ? 1300 : 500; msgPool = up ? tbShotUpMsgs : tbShotDownMsgs; }
-    else { animDuration = up ? 3400 : 500; msgPool = up ? tbJointUpMsgs : tbJointDownMsgs; }
+    if (type === 'beers') { animDuration = up ? 4400 : 900; msgPool = up ? tbBeerUpMsgs : tbBeerDownMsgs; }
+    else if (type === 'shots') { animDuration = up ? 2200 : 900; msgPool = up ? tbShotUpMsgs : tbShotDownMsgs; }
+    else { animDuration = up ? 5600 : 900; msgPool = up ? tbJointUpMsgs : tbJointDownMsgs; }
 
     const msg = tbPick(msgPool).replace('{name}', player.name);
     let html;
@@ -2875,24 +2879,12 @@ function tbEnsureLive(tid){
             if(ch.type !== 'added') return;
             const d = ch.doc.data();
             if(!d || !d.name) return;
+            if(d.by && d.by === currentNick) return; // vlastní právě potvrzené změny už byly přehrány okamžitě
             tbQueueSubstanceEvent(d.type, { name: d.name }, 0, 0, d.amount || 1);
         });
     }, (err) => console.error('Živé události:', err));
 }
 
-async function tbDrinkChange(tid, name, type, delta){
-    if(!hasPerm('turnaj')) return;
-    const t = allTournaments.find(x => x.id === tid);
-    if(!t) return;
-    const cur = tbGetPlayerStats(t, name)[type] || 0;
-    if(delta < 0 && cur <= 0) return;
-    try{
-        await updateDoc(doc(db, 'tournaments', tid), { [`drinks.${tbKey(name)}.${type}`]: increment(delta) });
-    }catch(err){ console.error(err); alert('Uložení se nepovedlo.'); return; }
-    try{
-        await addDoc(collection(db, 'tournaments', tid, 'drinkEvents'), { type, name, amount: delta, by: currentNick || '', ts: new Date().toISOString() });
-    }catch(err){ console.error(err); alert('Počet se uložil, ale animaci se nepodařilo poslat ostatním — zkontroluj pravidla Firestore pro drinkEvents.'); }
-}
 async function tbSetSkill(tid, name, raw){
     if(!hasPerm('turnaj')) return;
     const v = Math.min(100, Math.max(1, parseInt(raw, 10) || 50));
@@ -2904,17 +2896,55 @@ async function tbSetSkill(tid, name, raw){
 
 // ---------- Okno "Handicap" (Dota styl) ----------
 let tbDrinkModalTid = null;
+let tbDrinkPending = {}; // klíč "jméno|typ" -> nepotvrzená změna (+/-), dokud se neklikne na Potvrdit
 function tbCloseDrinkModal(){
     tbDrinkModalTid = null;
+    tbDrinkPending = {};
     const o = document.getElementById('tbDrinkOverlay');
     if(o) o.remove();
 }
 function openTbDrinkModal(t){
     tbDrinkModalTid = t.id;
+    tbDrinkPending = {};
     tbRenderDrinkModal();
 }
 function tbRefreshDrinkModal(){
     if(tbDrinkModalTid) tbRenderDrinkModal();
+}
+function tbPendingCount(){
+    return Object.values(tbDrinkPending).reduce((a, d) => a + Math.abs(d), 0);
+}
+function tbAdjustPending(name, type, delta){
+    const key = name + '|' + type;
+    tbDrinkPending[key] = (tbDrinkPending[key] || 0) + delta;
+    if(tbDrinkPending[key] === 0) delete tbDrinkPending[key];
+    tbRenderDrinkModal();
+}
+async function tbConfirmDrinkChanges(){
+    const tid = tbDrinkModalTid;
+    const t = allTournaments.find(x => x.id === tid);
+    const entries = Object.entries(tbDrinkPending).filter(([,d]) => d !== 0);
+    if(!tid || !t || entries.length === 0) return;
+    tbDrinkPending = {};
+    tbRenderDrinkModal();
+
+    // zapsat do databáze (ostatním na stránce/projektoru se to objeví přes živé události)
+    const writes = entries.map(([key, delta]) => {
+        const [name, type] = key.split('|');
+        return updateDoc(doc(db, 'tournaments', tid), { [`drinks.${tbKey(name)}.${type}`]: increment(delta) })
+            .then(() => addDoc(collection(db, 'tournaments', tid, 'drinkEvents'), { type, name, amount: delta, by: currentNick || '', ts: new Date().toISOString() }))
+            .catch(err => { console.error(err); });
+    });
+
+    // vlastní animace přehrát rovnou, bez čekání na debounce (seskupené podle typu, tbFlushBatch to zajistí)
+    entries.forEach(([key, delta]) => {
+        const [name, type] = key.split('|');
+        tbPendingEvents.push({ type, player: { name }, before: 0, after: 0, amount: delta });
+    });
+    if(tbBatchTimer){ clearTimeout(tbBatchTimer); tbBatchTimer = null; }
+    tbFlushBatch();
+
+    await Promise.all(writes);
 }
 function tbRenderDrinkModal(){
     const t = allTournaments.find(x => x.id === tbDrinkModalTid);
@@ -2929,37 +2959,47 @@ function tbRenderDrinkModal(){
     }
     const prev = overlay.querySelector('.tb-drink-body');
     const prevScroll = prev ? prev.scrollTop : 0;
-    const ctrl = (icon, type, n) => `<span class="tb-drink-ctl"><span class="tb-drink-ico">${icon}</span><button type="button" class="tb-sub-btn" data-tbd="${type}|-1">−</button><b>${n}</b><button type="button" class="tb-sub-btn" data-tbd="${type}|1">+</button></span>`;
+    const ctrl = (icon, type, name, n, pendingD) => `<span class="tb-drink-ctl${pendingD ? ' tb-drink-ctl-pending' : ''}"><span class="tb-drink-ico">${icon}</span><button type="button" class="tb-sub-btn" data-tbd="${escapeHtml(name)}|${type}|-1">−</button><b>${n}${pendingD ? `<em class="tb-drink-pending-diff">${pendingD > 0 ? '+' : ''}${pendingD}</em>` : ''}</b><button type="button" class="tb-sub-btn" data-tbd="${escapeHtml(name)}|${type}|1">+</button></span>`;
     const body = (t.teams || []).map((tm, i) => {
         const members = tm.members || [];
         if(!members.length) return '';
         return `<div class="tb-drink-team">
             <div class="tb-drink-teamname">${tm.emblem ? escapeHtml(tm.emblem) + ' ' : ''}${escapeHtml(tm.name || `Tým ${i+1}`)}</div>
             ${members.map(n => {
+                const pB = tbDrinkPending[n + '|beers'] || 0, pS = tbDrinkPending[n + '|shots'] || 0, pJ = tbDrinkPending[n + '|joints'] || 0;
                 const s = tbEffectiveStats(t, n);
+                const shownBeers = s.beers + pB, shownShots = s.shots + pS, shownJoints = s.joints + pJ;
+                const base = s.base === null ? 0 : s.base;
+                const shownEff = s.base === null ? null : tbCalculateCurrentSkill({ baseSkill: base, beers: shownBeers, shots: shownShots, joints: shownJoints });
+                const shownHc = shownEff === null ? 0 : Math.max(0, base - shownEff);
                 return `<div class="tb-drink-row" data-tbd-name="${escapeHtml(n)}">
                     <div class="tb-drink-name">${escapeHtml(n)}</div>
                     <label class="tb-drink-skill">Skill <input type="number" min="1" max="100" placeholder="50" value="${s.base === null ? '' : s.base}" data-tbd-skill></label>
-                    <div class="tb-drink-eff">${s.eff !== null ? `→ <b>${s.eff}</b>${s.handicap > 0 ? ` <em>−${s.handicap}</em>` : ''}` : ''}</div>
-                    ${ctrl('🍺', 'beers', s.beers)}${ctrl(TB_SHOT_ICON, 'shots', s.shots)}${ctrl(TB_JOINT_ICON, 'joints', s.joints)}
+                    <div class="tb-drink-eff">${shownEff !== null ? `→ <b>${shownEff}</b>${shownHc > 0 ? ` <em>−${shownHc}</em>` : ''}` : ''}</div>
+                    ${ctrl('🍺', 'beers', n, shownBeers, pB)}${ctrl(TB_SHOT_ICON, 'shots', n, shownShots, pS)}${ctrl(TB_JOINT_ICON, 'joints', n, shownJoints, pJ)}
                 </div>`;
             }).join('')}
         </div>`;
     }).join('') || '<div class="empty" style="color:#b89b6a;">Turnaj zatím nemá žádné hráče v týmech.</div>';
+    const pendingN = tbPendingCount();
     overlay.innerHTML = `<div class="tb-drink-modal">
         <button type="button" class="tb-modal-close-btn" data-tbd-close>✕</button>
         <div class="tb-drink-title">Handicap turnaje</div>
-        <div class="tb-drink-sub">Každé pivo, panák a joint snižuje skill hráče. Všichni na stránce turnaje to uvidí.</div>
+        <div class="tb-drink-sub">Naklikej piva, panáky a jointy a potvrď tlačítkem dole — teprve pak se to uloží a spustí se animace všem na stránce.</div>
         <div class="tb-drink-body">${body}</div>
+        <div class="tb-drink-footer">
+            <button type="button" class="tb-btn-confirm" id="tbd-confirm-btn" ${pendingN ? '' : 'disabled'}>✅ Potvrdit${pendingN ? ` (${pendingN})` : ''}</button>
+        </div>
     </div>`;
     const nb = overlay.querySelector('.tb-drink-body');
     if(nb) nb.scrollTop = prevScroll;
     overlay.querySelector('[data-tbd-close]').addEventListener('click', tbCloseDrinkModal);
+    overlay.querySelector('#tbd-confirm-btn').addEventListener('click', tbConfirmDrinkChanges);
     overlay.querySelectorAll('.tb-drink-row').forEach(row => {
         const name = row.dataset.tbdName;
         row.querySelectorAll('[data-tbd]').forEach(btn => btn.addEventListener('click', () => {
-            const [type, d] = btn.dataset.tbd.split('|');
-            tbDrinkChange(t.id, name, type, parseInt(d, 10));
+            const [, type, d] = btn.dataset.tbd.split('|');
+            tbAdjustPending(name, type, parseInt(d, 10));
         }));
         const sk = row.querySelector('[data-tbd-skill]');
         sk.addEventListener('change', () => tbSetSkill(t.id, name, sk.value));
