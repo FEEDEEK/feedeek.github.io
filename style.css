@@ -619,19 +619,19 @@ textarea.discussion-input{ padding-right:34px; }
 .tb-btn-confirm{ background:linear-gradient(135deg, #f2c94c, #c88a1e); color:#1a1005; box-shadow:0 0 15px rgba(242,201,76,0.4); }
 .tb-btn-reroll{ background:#1c2233; color:#f2c94c; border:1px solid #c88a1e; }
 
-.tb-beer-liquid{ animation:tbBeerDrink 2.6s ease-in forwards; }
+.tb-beer-liquid{ animation:tbBeerDrink 4.4s ease-in forwards; }
 @keyframes tbBeerDrink{ from{ y:46; height:80; } to{ y:118; height:8; } }
-.tb-beer-foam{ transform-box:fill-box; animation:tbFoamDrink 2.6s ease-in forwards; }
+.tb-beer-foam{ transform-box:fill-box; animation:tbFoamDrink 4.4s ease-in forwards; }
 @keyframes tbFoamDrink{ from{ transform:translateY(0); } to{ transform:translateY(72px); } }
 
-.tb-shot-liquid2{ animation:tbShotDrink 1.3s ease-in forwards; }
+.tb-shot-liquid2{ animation:tbShotDrink 2.2s ease-in forwards; }
 @keyframes tbShotDrink{ 0%{ y:30; height:70; } 55%{ y:88; height:12; } 100%{ y:96; height:4; } }
-.tb-shot-svg-tip{ transform-origin:60px 100px; animation:tbShotTip 1.3s ease-in-out; }
+.tb-shot-svg-tip{ transform-origin:60px 100px; animation:tbShotTip 2.2s ease-in-out; }
 @keyframes tbShotTip{ 0%{ transform:rotate(0deg); } 45%{ transform:rotate(-20deg); } 100%{ transform:rotate(0deg); } }
 
-.tb-joint-body-group3{ transform-origin:14px 30px; animation:tbBurnBody 3.4s linear forwards; }
+.tb-joint-body-group3{ transform-origin:14px 30px; animation:tbBurnBody 5.6s linear forwards; }
 @keyframes tbBurnBody{ to{ transform:scaleX(0.35); } }
-.tb-joint-ember-group3{ animation:tbBurnEmber 3.4s linear forwards; }
+.tb-joint-ember-group3{ animation:tbBurnEmber 5.6s linear forwards; }
 @keyframes tbBurnEmber{ to{ transform:translateX(-104px); } }
 .tb-joint-glow3{ animation:tbGlowPulse 0.45s ease-in-out infinite alternate; }
 @keyframes tbGlowPulse{ from{ opacity:0.22; } to{ opacity:0.55; } }
@@ -687,7 +687,12 @@ textarea.discussion-input{ padding-right:34px; }
 }
 .tb-drink-title{ color:#e05050; font-size:22px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; text-shadow:0 0 10px rgba(220,50,50,.5); }
 .tb-drink-sub{ color:#b08a8a; font-size:13px; margin:4px 0 14px; }
-.tb-drink-body{ overflow-y:auto; padding-right:6px; }
+".tb-drink-body{ overflow-y:auto; padding-right:6px; }
+.tb-drink-footer{ border-top:1px solid #6b2c2c; margin-top:14px; padding-top:14px; display:flex; justify-content:flex-end; }
+.tb-drink-footer .tb-btn-confirm{ font-size:15px; padding:11px 22px; }
+.tb-drink-footer .tb-btn-confirm:disabled{ opacity:.4; cursor:not-allowed; }
+.tb-drink-ctl-pending b{ color:#f2c94c; }
+.tb-drink-pending-diff{ font-style:normal; font-size:11px; color:#e05050; margin-left:3px; }
 .tb-drink-team{ margin-bottom:16px; }
 .tb-drink-teamname{ color:#f2c94c; font-weight:700; border-bottom:1px solid #6b2c2c; padding-bottom:4px; margin-bottom:6px; }
 .tb-drink-row{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #2c1414; color:#e8dcc8; font-size:14px; }
