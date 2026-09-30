@@ -4325,7 +4325,7 @@ function renderTabRozvrh(ev){
       <form class="panel" id="form-schedule-item" style="max-width:480px;">
         <div class="field"><label>Den</label><select id="sch-day">${days.map(d=>`<option value="${d}">${fmtDate(d)}</option>`).join('')}</select></div>
         <div style="display:flex; gap:12px;">
-          <div class="field" style="flex:1;"><label>Od</label><input type="time" id="sch-start" required></div>
+          <div class="field" style="flex:1;"><label>Od (nepovinné)</label><input type="time" id="sch-start"></div>
           <div class="field" style="flex:1;"><label>Do (nepovinné)</label><input type="time" id="sch-end"></div>
         </div>
         <div class="field"><label>Co se bude dít</label><input type="text" id="sch-title" placeholder="Turnaj, oběd, příjezd..." required></div>
@@ -4345,7 +4345,10 @@ function renderTabRozvrh(ev){
       timeEnd: document.getElementById('sch-end').value || '',
       title: document.getElementById('sch-title').value.trim()
     };
-    if(!entry.title || !entry.timeStart) return;
+    if(!entry.title || (!entry.timeStart && !entry.timeEnd)){
+      alert('Vyplň aspoň jeden čas (Od nebo Do) a co se bude dít.');
+      return;
+    }
     const newSchedule = [...schedule, entry];
     try{
       await updateDoc(doc(db,'events',ev.id), { schedule: newSchedule });
@@ -4358,13 +4361,13 @@ function renderTabRozvrh(ev){
     const items = schedule
       .map((s, idx) => ({ ...s, idx }))
       .filter(s => s.day === d)
-      .sort((a,b) => a.timeStart.localeCompare(b.timeStart));
+      .sort((a,b) => (a.timeStart || a.timeEnd).localeCompare(b.timeStart || b.timeEnd));
     return `
       <div style="margin-top:20px;">
         <div class="bracket-section-title">${fmtDate(d)}</div>
         ${items.length === 0 ? '<div class="empty">Zatím nic naplánováno.</div>' : items.map(it => `
           <div class="suggestion-row">
-            <span class="txt"><b style="color:var(--gold);">${it.timeStart}${it.timeEnd?'–'+it.timeEnd:''}</b> — ${escapeHtml(it.title)}</span>
+            <span class="txt"><b style="color:var(--gold);">${it.timeStart && it.timeEnd ? `${it.timeStart}–${it.timeEnd}` : it.timeStart ? it.timeStart : `do ${it.timeEnd}`}</b> — ${escapeHtml(it.title)}</span>
             ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-remove-sch="${it.idx}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>` : ''}
           </div>
         `).join('')}
