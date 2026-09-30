@@ -190,7 +190,8 @@ form.panel, .panel{
 .food-day-heading{ font-family:'Cinzel', serif; font-size:15px; color:var(--gold); border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:10px; }
 
 /* ---- Detail akce ---- */
-.ed-top-row{ display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; }
+.ed-top-row{ display:flex; gap:24px; align-items:flex-start; }
+.ed-right-col{ flex:1; min-width:0; display:flex; flex-direction:column; gap:16px; }
 .ed-header-left-col{ flex:0 0 220px; display:flex; flex-direction:column; gap:12px; }
 .ed-header-map{ width:220px; height:160px; }
 
@@ -219,7 +220,7 @@ form.panel, .panel{
 @media (max-width: 900px){ .detail-grid, .detail-grid.no-sidebar{ grid-template-columns:1fr; } }
 
 .map-embed{ width:100%; height:180px; border:1px solid var(--line); background:var(--bg-panel); overflow:hidden; }
-.map-embed iframe{ width:100%; height:100%; border:0; filter:grayscale(0.3) invert(0.92) contrast(0.9); }
+.map-embed iframe{ width:100%; height:100%; border:0; }
 
 .ed-header-left-col .tab-switch{ display:flex; flex-direction:column; gap:2px; width:220px; }
 .tab-btn{ text-align:left; border:1px solid var(--line); background:var(--bg-panel); color:var(--text-muted); padding:10px 14px; font-size:13px; cursor:pointer; }
