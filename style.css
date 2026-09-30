@@ -110,7 +110,7 @@ h1.headline{ font-size:40px; font-weight:600; line-height:1.15; max-width:700px;
 
 .section-title{ font-size:22px; font-weight:600; margin-bottom:18px; }
 
-.grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:18px; margin-top:14px;}
+.grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:18px; margin-top:14px;}
 .event-card{ background:var(--bg-panel); border:1px solid var(--line); padding:20px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .15s ease; }
 .event-card:hover{ border-color:var(--gold-dim); }
 .event-card .tag{ align-self:flex-start; font-size:11px; color:var(--teal); border:1px solid var(--teal); padding:2px 8px; letter-spacing:.05em; }
@@ -365,6 +365,7 @@ form.panel, .panel{
 .tourney-title-corner{ flex:0 0 200px; text-align:right; display:flex; flex-direction:column; }
 .tourney-title-result{ flex:1; display:flex; align-items:center; justify-content:center; }
 .tourney-title-image{ width:72px; height:72px; object-fit:cover; border-radius:50%; margin-top:10px; border:2px solid var(--gold-dim); }
+.tourney-game-image{ max-width:110px; max-height:110px; width:auto; height:auto; object-fit:contain; margin-top:10px; }
 
 .score-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:50; }
 .score-modal{ background:var(--bg-panel); border:1px solid var(--gold-dim); padding:24px; width:280px; display:flex; flex-direction:column; gap:12px; }
@@ -795,3 +796,9 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .tbg-players label{ display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:600; }
 .tbg-svg{ width:100%; height:auto; background:#150a0a; border:1px solid #3a281a; }
 .tbg-legend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; font-size:12px; }
+
+.event-card-signup-open{ border-color:var(--teal); box-shadow:0 0 0 1px var(--teal), 0 0 18px rgba(47,143,143,0.25); }
+
+.ffa-rounds-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.ffa-round-head{ cursor:pointer; }
+.ffa-round-head:hover{ color:var(--gold); }
