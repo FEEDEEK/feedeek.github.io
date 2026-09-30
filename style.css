@@ -776,9 +776,9 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .trophy-podium-label .tp-name{ display:block; font-size:0.72em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .trophy-img{ height:auto; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)); }
-.trophy-gold{ width:92px; }
-.trophy-silver{ width:74px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) grayscale(0.85) brightness(1.15) contrast(0.95); }
-.trophy-bronze{ width:64px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) sepia(0.55) saturate(2.2) hue-rotate(-28deg) brightness(0.85); }
+.trophy-gold{ width:92px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) sepia(0.7) saturate(3.2) hue-rotate(-12deg) brightness(1.05); }
+.trophy-silver{ width:74px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) saturate(0.7) brightness(1.05); }
+.trophy-bronze{ width:64px; filter:drop-shadow(0 3px 8px rgba(0,0,0,0.55)) sepia(0.6) saturate(2.6) hue-rotate(-35deg) brightness(0.88); }
 .podium-wrap-big .trophy-gold{ width:160px; }
 .podium-wrap-big .trophy-silver{ width:126px; }
 .podium-wrap-big .trophy-bronze{ width:108px; }
