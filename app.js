@@ -363,7 +363,68 @@ function renderHome(){
 
 // ==================== FORMULÁŘ AKCE: hry (tagy) ====================
 // Zdroj log her: Steam + IGDB kombinovaně (přes vlastní Cloud Run funkci, protože obě blokují přímé volání z prohlížeče)
+function gameFieldHtml(existingName, existingImage){
+  return `<div class="field" style="position:relative;">
+    <label>Hra (nepovinné)</label>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <div style="flex:1; position:relative;">
+        <input type="text" id="new-tourney-game" placeholder="např. Dota 2, Quake 3 Arena, COD4..." autocomplete="off" value="${escapeHtml(existingName||'')}">
+        <div id="new-tourney-game-list" class="game-autocomplete-list" style="display:none;"></div>
+      </div>
+      <img id="new-tourney-game-preview" src="${existingImage ? existingImage.replace(/"/g,'&quot;') : ''}" alt="" style="width:48px; height:48px; object-fit:contain; flex-shrink:0; ${existingImage ? '' : 'display:none;'}">
+    </div>
+    <small>Podle tohohle appka pozná, jestli u výsledků zobrazit Aegis nebo klasický pohár, a zobrazí se i větší náhled u turnaje.</small>
+  </div>`;
+}
+function setupGameField(existingImage){
+  let gameImage = existingImage || '';
+  const input = document.getElementById('new-tourney-game');
+  const list = document.getElementById('new-tourney-game-list');
+  const preview = document.getElementById('new-tourney-game-preview');
+  attachGameAutocomplete(input, list, (name, image) => {
+    gameImage = image;
+    if(image){ preview.src = image; preview.style.display = 'block'; }
+    else{ preview.style.display = 'none'; }
+  });
+  return () => gameImage;
+}
+
 const STEAM_SEARCH_FUNCTION_URL = 'https://steam-game-search-632018940301.europe-west3.run.app';
+
+// Znovupoužitelné vyhledávání hry s logem (pole "Hra" u turnajů). onPick(name, image) se zavolá při výběru z nabídky.
+function attachGameAutocomplete(inputEl, listEl, onPick){
+  let debounceTimer = null;
+  inputEl.addEventListener('input', (e) => {
+    clearTimeout(debounceTimer);
+    const q = e.target.value.trim();
+    if(q.length < 2){ listEl.style.display = 'none'; return; }
+    debounceTimer = setTimeout(async () => {
+      try{
+        const res = await fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const results = data.items || [];
+        if(results.length === 0){ listEl.style.display = 'none'; return; }
+        listEl.innerHTML = results.map(r => `
+          <div class="game-autocomplete-item" data-pick-game-name="${escapeHtml(r.name)}" data-pick-game-image="${r.image ? r.image.replace(/"/g,'&quot;') : ''}">
+            ${r.image ? `<img src="${r.image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-autocomplete-noimg">🎮</div>'}
+            <span>${escapeHtml(r.name)}</span>
+          </div>
+        `).join('');
+        listEl.style.display = 'grid';
+        listEl.querySelectorAll('[data-pick-game-name]').forEach(item => {
+          item.addEventListener('click', () => {
+            inputEl.value = item.dataset.pickGameName;
+            listEl.style.display = 'none';
+            onPick(item.dataset.pickGameName, item.dataset.pickGameImage || '');
+          });
+        });
+      }catch(err){ console.error(err); listEl.style.display = 'none'; }
+    }, 400);
+  });
+  document.addEventListener('click', (e) => {
+    if(!e.target.closest(`#${inputEl.id}`) && !e.target.closest(`#${listEl.id}`)) listEl.style.display = 'none';
+  });
+}
 let gameLogoTargetIdx = null;
 
 function normalizeGame(g){
@@ -986,7 +1047,7 @@ function renderStatsAndRsvp(){
       }catch(err){ alert('Přihlášení se nepovedlo.'); console.error(err); }
     });
   }else{
-    rsvpBox.innerHTML = `<button type="button" class="btn-ghost" id="rsvp-cancel" ${deadlinePassed ? 'disabled title="Uzávěrka změn už proběhla"' : ''}>Odhlásit se z akce</button>`;
+    rsvpBox.innerHTML = `<button type="button" class="btn-ghost" id="rsvp-cancel" style="color:var(--crimson); border-color:var(--crimson);" ${deadlinePassed ? 'disabled title="Uzávěrka změn už proběhla"' : ''}>Odhlásit se z akce</button>`;
     const cancelBtn = document.getElementById('rsvp-cancel');
     if(cancelBtn) cancelBtn.addEventListener('click', async () => {
       if(!confirm('Opravdu se chceš z akce odhlásit?')) return;
@@ -1672,11 +1733,14 @@ function renderFfaBody(t, box){
   const rounds = (t.ffa && t.ffa.rounds) || [];
   const canEdit = hasPerm('turnaj');
   box.innerHTML = `
-    <div class="section-title" style="font-size:16px; margin-top:0;">Kola / mapy</div>
-    ${rounds.length === 0 ? '<p class="empty">Zatím žádné odehrané kolo.</p>' : `
+    <div class="ffa-rounds-head">
+      <div class="section-title" style="font-size:16px; margin-top:0; margin-bottom:0;">Kola / mapy</div>
+      ${canEdit ? `<button type="button" class="btn-sm" id="btn-add-ffa-round">+ Přidat kolo</button>` : ''}
+    </div>
+    ${rounds.length === 0 ? '<p class="empty">Zatím žádné odehrané kolo. Přidej první tlačítkem výše.</p>' : `
       <div style="overflow-x:auto;">
         <table class="ffa-rounds-table">
-          <thead><tr><th>Hráč</th>${rounds.map((r,ri) => `<th>${escapeHtml(r.label || ('Kolo '+(ri+1)))}</th>`).join('')}<th>Celkem</th></tr></thead>
+          <thead><tr><th>Hráč</th>${rounds.map((r,ri) => `<th ${canEdit ? `class="ffa-round-head" data-ffa-rename="${ri}" title="Klikni pro přejmenování"` : ''}>${escapeHtml(r.label || ('Kolo '+(ri+1)))}${canEdit ? ' ✏️' : ''}</th>`).join('')}<th>Celkem</th></tr></thead>
           <tbody>
             ${participants.map(name => `<tr><td>${escapeHtml(name)}</td>${rounds.map((r,ri) => `<td>${canEdit
                 ? `<input type="number" value="${(r.scores||{})[name] ?? ''}" data-ffa-score="${ri}|${escapeHtml(name)}">`
@@ -1685,7 +1749,6 @@ function renderFfaBody(t, box){
         </table>
       </div>
     `}
-    ${canEdit ? `<button type="button" class="btn-ghost btn-sm" id="btn-add-ffa-round">+ Přidat kolo</button>` : ''}
     <div class="section-title" style="font-size:16px; margin-top:26px;">Průběžné pořadí</div>
     <div id="ffa-podium-box"></div>
   `;
@@ -1698,6 +1761,16 @@ function renderFfaBody(t, box){
         const newRounds = rounds.map((r, i) => i === parseInt(ri,10)
           ? { ...r, scores: { ...(r.scores||{}), [name]: Number(inp.value) || 0 } }
           : r);
+        try{ await updateDoc(doc(db,'tournaments',t.id), { 'ffa.rounds': newRounds }); }
+        catch(err){ console.error(err); }
+      });
+    });
+    box.querySelectorAll('[data-ffa-rename]').forEach(th => {
+      th.addEventListener('click', async () => {
+        const ri = parseInt(th.dataset.ffaRename, 10);
+        const label = prompt('Nový název kola', rounds[ri].label || `Kolo ${ri+1}`);
+        if(label === null || !label.trim()) return;
+        const newRounds = rounds.map((r, i) => i === ri ? { ...r, label: label.trim() } : r);
         try{ await updateDoc(doc(db,'tournaments',t.id), { 'ffa.rounds': newRounds }); }
         catch(err){ console.error(err); }
       });
@@ -1753,6 +1826,8 @@ function renderTurnajPage(){
           <div class="tourney-title-top">
             ${ev ? `<div class="status-hint">${escapeHtml(ev.name)}</div>` : ''}
             <h1 class="headline" style="font-size:22px;">${escapeHtml(t.name)}</h1>
+            ${t.gameImage ? `<img src="${t.gameImage.replace(/"/g,'&quot;')}" alt="" class="tourney-game-image">` : ''}
+            ${t.game ? `<div class="status-hint" style="margin-top:4px;">${escapeHtml(t.game)}</div>` : ''}
             ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" class="tourney-title-image">` : ''}
           </div>
           <div class="tourney-title-result" id="tourney-title-result"></div>
@@ -1809,6 +1884,22 @@ function renderTurnajPage(){
         cornerActions.appendChild(toggleBtn);
       }
 
+      const revertBtn = document.createElement('button');
+      revertBtn.type = 'button';
+      revertBtn.className = 'btn-ghost btn-sm';
+      revertBtn.textContent = '↩ Zpět na přihlašování';
+      revertBtn.title = 'Vrátí turnaj do fáze přihlašování — přidáš další hráče a formát nastavíš znovu';
+      revertBtn.addEventListener('click', async () => {
+        if(!confirm('Vrátit turnaj do fáze přihlašování? Aktuální týmy / kola a zapsané skóre se tím smažou (seznam přihlášených zůstane zachovaný).')) return;
+        try{
+          await updateDoc(doc(db,'tournaments',t.id), {
+            status:'signup', format:null, teams:[], results:{}, swissResults:{},
+            ffa:{ participants:[], rounds:[] }
+          });
+        }catch(err){ alert('Nepovedlo se vrátit.'); console.error(err); }
+      });
+      cornerActions.appendChild(revertBtn);
+
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'btn-ghost btn-sm';
@@ -1850,7 +1941,7 @@ function renderTurnajPage(){
 
   // seznam turnajů
   tbStopLive();
-  let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaj</h1></div><div style="display:flex; gap:10px;">`;
+  let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaje</h1></div><div style="display:flex; gap:10px;">`;
   html += hasPerm('turnaj') ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
   html += `</div></div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
   box.innerHTML = html;
@@ -1881,7 +1972,7 @@ function renderTurnajPage(){
       statusTxt = champion ? `🏆 Vítěz: ${escapeHtml(teamName(t, champion.team))}` : 'Základní část se ještě hraje';
     }
     return `
-      <div class="event-card" data-open-tourney="${t.id}">
+      <div class="event-card ${t.status === 'signup' ? 'event-card-signup-open' : ''}" data-open-tourney="${t.id}">
         <div style="display:flex; align-items:center; gap:10px;">
           ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="width:36px; height:36px; object-fit:cover; border-radius:50%; border:1px solid var(--gold-dim); flex-shrink:0;">` : ''}
           ${badgeTag}
@@ -1932,7 +2023,7 @@ function renderTournamentSignupPhase(t, box){
       <h1 class="headline" style="font-size:26px; margin-top:10px;">${escapeHtml(t.name)}</h1>
       ${t.game ? `<div class="status-hint">${escapeHtml(t.game)}</div>` : ''}
     </div>
-    <p class="lede" style="margin-top:0;">Klikni na "Účastním se", pokud chceš hrát. Formát (týmy, nebo všichni proti všem) nastaví admin, až se přihlásí dost lidí.</p>
+    <p class="lede" style="margin-top:0;">Klikni na "Zúčastním se", pokud chceš hrát. Formát (týmy, nebo všichni proti všem) nastaví admin, až se přihlásí dost lidí.</p>
     <div id="signup-cta"></div>
     <div class="section-title" style="font-size:15px;">Přihlášení (${signups.length})</div>
     <div class="signup-list" id="signup-list"></div>
@@ -1954,13 +2045,14 @@ function renderTournamentSignupPhase(t, box){
     btn.type = 'button';
     if(iAmIn){
       btn.className = 'btn-ghost';
+      btn.style.cssText = 'color:var(--crimson); border-color:var(--crimson);';
       btn.textContent = 'Odhlásit se';
       btn.addEventListener('click', async () => {
         try{ await updateDoc(doc(db,'tournaments',t.id), { signups: arrayRemove(currentNick) }); }
         catch(err){ console.error(err); }
       });
     }else{
-      btn.textContent = '✅ Účastním se';
+      btn.textContent = 'Zúčastním se';
       btn.addEventListener('click', async () => {
         try{ await updateDoc(doc(db,'tournaments',t.id), { signups: arrayUnion(currentNick) }); }
         catch(err){ console.error(err); }
@@ -2151,7 +2243,7 @@ function renderFfaFormatSetup(t, box){
   });
   document.getElementById('btn-confirm-ffa-setup').addEventListener('click', async () => {
     try{
-      await updateDoc(doc(db,'tournaments',t.id), { format:'ffa', status:'ready', 'ffa.participants': localList, 'ffa.rounds': [] });
+      await updateDoc(doc(db,'tournaments',t.id), { format:'ffa', status:'ready', 'ffa.participants': localList, 'ffa.rounds': [{ label:'Kolo 1', scores:{} }] });
       tourneySetupStep = null;
     }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
   });
@@ -2191,7 +2283,7 @@ function openSignupTournamentForm(){
     <form class="panel" id="form-new-tourney" style="max-width:640px;">
       <div class="section-title" style="font-size:16px; margin-top:0;">Otevřít přihlašování</div>
       <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Turnaj v COD4" required></div>
-      <div class="field"><label>Hra (nepovinné)</label><input type="text" id="new-tourney-game" placeholder="např. Dota 2, Quake 3 Arena, COD4..."><small>Podle tohohle appka pozná, jestli u výsledků zobrazit Aegis, nebo klasický pohár.</small></div>
+      ${gameFieldHtml('', '')}
       <div class="field"><label>Akce (nepovinné)</label><select id="new-tourney-event">
         <option value="">— bez přiřazené akce —</option>
         ${evOptions.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}${e.dateEnd < todayIso() ? ' (proběhlo)' : ''}</option>`).join('')}
@@ -2204,6 +2296,7 @@ function openSignupTournamentForm(){
     </form>
   `;
   document.getElementById('btn-cancel-new-tourney').addEventListener('click', () => { slot.innerHTML = ''; });
+  const getGameImage1 = setupGameField('');
   document.getElementById('form-new-tourney').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('new-tourney-name').value.trim();
@@ -2211,6 +2304,7 @@ function openSignupTournamentForm(){
     const payload = {
       name,
       game: document.getElementById('new-tourney-game').value.trim(),
+      gameImage: getGameImage1(),
       eventId: document.getElementById('new-tourney-event').value,
       imageUrl: document.getElementById('new-tourney-image').value.trim(),
       status: 'signup', format: null, signups: [],
@@ -2243,7 +2337,7 @@ function openDirectDrawTournamentForm(){
   slot.innerHTML = `
     <form class="panel" id="form-new-tourney" style="max-width:940px;">
       <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" required></div>
-      <div class="field"><label>Hra (nepovinné)</label><input type="text" id="new-tourney-game" placeholder="např. Dota 2, Quake 3 Arena, COD4..."><small>Podle tohohle appka pozná, jestli u výsledků zobrazit Aegis, nebo klasický pohár.</small></div>
+      ${gameFieldHtml('', '')}
       <div class="field"><label>Akce (hráči se načtou automaticky)</label><select id="new-tourney-event">
         <option value="">— bez přiřazené akce —</option>
         ${evOptions.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}${e.dateEnd < todayIso() ? ' (proběhlo)' : ''}</option>`).join('')}
@@ -2275,6 +2369,7 @@ function openDirectDrawTournamentForm(){
   `;
   slot.scrollIntoView({ behavior:'smooth', block:'start' });
   tbRenderDrawPlayers();
+  const getGameImage2 = setupGameField('');
 
   document.getElementById('btn-cancel-new-tourney').addEventListener('click', () => { slot.innerHTML = ''; tbDraw = { players: [], teams: null }; });
   document.getElementById('tb-team-size').addEventListener('input', () => { tbUpdateTeamCountHint(); tbInvalidateDraw(); });
@@ -2323,6 +2418,7 @@ function openDirectDrawTournamentForm(){
     const eventId = document.getElementById('new-tourney-event').value;
     const imageUrl = document.getElementById('new-tourney-image').value.trim();
     const game = document.getElementById('new-tourney-game').value.trim();
+    const gameImage = getGameImage2();
     if(!name) return;
     let teams = [], skills = {};
     if(tbDraw.teams){
@@ -2339,7 +2435,7 @@ function openDirectDrawTournamentForm(){
     const createdAt = new Date().toISOString();
     try{
       const docRef = await addDoc(collection(db,'tournaments'), {
-        name, game, eventId, teams, results:{}, swissResults:{}, imageUrl,
+        name, game, gameImage, eventId, teams, results:{}, swissResults:{}, imageUrl,
         status:'ready', format:'teams', signups:[], ffa:{ participants:[], rounds:[] },
         teamSize: tbTeamSizeVal(), createdAt
       });
@@ -2357,7 +2453,7 @@ function openEditTournamentForm(existing){
   slot.innerHTML = `
     <form class="panel" id="form-new-tourney">
       <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" value="${escapeHtml(existing.name)}" required></div>
-      <div class="field"><label>Hra (nepovinné)</label><input type="text" id="new-tourney-game" placeholder="např. Dota 2, Quake 3 Arena, COD4..." value="${escapeHtml(existing.game||'')}"><small>Podle tohohle appka pozná, jestli u výsledků zobrazit Aegis, nebo klasický pohár.</small></div>
+      ${gameFieldHtml(existing.game || '', existing.gameImage || '')}
       <div class="field"><label>Akce (nepovinné)</label><select id="new-tourney-event">
         <option value="">— bez přiřazené akce —</option>
         ${evOptions.map(e=>`<option value="${e.id}" ${existing.eventId===e.id?'selected':''}>${escapeHtml(e.name)}${e.dateEnd < todayIso() ? ' (proběhlo)' : ''}</option>`).join('')}
@@ -2371,15 +2467,17 @@ function openEditTournamentForm(existing){
   `;
   slot.scrollIntoView({ behavior:'smooth', block:'start' });
   document.getElementById('btn-cancel-new-tourney').addEventListener('click', () => { slot.innerHTML = ''; });
+  const getGameImage3 = setupGameField(existing.gameImage || '');
   document.getElementById('form-new-tourney').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('new-tourney-name').value.trim();
     const eventId = document.getElementById('new-tourney-event').value;
     const imageUrl = document.getElementById('new-tourney-image').value.trim();
     const game = document.getElementById('new-tourney-game').value.trim();
+    const gameImage = getGameImage3();
     if(!name) return;
     try{
-      await updateDoc(doc(db,'tournaments',existing.id), { name, eventId, imageUrl, game });
+      await updateDoc(doc(db,'tournaments',existing.id), { name, eventId, imageUrl, game, gameImage });
       slot.innerHTML = '';
       renderTurnajPage();
     }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
