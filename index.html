@@ -135,8 +135,22 @@
           <label>💰 Vstupné a platba (nepovinné)</label>
           <div class="tag-input-row">
             <input type="number" id="ev-fee" placeholder="Částka (Kč)" min="0" style="max-width:160px;">
-            <input type="url" id="ev-qr" placeholder="URL obrázku QR kódu pro platbu">
           </div>
+
+          <small style="display:block; margin:10px 0 4px;">Číslo účtu — appka pak každému přihlášenému sama vygeneruje jeho vlastní QR platbu s unikátním variabilním symbolem, ať jde poznat, kdo zaplatil:</small>
+          <div class="tag-input-row">
+            <input type="text" id="ev-acc-prefix" placeholder="Předčíslí (nepovinné)" style="max-width:130px;">
+            <input type="text" id="ev-acc-number" placeholder="Číslo účtu" style="max-width:170px;">
+            <input type="text" id="ev-acc-bank" placeholder="Kód banky (např. 0100)" style="max-width:150px;">
+          </div>
+
+          <small style="display:block; margin:10px 0 4px;">Nebo místo toho nahraj vlastní obrázek QR kódu (stejný pro všechny, bez rozlišení kdo platil):</small>
+          <div class="tag-input-row">
+            <input type="file" id="ev-qr-file" accept="image/*" style="flex:1;">
+          </div>
+          <input type="url" id="ev-qr" placeholder="...nebo vlož přímo URL obrázku" style="margin-top:6px;">
+          <div id="ev-qr-upload-msg" class="small-msg"></div>
+          <img id="ev-qr-preview" src="" alt="" style="display:none; width:100px; height:100px; object-fit:contain; margin-top:8px; border:1px solid var(--line); background:#fff; padding:4px;">
         </div>
 
         <div class="field tag-input-box">
@@ -214,6 +228,7 @@
                     <p class="lede" id="ed-desc"></p>
                     <div id="ed-entryfee"></div>
                     <div class="rsvp-box" id="ed-rsvp"></div>
+                    <div id="ed-payment-qr"></div>
                   </div>
                   <div id="ed-datevote"></div>
                 </div>
@@ -413,6 +428,7 @@
       if(nav) nav.classList.add('active');
     })();
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
 </html>
