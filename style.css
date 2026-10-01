@@ -834,3 +834,8 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
   0%,100%{ box-shadow:0 0 12px rgba(242,201,76,.45); }
   50%{ box-shadow:0 0 26px rgba(242,201,76,.9); }
 }
+
+.payment-qr-box{ display:flex; align-items:center; gap:14px; margin-top:14px; padding:12px; background:rgba(0,0,0,0.3); border:1px solid var(--gold-dim); max-width:320px; }
+.payment-qr-box canvas{ background:#fff; padding:6px; border-radius:4px; flex-shrink:0; }
+.payment-qr-info{ font-size:13px; line-height:1.6; }
+.payment-qr-info b{ color:var(--gold); }
