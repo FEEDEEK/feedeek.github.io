@@ -576,11 +576,37 @@ const btnNewEvent = document.getElementById('btn-new-event');
 const akceListWrap = document.getElementById('akce-list-wrap');
 let editingEventId = null;
 
+function updateEvQrPreview(){
+  const url = document.getElementById('ev-qr').value.trim();
+  const preview = document.getElementById('ev-qr-preview');
+  preview.src = url;
+  preview.style.display = url ? 'block' : 'none';
+}
+document.getElementById('ev-qr').addEventListener('input', updateEvQrPreview);
+document.getElementById('ev-qr-file').addEventListener('change', async () => {
+  const fileInput = document.getElementById('ev-qr-file');
+  const msg = document.getElementById('ev-qr-upload-msg');
+  const file = fileInput.files[0];
+  if(!file) return;
+  if(file.size > 5 * 1024 * 1024){ msg.textContent = 'Soubor je moc velký (max 5 MB).'; return; }
+  msg.textContent = 'Nahrávám...';
+  try{
+    const fileRef = ref(storage, `qr-codes/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    document.getElementById('ev-qr').value = url;
+    updateEvQrPreview();
+    msg.textContent = 'Nahráno.';
+  }catch(err){ console.error(err); msg.textContent = 'Nahrání se nepovedlo.'; }
+});
+
 function resetEventFormHelpers(){
   currentEventGames = [];
   currentEventFood = emptyFoodSchedule();
   currentEventDateOptions = [];
   gameLogoTargetIdx = null;
+  document.getElementById('ev-qr-upload-msg').textContent = '';
+  updateEvQrPreview();
   renderFormGames();
   renderFormFood();
   renderFormDateOptions();
@@ -653,6 +679,9 @@ formEvent.addEventListener('submit', async (e) => {
     imageUrl: document.getElementById('ev-image').value.trim(),
     fee: parseInt(document.getElementById('ev-fee').value, 10) || 0,
     qrUrl: document.getElementById('ev-qr').value.trim(),
+    accPrefix: document.getElementById('ev-acc-prefix').value.trim(),
+    accNumber: document.getElementById('ev-acc-number').value.trim(),
+    accBank: document.getElementById('ev-acc-bank').value.trim(),
     dateOptions,
     dateVoteDeadline: document.getElementById('ev-dateopt-deadline').value || '',
     games: [...currentEventGames],
@@ -689,6 +718,10 @@ function startEditEvent(ev){
   document.getElementById('ev-image').value = ev.imageUrl || '';
   document.getElementById('ev-fee').value = ev.fee || '';
   document.getElementById('ev-qr').value = ev.qrUrl || '';
+  document.getElementById('ev-acc-prefix').value = ev.accPrefix || '';
+  document.getElementById('ev-acc-number').value = ev.accNumber || '';
+  document.getElementById('ev-acc-bank').value = ev.accBank || '';
+  updateEvQrPreview();
   currentEventDateOptions = Array.isArray(ev.dateOptions) ? [...ev.dateOptions] : [];
   renderFormDateOptions();
   document.getElementById('ev-dateopt-deadline').value = ev.dateVoteDeadline || '';
@@ -971,12 +1004,79 @@ function renderActiveTab(ev){
   else renderTabFoto(ev);
 }
 
+// ==================== QR platba (SPAYD) ====================
+// Převod českého čísla účtu na IBAN podle ISO 13616 / MOD-97-10.
+// Ověřeno proti více nezávislým zdrojům (kutac.cz, e-banky.cz, kodbank.cz).
+function czAccountToIban(prefix, account, bankCode){
+  const p = String(prefix || '').replace(/\D/g,'').padStart(6, '0');
+  const a = String(account || '').replace(/\D/g,'').padStart(10, '0');
+  const bank = String(bankCode || '').replace(/\D/g,'').padStart(4, '0');
+  if(a === '0000000000' || bank === '0000') return null;
+  const bban = bank + p + a; // 20 číslic
+  // CZ -> C=12, Z=35, plus dvě nulové kontrolní číslice coby zástupné místo
+  const numStr = bban + '123500';
+  let remainder = 0n;
+  for(const ch of numStr){ remainder = (remainder * 10n + BigInt(ch)) % 97n; }
+  const check = (98n - remainder).toString().padStart(2, '0');
+  return 'CZ' + check + bban;
+}
+
+// Deterministický variabilní symbol (6 číslic) odvozený z UID uživatele - stejný pokaždé, nic se nemusí ukládat.
+function vsFromUid(uid){
+  let h = 0;
+  for(let i = 0; i < uid.length; i++){ h = (h * 31 + uid.charCodeAt(i)) >>> 0; }
+  return String(h % 1000000).padStart(6, '0');
+}
+
+// Odstranění diakritiky a nepovolených znaků (SPAYD musí být čisté ASCII, bez hvězdiček)
+function spaydSafe(str){
+  return String(str || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\*/g, '')
+    .toUpperCase();
+}
+
+function buildSpaydString(iban, amount, vs, msg){
+  let s = `SPD*1.0*ACC:${iban}*AM:${Number(amount).toFixed(2)}*CC:CZK`;
+  if(vs) s += `*X-VS:${vs}`;
+  if(msg) s += `*MSG:${spaydSafe(msg).slice(0, 60)}`;
+  return s;
+}
+
+function eventHasOwnPaymentAccount(ev){
+  return !!(ev.fee && ev.accNumber && ev.accBank);
+}
+
+// Vykreslí osobní QR platbu konkrétního uživatele (vlastní variabilní symbol) do daného kontejneru.
+async function renderPersonalPaymentQr(ev, uid, nick, box){
+  if(!eventHasOwnPaymentAccount(ev)){ box.innerHTML = ''; return; }
+  const iban = czAccountToIban(ev.accPrefix, ev.accNumber, ev.accBank);
+  if(!iban){ box.innerHTML = ''; return; }
+  const vs = vsFromUid(uid);
+  const spayd = buildSpaydString(iban, ev.fee, vs, `${ev.name || 'LAN'} ${nick}`);
+  box.innerHTML = `
+    <div class="payment-qr-box">
+      <canvas id="payment-qr-canvas"></canvas>
+      <div class="payment-qr-info">
+        <div><b>${ev.fee} Kč</b></div>
+        <div>VS: <b>${vs}</b></div>
+        <div class="status-hint">Naskenuj v bankovní appce (QR Platba)</div>
+      </div>
+    </div>
+  `;
+  try{
+    await window.QRCode.toCanvas(document.getElementById('payment-qr-canvas'), spayd, { width: 150, margin: 1 });
+  }catch(err){ console.error('QR generování selhalo:', err); box.innerHTML = '<div class="empty">QR kód se nepodařilo vygenerovat.</div>'; }
+}
+
 function renderEntryFeeBlock(ev){
   const box = document.getElementById('ed-entryfee');
   if(!ev.fee && !ev.qrUrl){ box.innerHTML = ''; return; }
+  const showSharedQr = ev.qrUrl && !eventHasOwnPaymentAccount(ev);
   box.innerHTML = `
-    ${ev.qrUrl ? `<img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu" style="margin-bottom:8px;">` : ''}
+    ${showSharedQr ? `<img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu" style="margin-bottom:8px;">` : ''}
     ${ev.fee ? `<div style="font-size:28px; font-weight:700; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,0.8);">${ev.fee} Kč</div><div style="font-size:13px; font-weight:600; color:var(--gold); text-transform:uppercase; letter-spacing:.08em; text-shadow:0 1px 4px rgba(0,0,0,0.8);">Vstupné</div>` : ''}
+    ${eventHasOwnPaymentAccount(ev) ? `<div class="status-hint" style="margin-top:4px;">Po přihlášení uvidíš svůj osobní QR s variabilním symbolem</div>` : ''}
   `;
 }
 
@@ -1048,9 +1148,11 @@ function renderStatsAndRsvp(){
   if(!ev) return;
 
   const rsvpBox = document.getElementById('ed-rsvp');
+  const qrBoxEl = document.getElementById('ed-payment-qr');
   if(!currentUser || !currentNick){
     rsvpBox.innerHTML = `<button type="button" id="rsvp-login-btn">Přihlásit se na akci</button>`;
     document.getElementById('rsvp-login-btn').addEventListener('click', () => { pendingEventId = ev.id; showView('ucet'); });
+    if(qrBoxEl) qrBoxEl.innerHTML = '';
     return;
   }
 
@@ -1061,6 +1163,7 @@ function renderStatsAndRsvp(){
 
   if(!myReg){
     rsvpBox.innerHTML = `<button type="button" id="rsvp-register-btn" ${full ? 'disabled title="Akce je plně obsazená"' : ''}>Přihlásit se na akci</button>`;
+    if(qrBoxEl) qrBoxEl.innerHTML = '';
     const btn = document.getElementById('rsvp-register-btn');
     if(btn) btn.addEventListener('click', async () => {
       try{
@@ -1077,6 +1180,8 @@ function renderStatsAndRsvp(){
       try{ await deleteDoc(doc(db, 'events', ev.id, 'registrations', currentUser.uid)); }
       catch(err){ alert('Odhlášení se nepovedlo.'); console.error(err); }
     });
+    const qrBox = qrBoxEl;
+    if(qrBox) renderPersonalPaymentQr(ev, currentUser.uid, currentNick, qrBox);
   }
 }
 
@@ -1188,8 +1293,8 @@ function renderAttendees(){
       }else{
         statusHtml = `<span class="status-pill ${r.status === 'maybe' ? 'maybe' : 'going'}">${r.status === 'maybe' ? 'Možná' : 'Určitě'}</span>`;
       }
-      const coinHtml = (ev && ev.fee)
-        ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} ${hasPerm('akce') ? 'admin-toggle' : ''}" data-toggle-paid="${hasPerm('akce') ? r._docId : ''}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}">${coinSvg(r.paid)}</span>`
+      const coinHtml = (ev && ev.fee && hasPerm('akce'))
+        ? `<span class="coin-icon ${r.paid ? 'paid' : 'unpaid'} admin-toggle" data-toggle-paid="${r._docId}" title="${r.paid ? 'Zaplaceno' : 'Nezaplaceno'}">${coinSvg(r.paid)}</span>`
         : '';
       return `
         <div class="attendee-row">
