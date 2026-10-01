@@ -193,15 +193,17 @@
           <div class="ed-top-row">
             <div class="ed-header-left-col">
               <div class="ed-when-where">
-                <div class="ed-when-where-row"><span class="ed-ww-label">KDY:</span> <span id="ed-when"></span></div>
-                <div class="ed-when-where-row"><span class="ed-ww-label">KDE:</span> <span id="ed-where"></span></div>
+                <div class="ed-when-where-row"><span class="ed-ww-label">KDY:</span></div>
+                <div class="ed-when-where-row ed-ww-value" id="ed-when"></div>
+                <div class="ed-when-where-row" style="margin-top:8px;"><span class="ed-ww-label">KDE:</span></div>
+                <div class="ed-when-where-row ed-ww-value" id="ed-where"></div>
               </div>
               <div class="map-embed ed-header-map" id="ed-map"></div>
               <div class="tab-switch" id="ed-tabs">
                 <button type="button" class="tab-btn active" data-tab="prehled">Přehled</button>
                 <button type="button" class="tab-btn" data-tab="rozvrh">Rozvrh</button>
                 <button type="button" class="tab-btn" data-tab="jidlo">Jídlo</button>
-                <button type="button" class="tab-btn" data-tab="turnaj">Turnaj</button>
+                <button type="button" class="tab-btn" data-tab="turnaj">Turnaje</button>
                 <button type="button" class="tab-btn" data-tab="foto">Foto</button>
               </div>
             </div>
@@ -210,11 +212,11 @@
                 <div class="ed-header-inner">
                   <div class="ed-header-main" id="ed-header-main">
                     <p class="lede" id="ed-desc"></p>
+                    <div id="ed-entryfee"></div>
+                    <div class="rsvp-box" id="ed-rsvp"></div>
                   </div>
                   <div id="ed-datevote"></div>
                 </div>
-                <div class="rsvp-box ed-rsvp-corner" id="ed-rsvp"></div>
-                <div class="ed-fee-corner" id="ed-entryfee"></div>
                 <div class="ed-tourney-cta" id="ed-tourney-cta"></div>
               </div>
               <div class="tab-panel" id="tab-prehled"></div>
