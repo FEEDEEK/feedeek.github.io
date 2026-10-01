@@ -903,7 +903,6 @@ function renderTournamentSignupCta(ev){
       <div class="tourney-signup-panel-title">Otevřené turnaje</div>
       ${list.map(t => `
         <button type="button" class="tourney-signup-cta-btn" data-cta-open="${t.id}">
-          <span class="tourney-cta-sparkles"></span>
           ${t.gameImage ? `<img src="${t.gameImage.replace(/"/g,'&quot;')}" alt="" class="tourney-cta-logo">` : ''}
           <span>${escapeHtml(t.name)}</span>
         </button>
@@ -4310,7 +4309,7 @@ function renderTabTurnaj(ev){
   const box = document.getElementById('tab-turnaj');
   const linked = allTournaments.filter(t => t.eventId === ev.id);
 
-  let html = `<div class="section-title" style="font-size:16px;">Turnaj</div>`;
+  let html = `<div class="section-title" style="font-size:16px;">Turnaje</div>`;
   if(linked.length === 0){
     html += '<div class="empty">K téhle akci zatím není přiřazený žádný turnaj. Založíš ho v horním menu "Turnaje".</div>';
     box.innerHTML = html;
