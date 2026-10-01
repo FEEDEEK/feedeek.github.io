@@ -917,7 +917,8 @@ function renderTournamentSignupCta(ev){
 
 function renderEventDetailStatic(ev){
   document.getElementById('ed-title').textContent = (ev.number ? ev.number + ' — ' : '') + ev.name;
-  document.getElementById('ed-meta').textContent = fmtDateRange(ev) + ' · ' + ev.place;
+  document.getElementById('ed-when').textContent = fmtDateRange(ev);
+  document.getElementById('ed-where').textContent = ev.place || '—';
   document.getElementById('ed-desc').textContent = ev.desc || '';
 
   const header = document.getElementById('ed-header');
