@@ -187,10 +187,15 @@
 
     <!-- DETAIL AKCE -->
     <section class="view" id="view-event">
+      <h1 class="headline ed-page-title" id="ed-title" style="font-size:30px;">—</h1>
       <div class="detail-grid">
         <div class="detail-col-center">
           <div class="ed-top-row">
             <div class="ed-header-left-col">
+              <div class="ed-when-where">
+                <div class="ed-when-where-row"><span class="ed-ww-label">KDY:</span> <span id="ed-when"></span></div>
+                <div class="ed-when-where-row"><span class="ed-ww-label">KDE:</span> <span id="ed-where"></span></div>
+              </div>
               <div class="map-embed ed-header-map" id="ed-map"></div>
               <div class="tab-switch" id="ed-tabs">
                 <button type="button" class="tab-btn active" data-tab="prehled">Přehled</button>
@@ -204,13 +209,11 @@
               <div class="ed-header" id="ed-header">
                 <div class="ed-header-inner">
                   <div class="ed-header-main" id="ed-header-main">
-                    <h1 class="headline" id="ed-title" style="font-size:32px;">—</h1>
-                    <p class="lede" id="ed-meta"></p>
                     <p class="lede" id="ed-desc"></p>
-                    <div class="rsvp-box" id="ed-rsvp" style="margin-top:16px;"></div>
                   </div>
                   <div id="ed-datevote"></div>
                 </div>
+                <div class="rsvp-box ed-rsvp-corner" id="ed-rsvp"></div>
                 <div class="ed-fee-corner" id="ed-entryfee"></div>
                 <div class="ed-tourney-cta" id="ed-tourney-cta"></div>
               </div>
