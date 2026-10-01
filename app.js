@@ -896,10 +896,23 @@ let currentPhotos = [];
 function renderTournamentSignupCta(ev){
   const box = document.getElementById('ed-tourney-cta');
   if(!box) return;
-  const t = allTournaments.find(x => x.eventId === ev.id && x.status === 'signup');
-  if(!t){ box.innerHTML = ''; return; }
-  box.innerHTML = `<button type="button" class="tourney-signup-cta-btn" id="ed-tourney-cta-btn">📝 Přihlásit se na turnaj</button>`;
-  document.getElementById('ed-tourney-cta-btn').addEventListener('click', () => setRoute('#turnaj/' + t.id));
+  const list = allTournaments.filter(x => x.eventId === ev.id && x.status === 'signup');
+  if(list.length === 0){ box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div class="tourney-signup-panel">
+      <div class="tourney-signup-panel-title">Otevřené turnaje</div>
+      ${list.map(t => `
+        <button type="button" class="tourney-signup-cta-btn" data-cta-open="${t.id}">
+          <span class="tourney-cta-sparkles"></span>
+          ${t.gameImage ? `<img src="${t.gameImage.replace(/"/g,'&quot;')}" alt="" class="tourney-cta-logo">` : ''}
+          <span>${escapeHtml(t.name)}</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
+  box.querySelectorAll('[data-cta-open]').forEach(btn => {
+    btn.addEventListener('click', () => setRoute('#turnaj/' + btn.dataset.ctaOpen));
+  });
 }
 
 function renderEventDetailStatic(ev){
@@ -1992,8 +2005,9 @@ function renderTurnajPage(){
     }
     return `
       <div class="event-card ${t.status === 'signup' ? 'event-card-signup-open' : ''}" data-open-tourney="${t.id}">
+        ${t.gameImage ? `<div class="tourney-card-banner"><img src="${t.gameImage.replace(/"/g,'&quot;')}" alt=""></div>` : ''}
         <div style="display:flex; align-items:center; gap:10px;">
-          ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="width:36px; height:36px; object-fit:cover; border-radius:50%; border:1px solid var(--gold-dim); flex-shrink:0;">` : ''}
+          ${!t.gameImage && t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" style="width:36px; height:36px; object-fit:cover; border-radius:50%; border:1px solid var(--gold-dim); flex-shrink:0;">` : ''}
           ${badgeTag}
         </div>
         <h3>${escapeHtml(t.name)}</h3>
@@ -4319,8 +4333,8 @@ function renderTabTurnaj(ev){
     }
     return `
       <div class="event-card ${t.status === 'signup' ? 'event-card-signup-open' : ''}" data-open-tourney-compact="${t.id}" style="cursor:pointer;">
+        ${t.gameImage ? `<div class="tourney-card-banner"><img src="${t.gameImage.replace(/"/g,'&quot;')}" alt=""></div>` : ''}
         <div style="display:flex; align-items:center; gap:10px;">
-          ${t.gameImage ? `<img src="${t.gameImage.replace(/"/g,'&quot;')}" alt="" style="width:36px; height:36px; object-fit:contain; flex-shrink:0;">` : ''}
           ${badgeTag}
         </div>
         <h3>${escapeHtml(t.name)}</h3>
