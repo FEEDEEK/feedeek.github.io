@@ -111,7 +111,9 @@ h1.headline{ font-size:40px; font-weight:600; line-height:1.15; max-width:700px;
 .section-title{ font-size:22px; font-weight:600; margin-bottom:18px; }
 
 .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:18px; margin-top:14px;}
-.event-card{ background:var(--bg-panel); border:1px solid var(--line); padding:20px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .15s ease; }
+.event-card{ background:var(--bg-panel); border:1px solid var(--line); padding:20px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .15s ease; position:relative; }
+.tourney-card-banner{ margin:-20px -20px 0; height:90px; display:flex; align-items:center; justify-content:center; background:var(--bg-panel-2); border-bottom:1px solid var(--line); overflow:hidden; }
+.tourney-card-banner img{ max-width:80%; max-height:76px; width:auto; height:auto; object-fit:contain; }
 .event-card:hover{ border-color:var(--gold-dim); }
 .event-card .tag{ align-self:flex-start; font-size:11px; color:var(--teal); border:1px solid var(--teal); padding:2px 8px; letter-spacing:.05em; }
 .event-card .tag.full{ color:var(--crimson); border-color:var(--crimson); }
@@ -811,9 +813,22 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .tourney-result-btn-big{ font-size:16px; padding:12px 24px; margin-top:12px; }
 
 .ed-tourney-cta{ position:absolute; top:16px; right:20px; z-index:2; }
+.tourney-signup-panel{ display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+.tourney-signup-panel-title{ font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--teal); font-weight:700; }
 .tourney-signup-cta-btn{
-  padding:10px 18px; font-size:14px; font-weight:700; cursor:pointer; border-radius:4px;
+  position:relative; overflow:visible; display:flex; align-items:center; gap:10px; width:max-content;
+  padding:10px 20px; font-size:15px; font-weight:800; cursor:pointer; border-radius:5px;
   background:linear-gradient(135deg, var(--teal), #1a6b6b); color:#06251f; border:1px solid var(--teal);
-  box-shadow:0 0 14px rgba(47,143,143,0.55); animation:tourneyCtaPulse 1.8s ease-in-out infinite;
+  box-shadow:0 0 14px rgba(47,143,143,0.55); animation:tourneyCtaPulse 1.6s ease-in-out infinite;
 }
-@keyframes tourneyCtaPulse{ 0%,100%{ box-shadow:0 0 10px rgba(47,143,143,0.45); } 50%{ box-shadow:0 0 22px rgba(47,143,143,0.85); } }
+.tourney-cta-logo{ width:26px; height:26px; object-fit:contain; flex-shrink:0; }
+@keyframes tourneyCtaPulse{ 0%,100%{ box-shadow:0 0 10px rgba(47,143,143,0.45); transform:scale(1); } 50%{ box-shadow:0 0 26px rgba(47,143,143,0.9); transform:scale(1.03); } }
+
+.tourney-cta-sparkles{ position:absolute; inset:-10px; pointer-events:none; }
+.tourney-cta-sparkles::before, .tourney-cta-sparkles::after{
+  content:'✦'; position:absolute; color:#fff8d6; text-shadow:0 0 6px var(--teal), 0 0 10px #fff;
+  animation:tourneyCtaSpark 1.4s ease-in-out infinite;
+}
+.tourney-cta-sparkles::before{ left:-4px; top:-2px; font-size:14px; animation-delay:.1s; }
+.tourney-cta-sparkles::after{ right:-4px; bottom:-4px; font-size:11px; animation-delay:.7s; }
+@keyframes tourneyCtaSpark{ 0%,100%{ opacity:0; transform:scale(0.5) rotate(0deg); } 45%{ opacity:1; transform:scale(1.15) rotate(20deg); } }
