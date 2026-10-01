@@ -893,6 +893,15 @@ let currentComments = [];
 let currentFoodComments = [];
 let currentPhotos = [];
 
+function renderTournamentSignupCta(ev){
+  const box = document.getElementById('ed-tourney-cta');
+  if(!box) return;
+  const t = allTournaments.find(x => x.eventId === ev.id && x.status === 'signup');
+  if(!t){ box.innerHTML = ''; return; }
+  box.innerHTML = `<button type="button" class="tourney-signup-cta-btn" id="ed-tourney-cta-btn">📝 Přihlásit se na turnaj</button>`;
+  document.getElementById('ed-tourney-cta-btn').addEventListener('click', () => setRoute('#turnaj/' + t.id));
+}
+
 function renderEventDetailStatic(ev){
   document.getElementById('ed-title').textContent = (ev.number ? ev.number + ' — ' : '') + ev.name;
   document.getElementById('ed-meta').textContent = fmtDateRange(ev) + ' · ' + ev.place;
@@ -903,6 +912,7 @@ function renderEventDetailStatic(ev){
 
   renderEntryFeeBlock(ev);
   renderDateVoteBlock(ev);
+  renderTournamentSignupCta(ev);
 
   const mapBox = document.getElementById('ed-map');
   const q = encodeURIComponent(ev.place || '');
@@ -1624,9 +1634,12 @@ const TEAM_COLORS = ['#e8e3d8','#c9a24b','#8b2635','#2f8f8f','#4a90d9','#9b59b6'
 onSnapshot(collection(db, 'tournaments'), (snap) => {
   allTournaments = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   if(document.getElementById('view-turnaj')?.classList.contains('active')) renderTurnajPage();
-  if(currentDetailEventId && currentTab === 'turnaj'){
+  if(currentDetailEventId){
     const ev = events.find(x=>x.id===currentDetailEventId);
-    if(ev) renderTabTurnaj(ev);
+    if(ev){
+      renderTournamentSignupCta(ev);
+      if(currentTab === 'turnaj') renderTabTurnaj(ev);
+    }
   }
   tryInitialRoute();
 });
@@ -1817,17 +1830,16 @@ function renderTurnajPage(){
     const swissPreview = isFfa ? null : computeSwissTournament(t);
     const ffaStandings = isFfa ? computeFfaStandings(t) : null;
     box.innerHTML = `
-      <div class="tourney-teams-panel" id="tourney-teams-panel"></div>
       <div class="tourney-main-row">
         <div class="tourney-bracket-col">
+          <div class="tourney-teams-panel" id="tourney-teams-panel"></div>
           <div class="${isFfa ? '' : 'bracket-scale-wrap'}" id="turnaj-detail-body"></div>
         </div>
         <div class="tourney-title-corner">
           <div class="tourney-title-top">
-            ${ev ? `<div class="status-hint">${escapeHtml(ev.name)}</div>` : ''}
-            <h1 class="headline" style="font-size:22px;">${escapeHtml(t.name)}</h1>
-            ${t.gameImage ? `<img src="${t.gameImage.replace(/"/g,'&quot;')}" alt="" class="tourney-game-image">` : ''}
-            ${t.game ? `<div class="status-hint" style="margin-top:4px;">${escapeHtml(t.game)}</div>` : ''}
+            ${ev ? `<div class="status-hint" style="white-space:nowrap;">${escapeHtml(ev.name)}</div>` : ''}
+            ${t.gameImage ? `<img src="${t.gameImage.replace(/"/g,'&quot;')}" alt="" class="tourney-game-image">` : (t.game ? `<div class="status-hint" style="margin-top:4px;">${escapeHtml(t.game)}</div>` : '')}
+            <h1 class="headline" style="font-size:22px; margin-top:8px;">${escapeHtml(t.name)}</h1>
             ${t.imageUrl ? `<img src="${t.imageUrl.replace(/"/g,'&quot;')}" alt="" class="tourney-title-image">` : ''}
           </div>
           <div class="tourney-title-result" id="tourney-title-result"></div>
@@ -1884,6 +1896,13 @@ function renderTurnajPage(){
         cornerActions.appendChild(toggleBtn);
       }
 
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'btn-ghost btn-sm';
+      editBtn.textContent = 'Upravit';
+      editBtn.addEventListener('click', () => { pendingEditTournamentId = t.id; setRoute('#turnaj'); });
+      cornerActions.appendChild(editBtn);
+
       const revertBtn = document.createElement('button');
       revertBtn.type = 'button';
       revertBtn.className = 'btn-ghost btn-sm';
@@ -1918,7 +1937,7 @@ function renderTurnajPage(){
       if(ffaStandings.placements.length > 0){
         const resultBtn = document.createElement('button');
         resultBtn.type = 'button';
-        resultBtn.className = 'btn-sm';
+        resultBtn.className = 'btn-sm tourney-result-btn-big';
         resultBtn.textContent = '🏆 Výsledek turnaje';
         resultBtn.addEventListener('click', () => openTournamentResultModal(t, null, ffaStandings));
         document.getElementById('tourney-title-result').appendChild(resultBtn);
@@ -1928,7 +1947,7 @@ function renderTurnajPage(){
       if(swissPreview.placements.length > 0){
         const resultBtn = document.createElement('button');
         resultBtn.type = 'button';
-        resultBtn.className = 'btn-sm';
+        resultBtn.className = 'btn-sm tourney-result-btn-big';
         resultBtn.textContent = '🏆 Výsledek turnaje';
         resultBtn.addEventListener('click', () => openTournamentResultModal(t, swissPreview));
         document.getElementById('tourney-title-result').appendChild(resultBtn);
@@ -2011,6 +2030,13 @@ function renderTurnajPage(){
       catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
     });
   });
+
+  if(pendingEditTournamentId){
+    const editId = pendingEditTournamentId;
+    pendingEditTournamentId = null;
+    const t = allTournaments.find(x => x.id === editId);
+    if(t) openNewTournamentForm(t);
+  }
 }
 
 // ---------- Fáze "Přihlašování" ----------
@@ -2087,6 +2113,7 @@ function renderTournamentSignupPhase(t, box){
 
 // ---------- Fáze "Nastavit turnaj" (formát) ----------
 let tourneySetupStep = null; // null | 'format' | 'team-draw' | 'ffa-confirm'
+let pendingEditTournamentId = null;
 let tourneyFormatChoice = null; // 'teams' | 'ffa'
 
 function renderTournamentFormatSetup(t, box){
@@ -4270,23 +4297,38 @@ function renderTabTurnaj(ev){
 
   let html = `<div class="section-title" style="font-size:16px;">Turnaj</div>`;
   if(linked.length === 0){
-    html += '<div class="empty">K téhle akci zatím není přiřazený žádný turnaj. Založíš ho v horním menu "Turnaj".</div>';
+    html += '<div class="empty">K téhle akci zatím není přiřazený žádný turnaj. Založíš ho v horním menu "Turnaje".</div>';
     box.innerHTML = html;
     return;
   }
-  html += linked.map(t => {
-    const swiss = computeSwissTournament(t);
-    const champion = swiss.placements.find(p => p.rank === 1);
-    const statusTxt = champion ? `🏆 Vítěz: ${escapeHtml(teamName(t, champion.team))}` : 'Základní část se ještě hraje';
+  html += `<div class="grid" style="margin-top:14px;">` + linked.map(t => {
+    let badgeTag = '', statusTxt = '';
+    if(t.status === 'signup'){
+      badgeTag = `<span class="tag tourney-signup-badge">Přihlášky otevřeny</span>`;
+      statusTxt = `${(t.signups||[]).length} přihlášených`;
+    }else if(t.format === 'ffa'){
+      const standings = computeFfaStandings(t);
+      const champion = standings.placements.find(p => p.rank === 1);
+      badgeTag = `<span class="tag">${(t.ffa && t.ffa.participants || []).length} hráčů</span>`;
+      statusTxt = champion ? `🏆 Vítěz: ${escapeHtml(champion.name)}` : 'Zatím žádné odehrané kolo';
+    }else{
+      const swiss = computeSwissTournament(t);
+      const champion = swiss.placements.find(p => p.rank === 1);
+      badgeTag = `<span class="tag">${(t.teams||[]).length} týmů</span>`;
+      statusTxt = champion ? `🏆 Vítěz: ${escapeHtml(teamName(t, champion.team))}` : 'Základní část se ještě hraje';
+    }
     return `
-      <div class="event-card" data-open-tourney-compact="${t.id}" style="margin-top:14px; cursor:pointer;">
-        <span class="tag">${(t.teams||[]).length} týmů</span>
+      <div class="event-card ${t.status === 'signup' ? 'event-card-signup-open' : ''}" data-open-tourney-compact="${t.id}" style="cursor:pointer;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${t.gameImage ? `<img src="${t.gameImage.replace(/"/g,'&quot;')}" alt="" style="width:36px; height:36px; object-fit:contain; flex-shrink:0;">` : ''}
+          ${badgeTag}
+        </div>
         <h3>${escapeHtml(t.name)}</h3>
         <p class="desc">${statusTxt}</p>
-        <span class="status-hint">Zobrazit celý pavouk →</span>
+        <span class="status-hint">${t.status === 'signup' ? 'Přihlásit se →' : 'Zobrazit celý pavouk →'}</span>
       </div>
     `;
-  }).join('');
+  }).join('') + `</div>`;
   box.innerHTML = html;
   box.querySelectorAll('[data-open-tourney-compact]').forEach(card => {
     card.addEventListener('click', () => {
@@ -4367,7 +4409,7 @@ function renderTabRozvrh(ev){
         <div class="bracket-section-title">${fmtDate(d)}</div>
         ${items.length === 0 ? '<div class="empty">Zatím nic naplánováno.</div>' : items.map(it => `
           <div class="suggestion-row">
-            <span class="txt"><b style="color:var(--gold);">${it.timeStart && it.timeEnd ? `${it.timeStart}–${it.timeEnd}` : it.timeStart ? it.timeStart : `do ${it.timeEnd}`}</b> — ${escapeHtml(it.title)}</span>
+            <span class="txt"><b style="color:var(--gold);">${it.timeStart && it.timeEnd ? `${it.timeStart}–${it.timeEnd}` : it.timeStart || it.timeEnd}</b> — ${escapeHtml(it.title)}</span>
             ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-remove-sch="${it.idx}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>` : ''}
           </div>
         `).join('')}
@@ -4974,7 +5016,7 @@ function updateAuthUI(){
 
   const accWidget = document.getElementById('topbar-account-widget');
   if(currentUser && currentNick){
-    accWidget.innerHTML = `<span class="acc-nick">${currentAvatar ? avatarTag(currentAvatar, 24) : ''}${escapeHtml(currentNick)}</span><button type="button" class="btn-ghost btn-sm" id="topbar-logout-btn">Odhlásit</button>`;
+    accWidget.innerHTML = `<span class="acc-nick">${currentAvatar ? avatarTag(currentAvatar, 24) : ''}${escapeHtml(currentNick)}</span><button type="button" class="btn-ghost btn-sm" id="topbar-logout-btn" style="color:var(--crimson); border-color:var(--crimson);">Odhlásit</button>`;
     document.getElementById('topbar-logout-btn').addEventListener('click', async () => { closeContactForm(); closeEventForm(); await signOut(auth); });
   }else{
     accWidget.innerHTML = `<button type="button" class="btn-sm" id="topbar-login-btn">Přihlásit / Registrovat</button>`;
