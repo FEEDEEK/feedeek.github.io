@@ -198,9 +198,11 @@ form.panel, .panel{
 .ed-header-left-col{ flex:0 0 220px; display:flex; flex-direction:column; gap:12px; }
 .ed-header-map{ width:220px; height:160px; }
 
-.ed-when-where{ font-size:13px; line-height:1.6; }
+.ed-when-where{ font-size:21px; line-height:1.4; }
 .ed-when-where-row{ color:var(--text); }
-.ed-ww-label{ color:var(--gold); font-weight:700; letter-spacing:.04em; }
+.ed-ww-label{ color:var(--gold); font-weight:800; letter-spacing:.05em; font-size:15px; }
+.ed-ww-value{ font-weight:600; }
+.ed-ww-value{ font-size:18px; font-weight:600; }
 
 .ed-header{
   flex:1; min-width:280px; margin-top:6px; position:relative; border:1px solid var(--line);
@@ -468,9 +470,14 @@ textarea.discussion-input{ padding-right:34px; }
 .account-avatar-big-wrap #account-avatar-big{ width:110px; height:110px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-dim); box-shadow:0 0 16px rgba(201,162,75,0.25); }
 .account-avatar-placeholder{ width:110px; height:110px; border-radius:50%; border:2px solid var(--gold-dim); background:var(--bg-panel-2); display:flex; align-items:center; justify-content:center; font-size:44px; box-shadow:0 0 16px rgba(201,162,75,0.25); }
 .account-avatar-upload-label{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
-.account-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; max-width:480px; padding:12px 0; border-bottom:1px solid var(--line); }
-.account-row-label{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; width:90px; flex-shrink:0; }
-.account-row-value{ flex:1; font-size:14px; color:var(--text); }
+.account-row button{ font-size:14px; padding:9px 16px; }
+.account-layout{ display:flex; gap:40px; align-items:flex-start; margin-top:18px; }
+.account-fields-col{ flex:1; min-width:0; max-width:480px; }
+.account-avatar-col{ flex:0 0 180px; text-align:center; }
+.account-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 0; border-bottom:1px solid var(--line); }
+.account-row-label{ font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; width:100px; flex-shrink:0; }
+.account-row-value{ flex:1; font-size:17px; color:var(--text); }
+@media (max-width:640px){ .account-layout{ flex-direction:column-reverse; } .account-avatar-col{ flex:1 1 100%; } }
 
 /* ---- Kontakty ---- */
 .contact-card{ background:var(--bg-panel); border:1px solid var(--line); padding:20px; text-align:center; }
@@ -839,3 +846,19 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .payment-qr-box canvas{ background:#fff; padding:6px; border-radius:4px; flex-shrink:0; }
 .payment-qr-info{ font-size:13px; line-height:1.6; }
 .payment-qr-info b{ color:var(--gold); }
+
+.rozvrh-layout{ display:flex; gap:28px; align-items:flex-start; }
+.rozvrh-list-col{ flex:1; min-width:0; }
+.rozvrh-form-col{ flex:0 0 360px; }
+.rozvrh-form-col .panel{ max-width:none; }
+@media (max-width:760px){ .rozvrh-layout{ flex-direction:column; } .rozvrh-form-col{ flex:1 1 100%; width:100%; } }
+
+.food-vote-row{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:13px; cursor:pointer; }
+.food-vote-row.disabled{ cursor:default; opacity:.7; }
+.food-vote-radio{ width:18px; height:18px; flex-shrink:0; border-radius:50%; border:2px solid var(--gold-dim); position:relative; }
+.food-vote-radio.checked{ border-color:var(--gold); }
+.food-vote-radio.checked::after{ content:''; position:absolute; inset:3px; border-radius:50%; background:var(--gold); }
+.food-vote-label{ min-width:60px; }
+.food-vote-bar-wrap{ flex:1; height:8px; background:var(--bg-panel-2); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+.food-vote-bar{ height:100%; background:linear-gradient(90deg, var(--gold-dim), var(--gold)); transition:width .3s ease; }
+.food-vote-count{ font-size:11px; color:var(--text-muted); min-width:28px; text-align:right; }
