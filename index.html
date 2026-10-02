@@ -250,34 +250,6 @@
 
     <!-- ÚČET -->
     <section class="view" id="view-ucet">
-      <h1 class="headline" style="font-size:28px;">Přihlášení / registrace</h1>
-      <p class="lede">Zadej přezdívku a heslo. Pokud pod tou přezdívkou účet ještě nemáš, rovnou tě necháme jeden založit.</p>
-
-      <div id="auth-logged-out" style="margin-top:20px;">
-        <form class="panel" id="form-auth">
-          <div class="field"><label>Přezdívka</label><input type="text" id="auth-nick" placeholder="Tvoje přezdívka" required></div>
-          <div class="field"><label>Heslo</label><input type="password" id="auth-password" placeholder="Aspoň 6 znaků" required minlength="6"></div>
-          <div class="field" id="auth-email-field" style="display:none;"><label>E-mail</label><input type="email" id="auth-email" placeholder="Potřebujeme ho pro založení účtu"></div>
-          <div class="field" id="auth-phone-field" style="display:none;"><label>Telefon (nepovinné)</label><input type="tel" id="auth-phone" placeholder="+420 ..."><small>Nikde se veřejně nezobrazuje, vidí ho jen admin.</small></div>
-          <button type="submit" id="auth-submit-btn">Pokračovat</button>
-          <div id="auth-message" class="small-msg"></div>
-        </form>
-
-        <div style="display:flex; align-items:center; gap:12px; max-width:480px; margin-top:20px;">
-          <div style="flex:1; height:1px; background:var(--line);"></div>
-          <span style="font-size:12px; color:var(--text-muted);">nebo</span>
-          <div style="flex:1; height:1px; background:var(--line);"></div>
-        </div>
-        <button type="button" class="btn-ghost" id="btn-google" style="margin-top:18px;">Pokračovat přes Google</button>
-
-        <div id="auth-google-nick-prompt" class="panel" style="display:none; max-width:480px; margin-top:18px;">
-          <p style="font-size:14px; color:var(--text-muted);">Ještě potřebujeme přezdívku, pod kterou tě uvidí ostatní.</p>
-          <div class="field"><label>Přezdívka</label><input type="text" id="google-nick-input" placeholder="Tvoje přezdívka" required></div>
-          <div class="field"><label>Telefon (nepovinné)</label><input type="tel" id="google-phone-input" placeholder="+420 ..."><small>Nikde se veřejně nezobrazuje, vidí ho jen admin.</small></div>
-          <button type="button" id="btn-google-nick-submit">Uložit přezdívku</button>
-        </div>
-      </div>
-
       <div id="auth-logged-in" style="display:none; margin-top:20px;">
         <button type="button" class="btn-ghost" id="btn-logout">Odhlásit se</button>
 
@@ -336,7 +308,16 @@
           </div>
           <form class="panel" id="form-change-emoji" style="display:none;">
             <div class="chip-row" id="emoji-preset-row"></div>
-            <div class="field"><label>Nebo vlastní emotikon</label><input type="text" id="new-emoji-input" maxlength="4" style="max-width:80px; font-size:20px; text-align:center;"></div>
+            <div class="field"><label>Nebo vlastní znak</label><input type="text" id="new-emoji-input" maxlength="4" style="max-width:80px; font-size:20px; text-align:center;"></div>
+            <div class="field">
+              <label>Nebo vlastní obrázek — vlož URL, nebo nahraj z počítače</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="url" id="new-emoji-url-input" placeholder="https://..." style="flex:1;">
+                <label for="new-emoji-file-input" class="btn-ghost btn-sm" style="cursor:pointer; white-space:nowrap;">📤 Nahrát</label>
+                <input type="file" id="new-emoji-file-input" accept="image/*" style="display:none;">
+              </div>
+              <div id="emoji-upload-msg" class="small-msg"></div>
+            </div>
             <div style="display:flex; gap:8px;">
               <button type="submit">Uložit</button>
               <button type="button" class="btn-ghost" id="btn-cancel-emoji">Zrušit</button>
@@ -432,6 +413,48 @@
       if(nav) nav.classList.add('active');
     })();
     </script>
+    <!-- Přihlašovací/registrační modal -->
+    <div id="login-modal-overlay" class="score-modal-backdrop" style="display:none;">
+      <div class="score-modal" style="max-width:480px;">
+        <button type="button" class="tb-modal-close-btn" id="login-modal-close">✕</button>
+        <h1 class="headline" style="font-size:24px; margin-top:0;">Přihlášení / registrace</h1>
+        <p class="lede" style="margin-top:4px;">Zadej přezdívku a heslo. Pokud pod tou přezdívkou účet ještě nemáš, rovnou tě necháme jeden založit.</p>
+
+        <div id="auth-logged-out" style="margin-top:20px;">
+          <form class="panel" id="form-auth">
+            <div class="field"><label>Přezdívka</label><input type="text" id="auth-nick" placeholder="Tvoje přezdívka" required></div>
+            <div class="field"><label>Heslo</label><input type="password" id="auth-password" placeholder="Aspoň 6 znaků" required minlength="6"></div>
+            <div class="field" id="auth-email-field" style="display:none;"><label>E-mail</label><input type="email" id="auth-email" placeholder="Potřebujeme ho pro založení účtu"></div>
+            <div class="field" id="auth-phone-field" style="display:none;"><label>Telefon (nepovinné)</label><input type="tel" id="auth-phone" placeholder="+420 ..."><small>Nikde se veřejně nezobrazuje, vidí ho jen admin.</small></div>
+            <button type="submit" id="auth-submit-btn">Pokračovat</button>
+            <div id="auth-message" class="small-msg"></div>
+          </form>
+
+          <div style="display:flex; align-items:center; gap:12px; margin-top:20px;">
+            <div style="flex:1; height:1px; background:var(--line);"></div>
+            <span style="font-size:12px; color:var(--text-muted);">nebo</span>
+            <div style="flex:1; height:1px; background:var(--line);"></div>
+          </div>
+          <button type="button" class="btn-ghost google-signin-btn" id="btn-google" style="margin-top:18px;">
+            <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">
+              <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.5 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.3 13.1 17.7 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.5 2.9-2.2 5.4-4.6 7l7.4 5.7c4.3-4 6.9-9.8 6.9-17.2z"/>
+              <path fill="#FBBC05" d="M10.5 28.3A14.5 14.5 0 0 1 9.7 24c0-1.5.3-3 .7-4.3l-7.9-6.1A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6.4z"/>
+              <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.2-8.5 2.2-6.3 0-11.7-3.6-13.5-9l-7.9 6.4C6.5 42.6 14.6 48 24 48z"/>
+            </svg>
+            <span>Pokračovat přes Google</span>
+          </button>
+
+          <div id="auth-google-nick-prompt" class="panel" style="display:none; margin-top:18px;">
+            <p style="font-size:14px; color:var(--text-muted);">Ještě potřebujeme přezdívku, pod kterou tě uvidí ostatní.</p>
+            <div class="field"><label>Přezdívka</label><input type="text" id="google-nick-input" placeholder="Tvoje přezdívka" required></div>
+            <div class="field"><label>Telefon (nepovinné)</label><input type="tel" id="google-phone-input" placeholder="+420 ..."><small>Nikde se veřejně nezobrazuje, vidí ho jen admin.</small></div>
+            <button type="button" id="btn-google-nick-submit">Uložit přezdívku</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
