@@ -208,7 +208,7 @@ form.panel, .panel{
   flex:1; min-width:280px; margin-top:6px; position:relative; border:1px solid var(--line);
   background-color:#0a0c10;
   background-size:contain; background-position:center; background-repeat:no-repeat;
-  min-height:130px; display:flex; flex-direction:column; justify-content:flex-end;
+  min-height:190px; display:flex; flex-direction:column; justify-content:flex-end;
 }
 .ed-header-inner{
   display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;
