@@ -466,14 +466,14 @@ textarea.discussion-input{ padding-right:34px; }
 .photo-upload-progress{ font-size:12px; color:var(--text-muted); margin-top:8px; }
 
 /* ---- Účet ---- */
-.account-avatar-big-wrap{ position:relative; width:110px; height:110px; margin:0 auto 14px; }
-.account-avatar-big-wrap #account-avatar-big{ width:110px; height:110px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-dim); box-shadow:0 0 16px rgba(201,162,75,0.25); }
-.account-avatar-placeholder{ width:110px; height:110px; border-radius:50%; border:2px solid var(--gold-dim); background:var(--bg-panel-2); display:flex; align-items:center; justify-content:center; font-size:44px; box-shadow:0 0 16px rgba(201,162,75,0.25); }
-.account-avatar-upload-label{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+.account-avatar-big-wrap{ position:relative; width:170px; height:170px; margin:0 auto 18px; }
+.account-avatar-big-wrap #account-avatar-big{ width:170px; height:170px; border-radius:50%; object-fit:cover; border:3px solid var(--gold-dim); box-shadow:0 0 20px rgba(201,162,75,0.3); }
+.account-avatar-placeholder{ width:170px; height:170px; border-radius:50%; border:3px solid var(--gold-dim); background:var(--bg-panel-2); display:flex; align-items:center; justify-content:center; font-size:66px; box-shadow:0 0 20px rgba(201,162,75,0.3); }
+.account-avatar-upload-label{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:16px; padding:11px 20px; }
 .account-row button{ font-size:14px; padding:9px 16px; }
 .account-layout{ display:flex; gap:40px; align-items:flex-start; margin-top:18px; }
 .account-fields-col{ flex:1; min-width:0; max-width:480px; }
-.account-avatar-col{ flex:0 0 180px; text-align:center; }
+.account-avatar-col{ flex:0 0 220px; text-align:center; }
 .account-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 0; border-bottom:1px solid var(--line); }
 .account-row-label{ font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; width:100px; flex-shrink:0; }
 .account-row-value{ flex:1; font-size:17px; color:var(--text); }
@@ -848,16 +848,14 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .payment-qr-info b{ color:var(--gold); }
 
 .rozvrh-layout{ display:flex; gap:28px; align-items:flex-start; }
-.rozvrh-list-col{ flex:1; min-width:0; }
-.rozvrh-form-col{ flex:0 0 360px; }
+.rozvrh-list-col{ flex:1 1 0; min-width:0; }
+.rozvrh-form-col{ flex:1 1 0; min-width:0; }
 .rozvrh-form-col .panel{ max-width:none; }
 @media (max-width:760px){ .rozvrh-layout{ flex-direction:column; } .rozvrh-form-col{ flex:1 1 100%; width:100%; } }
 
 .food-vote-row{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:13px; cursor:pointer; }
 .food-vote-row.disabled{ cursor:default; opacity:.7; }
-.food-vote-radio{ width:18px; height:18px; flex-shrink:0; border-radius:50%; border:2px solid var(--gold-dim); position:relative; }
-.food-vote-radio.checked{ border-color:var(--gold); }
-.food-vote-radio.checked::after{ content:''; position:absolute; inset:3px; border-radius:50%; background:var(--gold); }
+.food-vote-hex{ width:22px; height:22px; }
 .food-vote-label{ min-width:60px; }
 .food-vote-bar-wrap{ flex:1; height:8px; background:var(--bg-panel-2); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
 .food-vote-bar{ height:100%; background:linear-gradient(90deg, var(--gold-dim), var(--gold)); transition:width .3s ease; }
