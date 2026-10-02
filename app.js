@@ -27,12 +27,12 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 const MEAL_SLOTS = [
+  { key:'pivo',          label:'Pivo', day:'Pivo' },
   { key:'fri-dinner',    label:'Pátek — Večeře', day:'Pátek' },
   { key:'sat-breakfast', label:'Sobota — Snídaně', day:'Sobota' },
   { key:'sat-lunch',     label:'Sobota — Oběd', day:'Sobota' },
   { key:'sat-dinner',    label:'Sobota — Večeře', day:'Sobota' },
-  { key:'sun-breakfast', label:'Neděle — Snídaně', day:'Neděle' },
-  { key:'pivo',          label:'Pivo', day:'Ostatní' }
+  { key:'sun-breakfast', label:'Neděle — Snídaně', day:'Neděle' }
 ];
 function emptyFoodSchedule(){
   const o = {};
@@ -66,6 +66,7 @@ let pendingEventId = null;
 
 let currentEventGames = [];
 let currentEventFood = emptyFoodSchedule();
+let currentEventFoodVoting = {}; // { slotKey: true } - tenhle blok se hlasuje místo pevné nabídky
 let currentEventDateOptions = [];
 
 function fmtDate(iso){
@@ -522,16 +523,31 @@ function renderFormFood(){
   const box = document.getElementById('food-schedule-preview');
   box.innerHTML = MEAL_SLOTS.map(slot => {
     const items = currentEventFood[slot.key] || [];
+    const isVoting = !!currentEventFoodVoting[slot.key];
     const chips = items.length
       ? items.map((food, idx) => `<span class="tag-chip">${escapeHtml(food)}<span class="x" data-remove-food="${slot.key}|${idx}">×</span></span>`).join(' ')
       : '<span style="color:var(--text-muted);">Žádné položky</span>';
-    return `<div class="meal-slot-block"><b>${slot.label}:</b><br><div class="chip-row" style="margin-top:6px;">${chips}</div></div>`;
+    return `<div class="meal-slot-block">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <b>${slot.label}:</b>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer; white-space:nowrap;">
+          <input type="checkbox" data-food-voting-toggle="${slot.key}" ${isVoting ? 'checked' : ''}> Hlasování místo pevné nabídky
+        </label>
+      </div>
+      <small style="display:block; color:var(--text-muted); margin-top:2px;">${isVoting ? 'Lidé budou hlasovat, která z položek níž to bude.' : 'Lidé si zaškrtnou, co z nabídky chtějí.'}</small>
+      <div class="chip-row" style="margin-top:6px;">${chips}</div>
+    </div>`;
   }).join('');
   box.querySelectorAll('[data-remove-food]').forEach(el => {
     el.addEventListener('click', () => {
       const [key, idxStr] = el.dataset.removeFood.split('|');
       currentEventFood[key].splice(parseInt(idxStr,10), 1);
       renderFormFood();
+    });
+  });
+  box.querySelectorAll('[data-food-voting-toggle]').forEach(el => {
+    el.addEventListener('change', () => {
+      currentEventFoodVoting[el.dataset.foodVotingToggle] = el.checked;
     });
   });
 }
@@ -603,6 +619,7 @@ document.getElementById('ev-qr-file').addEventListener('change', async () => {
 function resetEventFormHelpers(){
   currentEventGames = [];
   currentEventFood = emptyFoodSchedule();
+  currentEventFoodVoting = {};
   currentEventDateOptions = [];
   gameLogoTargetIdx = null;
   document.getElementById('ev-qr-upload-msg').textContent = '';
@@ -687,6 +704,7 @@ formEvent.addEventListener('submit', async (e) => {
     games: [...currentEventGames],
     foodPlan: document.getElementById('ev-foodplan').value.trim(),
     foodSchedule: JSON.parse(JSON.stringify(currentEventFood)),
+    foodVotingSlots: JSON.parse(JSON.stringify(currentEventFoodVoting)),
     changeDeadline: document.getElementById('ev-deadline').value || ''
   };
   try{
@@ -735,6 +753,7 @@ function startEditEvent(ev){
       currentEventFood[slot.key] = Array.isArray(ev.foodSchedule[slot.key]) ? [...ev.foodSchedule[slot.key]] : [];
     });
   }
+  currentEventFoodVoting = ev.foodVotingSlots ? { ...ev.foodVotingSlots } : {};
   renderFormGames();
   renderFormFood();
 
@@ -1177,7 +1196,12 @@ function renderStatsAndRsvp(){
     const cancelBtn = document.getElementById('rsvp-cancel');
     if(cancelBtn) cancelBtn.addEventListener('click', async () => {
       if(!confirm('Opravdu se chceš z akce odhlásit?')) return;
-      try{ await deleteDoc(doc(db, 'events', ev.id, 'registrations', currentUser.uid)); }
+      try{
+        await deleteDoc(doc(db, 'events', ev.id, 'registrations', currentUser.uid));
+        // nečekat jen na živý listener - rovnou celou stránku znovu vykreslit, ať nic nezůstane neaktuální bez ručního refreshe
+        delete currentRegistrationsMap[currentUser.uid];
+        applyRoute();
+      }
       catch(err){ alert('Odhlášení se nepovedlo.'); console.error(err); }
     });
     const qrBox = qrBoxEl;
@@ -1348,11 +1372,11 @@ function renderTabPrehled(ev){
   box.innerHTML = `
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:28px;">
       <div>
-        <div class="section-title" style="font-size:16px;">Co se bude hrát</div>
+        <div class="section-title" style="font-size:16px;">🎮 Co se bude hrát</div>
         <div class="game-display-grid">${games.length ? games.map(g=>`<div class="game-display-card">${g.image ? `<img src="${g.image.replace(/"/g,'&quot;')}" alt="">` : '<div class="game-display-noimg">🎮</div>'}<span>${escapeHtml(g.name)}</span></div>`).join('') : '<span class="empty">Zatím nic nevypsáno.</span>'}</div>
       </div>
       <div>
-        <div class="section-title" style="font-size:16px;">Chtěl by sis zahrát ještě něco jiného?</div>
+        <div class="section-title" style="font-size:16px;">🎲 Chtěl by sis zahrát ještě něco jiného?</div>
         <div class="field" style="display:flex; flex-direction:row; gap:8px; align-items:flex-end; position:relative;">
           <div style="flex:1; position:relative;">
             <input type="text" id="suggestion-input" placeholder="Např. HALO" autocomplete="off">
@@ -1364,7 +1388,7 @@ function renderTabPrehled(ev){
       </div>
     </div>
 
-    <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze</div>
+    <div class="section-title" style="font-size:16px; margin-top:28px;">💬 Diskuze</div>
     <div class="discussion-block">
       <div class="discussion-list" id="comments-list"></div>
       <div class="discussion-input-row">
@@ -1604,7 +1628,10 @@ function renderTabJidlo(ev){
   const myReg = currentUser ? currentRegistrationsMap[currentUser.uid] : null;
   const deadlinePassed = isPastDeadline(ev);
   const schedule = ev.foodSchedule || {};
+  const votingSlots = ev.foodVotingSlots || {};
+  const foodVotes = ev.foodVotes || {};
   const activeSlots = MEAL_SLOTS.filter(slot => schedule[slot.key] && schedule[slot.key].length > 0);
+  const hasFixedSlot = activeSlots.some(slot => !votingSlots[slot.key]);
 
   let slotsHtml = '';
   if(activeSlots.length === 0){
@@ -1622,6 +1649,38 @@ function renderTabJidlo(ev){
         <div class="food-day-heading">${escapeHtml(grp.day)}</div>
         ${grp.slots.map(slot => {
           const options = schedule[slot.key];
+          const shortLabel = slot.label.includes('—') ? slot.label.split('—')[1].trim() : slot.label;
+          const isVoting = !!votingSlots[slot.key];
+
+          if(isVoting){
+            const votesForSlot = foodVotes[slot.key] || {};
+            const myVote = currentUser ? votesForSlot[currentUser.uid] : null;
+            const tally = {};
+            options.forEach(o => tally[o] = 0);
+            Object.values(votesForSlot).forEach(v => { if(tally[v] !== undefined) tally[v]++; });
+            const totalVotes = Object.values(tally).reduce((a,b)=>a+b, 0);
+
+            const votingHtml = options.map(o => {
+              const count = tally[o];
+              const pct = totalVotes ? Math.round((count / totalVotes) * 100) : 0;
+              return `
+                <label class="food-vote-row ${(!myReg || deadlinePassed) ? 'disabled' : ''}">
+                  <span class="food-vote-radio ${myVote === o ? 'checked' : ''}" data-food-vote data-slot="${slot.key}" data-value="${escapeHtml(o)}"></span>
+                  <span class="food-vote-label">${escapeHtml(o)}</span>
+                  <span class="food-vote-bar-wrap"><span class="food-vote-bar" style="width:${pct}%;"></span></span>
+                  <span class="food-vote-count">${count}×</span>
+                </label>
+              `;
+            }).join('');
+
+            return `
+              <div class="meal-slot-block" style="margin-bottom:18px;">
+                <b style="font-size:13px;">🗳️ ${shortLabel}</b>
+                <div style="margin-top:6px;">${myReg ? votingHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš hlasovat.</span>'}</div>
+              </div>
+            `;
+          }
+
           const myChoices = (myReg && myReg.food && Array.isArray(myReg.food[slot.key])) ? myReg.food[slot.key] : [];
 
           const portionCounts = {};
@@ -1647,7 +1706,7 @@ function renderTabJidlo(ev){
 
           return `
             <div class="meal-slot-block" style="margin-bottom:18px;">
-              <b style="font-size:13px;">${slot.label.includes('—') ? slot.label.split('—')[1].trim() : slot.label}</b>
+              <b style="font-size:13px;">${shortLabel}</b>
               <div style="margin-top:6px;">${myReg ? checkboxesHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš vybrat.</span>'}</div>
             </div>
           `;
@@ -1657,11 +1716,11 @@ function renderTabJidlo(ev){
   }
 
   box.innerHTML = `
-    <div class="section-title" style="font-size:16px;">Plán jídla</div>
+    <div class="section-title" style="font-size:16px;">🍔 Plán jídla</div>
     <p class="lede" style="margin-top:0;">${escapeHtml(ev.foodPlan || 'Zatím nic naplánováno.')}</p>
     ${deadlinePassed ? '<p class="status-hint">Uzávěrka změn proběhla — výběr už nejde měnit.</p>' : ''}
     ${slotsHtml}
-    ${(myReg && activeSlots.length > 0 && !deadlinePassed) ? `
+    ${(myReg && hasFixedSlot && !deadlinePassed) ? `
       <div class="food-confirm-row">
         <button type="button" id="btn-confirm-food">Potvrdit menu</button>
         <span class="small-msg" id="food-confirm-msg"></span>
@@ -1686,6 +1745,18 @@ function renderTabJidlo(ev){
     if(el.classList.contains('disabled')) return;
     el.addEventListener('click', () => {
       el.classList.toggle('checked');
+    });
+  });
+
+  box.querySelectorAll('[data-food-vote]').forEach(el => {
+    if(el.closest('.food-vote-row').classList.contains('disabled')) return;
+    el.addEventListener('click', async () => {
+      if(!currentUser) return;
+      const slotKey = el.dataset.slot;
+      const value = el.dataset.value;
+      try{
+        await updateDoc(doc(db,'events',ev.id), { [`foodVotes.${slotKey}.${currentUser.uid}`]: value });
+      }catch(err){ console.error(err); }
     });
   });
 
@@ -4414,7 +4485,7 @@ function renderTabTurnaj(ev){
   const box = document.getElementById('tab-turnaj');
   const linked = allTournaments.filter(t => t.eventId === ev.id);
 
-  let html = `<div class="section-title" style="font-size:16px;">Turnaje</div>`;
+  let html = `<div class="section-title" style="font-size:16px;">🏆 Turnaje</div>`;
   if(linked.length === 0){
     html += '<div class="empty">K téhle akci zatím není přiřazený žádný turnaj. Založíš ho v horním menu "Turnaje".</div>';
     box.innerHTML = html;
@@ -4480,21 +4551,25 @@ function renderTabRozvrh(ev){
     return;
   }
 
-  let html = `<div class="section-title" style="font-size:16px;">Rozvrh</div>`;
+  let html = `<div class="section-title" style="font-size:16px;">🕐 Rozvrh</div>`;
+  html += `<div class="rozvrh-layout">`;
+  html += `<div class="rozvrh-list-col"><div id="schedule-days"></div></div>`;
   if(hasPerm('turnaj')){
     html += `
-      <form class="panel" id="form-schedule-item" style="max-width:480px;">
-        <div class="field"><label>Den</label><select id="sch-day">${days.map(d=>`<option value="${d}">${fmtDate(d)}</option>`).join('')}</select></div>
-        <div style="display:flex; gap:12px;">
-          <div class="field" style="flex:1;"><label>Od (nepovinné)</label><input type="time" id="sch-start"></div>
-          <div class="field" style="flex:1;"><label>Do (nepovinné)</label><input type="time" id="sch-end"></div>
-        </div>
-        <div class="field"><label>Co se bude dít</label><input type="text" id="sch-title" placeholder="Turnaj, oběd, příjezd..." required></div>
-        <button type="submit">Přidat do rozvrhu</button>
-      </form>
+      <div class="rozvrh-form-col">
+        <form class="panel" id="form-schedule-item">
+          <div class="field"><label>Den</label><select id="sch-day">${days.map(d=>`<option value="${d}">${fmtDate(d)}</option>`).join('')}</select></div>
+          <div style="display:flex; gap:12px;">
+            <div class="field" style="flex:1;"><label>Od (nepovinné)</label><input type="time" id="sch-start"></div>
+            <div class="field" style="flex:1;"><label>Do (nepovinné)</label><input type="time" id="sch-end"></div>
+          </div>
+          <div class="field"><label>Co se bude dít</label><input type="text" id="sch-title" placeholder="Turnaj, oběd, příjezd..." required></div>
+          <button type="submit">Přidat do rozvrhu</button>
+        </form>
+      </div>
     `;
   }
-  html += `<div id="schedule-days"></div>`;
+  html += `</div>`;
   box.innerHTML = html;
 
   const formSch = document.getElementById('form-schedule-item');
@@ -4550,7 +4625,7 @@ function renderTabRozvrh(ev){
 function renderTabFoto(ev){
   const box = document.getElementById('tab-foto');
   box.innerHTML = `
-    <div class="section-title" style="font-size:16px;">Foto</div>
+    <div class="section-title" style="font-size:16px;">📷 Foto</div>
     <p class="lede" style="margin-top:0;">Nahraj fotky nebo videa přímo ze zařízení (jde vybrat víc najednou), nebo vlož odkaz (např. z YouTube).</p>
     <div class="photo-add-row">
       <div class="field" style="flex:1;"><label>Nahrát ze zařízení</label><input type="file" id="photo-file-input" accept="image/*,video/*" multiple></div>
