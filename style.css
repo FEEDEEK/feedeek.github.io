@@ -864,3 +864,6 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .google-signin-btn{ display:flex; align-items:center; gap:10px; justify-content:center; width:100%; }
 .google-signin-btn svg{ flex-shrink:0; }
 #login-modal-overlay .score-modal{ text-align:left; width:440px; max-width:90vw; }
+#login-modal-overlay #auth-logged-out{ width:100%; }
+#login-modal-overlay .panel{ width:100%; max-width:100%; box-sizing:border-box; }
+#login-modal-overlay .field{ width:100%; box-sizing:border-box; }
