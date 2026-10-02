@@ -1098,7 +1098,7 @@ async function renderPersonalPaymentQr(ev, uid, nick, box){
   `;
   try{
     if(typeof window.QRCode !== 'function') throw new Error('QR knihovna se nenačetla');
-    new window.QRCode(document.getElementById('payment-qr-canvas'), { text: spayd, width: 150, height: 150, correctLevel: window.QRCode.CorrectLevel.M });
+    new window.QRCode(document.getElementById('payment-qr-canvas'), { text: spayd, width: 100, height: 100, correctLevel: window.QRCode.CorrectLevel.M });
   }catch(err){ console.error('QR generování selhalo:', err); box.innerHTML = '<div class="empty">QR kód se nepodařilo vygenerovat.</div>'; }
 }
 
