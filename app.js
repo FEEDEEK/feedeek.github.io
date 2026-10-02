@@ -1369,7 +1369,17 @@ function renderAttendees(){
 function renderTabPrehled(ev){
   const box = document.getElementById('tab-prehled');
   const games = [...(ev.games || [])].map(normalizeGame).sort((a,b) => a.name.localeCompare(b.name, 'cs'));
+  const schedule = ev.foodSchedule || {};
+  const votingSlots = ev.foodVotingSlots || {};
+  const activeVotingSlots = MEAL_SLOTS.filter(s => votingSlots[s.key] && schedule[s.key] && schedule[s.key].length > 0);
+  const votingAnnounceHtml = activeVotingSlots.length ? `
+    <button type="button" class="tourney-signup-cta-btn food-vote-announce" id="food-vote-announce-btn" style="margin-bottom:18px;">
+      <span class="tourney-cta-sparkles"></span>
+      <span>🗳️ Probíhá hlasování: ${activeVotingSlots.map(s => escapeHtml(s.label)).join(', ')}</span>
+    </button>
+  ` : '';
   box.innerHTML = `
+    ${votingAnnounceHtml}
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:28px;">
       <div>
         <div class="section-title" style="font-size:16px;">🎮 Co se bude hrát</div>
@@ -1465,6 +1475,12 @@ function renderTabPrehled(ev){
       await addDoc(collection(db,'events',ev.id,'comments'), { text, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
     }catch(err){ console.error(err); }
+  });
+
+  const voteAnnounceBtn = document.getElementById('food-vote-announce-btn');
+  if(voteAnnounceBtn) voteAnnounceBtn.addEventListener('click', () => {
+    const jidloTabBtn = document.querySelector('#ed-tabs [data-tab="jidlo"]');
+    if(jidloTabBtn) jidloTabBtn.click();
   });
 }
 
@@ -1654,18 +1670,23 @@ function renderTabJidlo(ev){
 
           if(isVoting){
             const votesForSlot = foodVotes[slot.key] || {};
-            const myVote = currentUser ? votesForSlot[currentUser.uid] : null;
+            const myVotesArr = (currentUser && Array.isArray(votesForSlot[currentUser.uid])) ? votesForSlot[currentUser.uid] : [];
             const tally = {};
             options.forEach(o => tally[o] = 0);
-            Object.values(votesForSlot).forEach(v => { if(tally[v] !== undefined) tally[v]++; });
-            const totalVotes = Object.values(tally).reduce((a,b)=>a+b, 0);
+            Object.values(votesForSlot).forEach(v => { (Array.isArray(v) ? v : []).forEach(o => { if(tally[o] !== undefined) tally[o]++; }); });
+            const voterCount = Object.keys(votesForSlot).length || 1;
 
             const votingHtml = options.map(o => {
               const count = tally[o];
-              const pct = totalVotes ? Math.round((count / totalVotes) * 100) : 0;
+              const pct = Math.round((count / voterCount) * 100);
               return `
                 <label class="food-vote-row ${(!myReg || deadlinePassed) ? 'disabled' : ''}">
-                  <span class="food-vote-radio ${myVote === o ? 'checked' : ''}" data-food-vote data-slot="${slot.key}" data-value="${escapeHtml(o)}"></span>
+                  <span class="food-toggle food-vote-hex ${myVotesArr.includes(o) ? 'checked' : ''}" data-food-vote data-slot="${slot.key}" data-value="${escapeHtml(o)}">
+                    <svg viewBox="0 0 26 26" class="food-toggle-svg">
+                      <polygon points="6.5,1.5 19.5,1.5 25,13 19.5,24.5 6.5,24.5 1,13"/>
+                      <path class="food-check" d="M7.5 13.5l3.3 3.3 7.7-7.7"/>
+                    </svg>
+                  </span>
                   <span class="food-vote-label">${escapeHtml(o)}</span>
                   <span class="food-vote-bar-wrap"><span class="food-vote-bar" style="width:${pct}%;"></span></span>
                   <span class="food-vote-count">${count}×</span>
@@ -1754,8 +1775,10 @@ function renderTabJidlo(ev){
       if(!currentUser) return;
       const slotKey = el.dataset.slot;
       const value = el.dataset.value;
+      const current = (foodVotes[slotKey] && Array.isArray(foodVotes[slotKey][currentUser.uid])) ? foodVotes[slotKey][currentUser.uid] : [];
+      const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
       try{
-        await updateDoc(doc(db,'events',ev.id), { [`foodVotes.${slotKey}.${currentUser.uid}`]: value });
+        await updateDoc(doc(db,'events',ev.id), { [`foodVotes.${slotKey}.${currentUser.uid}`]: next });
       }catch(err){ console.error(err); }
     });
   });
