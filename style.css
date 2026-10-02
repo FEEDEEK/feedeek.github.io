@@ -473,7 +473,7 @@ textarea.discussion-input{ padding-right:34px; }
 .account-row button{ font-size:14px; padding:9px 16px; }
 .account-layout{ display:flex; gap:40px; align-items:flex-start; margin-top:18px; }
 .account-fields-col{ flex:1; min-width:0; max-width:480px; }
-.account-avatar-col{ flex:0 0 220px; text-align:center; }
+.account-avatar-col{ flex:0 0 220px; text-align:center; margin-top:-18px; padding-left:24px; }
 .account-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 0; border-bottom:1px solid var(--line); }
 .account-row-label{ font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; width:100px; flex-shrink:0; }
 .account-row-value{ flex:1; font-size:17px; color:var(--text); }
@@ -860,3 +860,7 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .food-vote-bar-wrap{ flex:1; height:8px; background:var(--bg-panel-2); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
 .food-vote-bar{ height:100%; background:linear-gradient(90deg, var(--gold-dim), var(--gold)); transition:width .3s ease; }
 .food-vote-count{ font-size:11px; color:var(--text-muted); min-width:28px; text-align:right; }
+
+.google-signin-btn{ display:inline-flex; align-items:center; gap:10px; justify-content:center; }
+.google-signin-btn svg{ flex-shrink:0; }
+#login-modal-overlay .score-modal{ text-align:left; }
