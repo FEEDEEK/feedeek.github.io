@@ -829,6 +829,8 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 
 .ed-tourney-cta{ position:absolute; top:16px; right:20px; z-index:2; }
 .tourney-signup-panel{ display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+.prehled-announce-row{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+.tourney-signup-panel-inline{ align-items:flex-start; }
 .tourney-signup-panel-title{ font-size:15px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold); font-weight:800; text-shadow:0 0 10px rgba(240,201,76,.5); }
 .tourney-signup-cta-btn{
   position:relative; overflow:visible; display:flex; align-items:center; gap:10px; width:max-content;
@@ -843,6 +845,8 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 }
 
 .payment-qr-box{ display:flex; align-items:center; gap:14px; margin-top:14px; padding:12px; background:rgba(0,0,0,0.3); border:1px solid var(--gold-dim); max-width:320px; }
+.payment-qr-box-compact{ flex-direction:column; gap:6px; max-width:none; margin-top:0; padding:8px; }
+.payment-qr-box-compact .payment-qr-info{ font-size:12px; text-align:center; }
 .payment-qr-canvas-wrap{ background:#fff; padding:6px; border-radius:4px; flex-shrink:0; line-height:0; }
 .payment-qr-info{ font-size:13px; line-height:1.6; }
 .payment-qr-info b{ color:var(--gold); }
