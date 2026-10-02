@@ -867,3 +867,4 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 #login-modal-overlay #auth-logged-out{ width:100%; }
 #login-modal-overlay .panel{ width:100%; max-width:100%; box-sizing:border-box; }
 #login-modal-overlay .field{ width:100%; box-sizing:border-box; }
+#login-modal-overlay input{ width:100%; text-align:left; box-sizing:border-box; }
