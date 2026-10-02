@@ -1097,7 +1097,7 @@ async function renderPersonalPaymentQr(ev, uid, nick, box){
   const spayd = buildSpaydString(iban, ev.fee, vs, `${ev.name || 'LAN'} ${nick}`);
   box.innerHTML = `
     <div class="payment-qr-box">
-      <canvas id="payment-qr-canvas"></canvas>
+      <div id="payment-qr-canvas" class="payment-qr-canvas-wrap"></div>
       <div class="payment-qr-info">
         <div><b>${ev.fee} Kč</b></div>
         <div>VS: <b>${vs}</b></div>
@@ -1106,7 +1106,8 @@ async function renderPersonalPaymentQr(ev, uid, nick, box){
     </div>
   `;
   try{
-    await window.QRCode.toCanvas(document.getElementById('payment-qr-canvas'), spayd, { width: 150, margin: 1 });
+    if(typeof window.QRCode !== 'function') throw new Error('QR knihovna se nenačetla');
+    new window.QRCode(document.getElementById('payment-qr-canvas'), { text: spayd, width: 150, height: 150, correctLevel: window.QRCode.CorrectLevel.M });
   }catch(err){ console.error('QR generování selhalo:', err); box.innerHTML = '<div class="empty">QR kód se nepodařilo vygenerovat.</div>'; }
 }
 
@@ -4976,16 +4977,38 @@ document.getElementById('btn-toggle-emoji').addEventListener('click', () => {
 document.getElementById('btn-cancel-emoji').addEventListener('click', () => {
   document.getElementById('form-change-emoji').style.display = 'none';
 });
+// Zmenší libovolně velký obrázek (ořízne na čtverec) na standardní velikost emotikonu přes canvas,
+// ať jde nahrát fotka z mobilu v plné velikosti a appka si z ní sama udělá malou ikonku.
+function resizeImageToBlob(file, targetSize){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const side = Math.min(img.width, img.height);
+      const sx = (img.width - side) / 2;
+      const sy = (img.height - side) / 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = targetSize;
+      canvas.height = targetSize;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, targetSize, targetSize);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('canvas.toBlob selhal')), 'image/png', 0.9);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Obrázek se nepodařilo načíst')); };
+    img.src = url;
+  });
+}
 document.getElementById('new-emoji-file-input').addEventListener('change', async () => {
   const fileInput = document.getElementById('new-emoji-file-input');
   const msg = document.getElementById('emoji-upload-msg');
   const file = fileInput.files[0];
   if(!file || !currentUser) return;
-  if(file.size > 5 * 1024 * 1024){ msg.textContent = 'Soubor je moc velký (max 5 MB).'; return; }
-  msg.textContent = 'Nahrávám...';
+  msg.textContent = 'Zmenšuji a nahrávám...';
   try{
-    const fileRef = ref(storage, `custom-emoji/${currentUser.uid}-${Date.now()}`);
-    await uploadBytes(fileRef, file);
+    const resized = await resizeImageToBlob(file, 128);
+    const fileRef = ref(storage, `custom-emoji/${currentUser.uid}-${Date.now()}.png`);
+    await uploadBytes(fileRef, resized);
     const url = await getDownloadURL(fileRef);
     document.getElementById('new-emoji-url-input').value = url;
     document.getElementById('new-emoji-input').value = '';
