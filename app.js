@@ -1392,6 +1392,7 @@ function renderTabPrehled(ev){
     </button>
   ` : '';
   box.innerHTML = `
+    ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" id="btn-mailto-event" style="margin-bottom:16px;">✉️ Pozvat e-mailem na tuhle akci</button>` : ''}
     <div class="prehled-announce-row">
       ${votingAnnounceHtml}
       <div id="prehled-tourney-cta"></div>
@@ -1494,6 +1495,13 @@ function renderTabPrehled(ev){
   });
 
   renderTournamentSignupCta(ev);
+  const mailtoEventBtn = document.getElementById('btn-mailto-event');
+  if(mailtoEventBtn) mailtoEventBtn.addEventListener('click', async () => {
+    const emails = await getAllUserEmails();
+    const subject = `Nová akce: ${ev.name}`;
+    const body = `Ahoj,\n\nchystá se akce "${ev.name}" (${fmtDateRange(ev)}, ${ev.place || ''}).\n\n${ev.desc || ''}\n\nPřihlas se na: ${location.origin}${location.pathname}#event/${ev.id}`;
+    openMailtoAll(emails, subject, body);
+  });
 
   const voteAnnounceBtn = document.getElementById('food-vote-announce-btn');
   if(voteAnnounceBtn) voteAnnounceBtn.addEventListener('click', () => {
@@ -1754,8 +1762,10 @@ function renderTabJidlo(ev){
     `).join('') + '</div>';
   }
 
+  const activeVotingSlots = MEAL_SLOTS.filter(slot => votingSlots[slot.key] && schedule[slot.key] && schedule[slot.key].length > 0);
   box.innerHTML = `
     <div class="section-title" style="font-size:16px;">🍔 Plán jídla</div>
+    ${(hasPerm('jidlo') && activeVotingSlots.length > 0) ? `<button type="button" class="btn-ghost btn-sm" id="btn-mailto-vote" style="margin-bottom:12px;">✉️ Poslat e-mail o hlasování</button>` : ''}
     <p class="lede" style="margin-top:0;">${escapeHtml(ev.foodPlan || 'Zatím nic naplánováno.')}</p>
     ${deadlinePassed ? '<p class="status-hint">Uzávěrka změn proběhla — výběr už nejde měnit.</p>' : ''}
     ${slotsHtml}
@@ -1799,6 +1809,14 @@ function renderTabJidlo(ev){
         await updateDoc(doc(db,'events',ev.id), { [`foodVotes.${slotKey}.${currentUser.uid}`]: next });
       }catch(err){ console.error(err); }
     });
+  });
+
+  const mailtoVoteBtn = document.getElementById('btn-mailto-vote');
+  if(mailtoVoteBtn) mailtoVoteBtn.addEventListener('click', async () => {
+    const emails = await getAllUserEmails();
+    const subject = `Probíhá hlasování: ${ev.name}`;
+    const body = `Ahoj,\n\nu akce "${ev.name}" právě probíhá hlasování o jídle/pivu. Zajdi se podívat a hlasuj:\n\n${location.origin}${location.pathname}#event/${ev.id}`;
+    openMailtoAll(emails, subject, body);
   });
 
   const confirmBtn = document.getElementById('btn-confirm-food');
@@ -2288,6 +2306,7 @@ function renderTournamentSignupPhase(t, box){
       <h1 class="headline" style="font-size:26px; margin-top:10px;">${escapeHtml(t.name)}</h1>
       ${t.game ? `<div class="status-hint">${escapeHtml(t.game)}</div>` : ''}
     </div>
+    ${hasPerm('turnaj') ? `<button type="button" class="btn-ghost btn-sm" id="btn-mailto-tourney" style="margin-bottom:14px;">✉️ Poslat e-mail o turnaji</button>` : ''}
     <p class="lede" style="margin-top:0;">Klikni na "Zúčastním se", pokud chceš hrát. Formát (týmy, nebo všichni proti všem) nastaví admin, až se přihlásí dost lidí.</p>
     <div id="signup-cta"></div>
     <div class="section-title" style="font-size:15px;">Přihlášení (${signups.length})</div>
@@ -2347,6 +2366,13 @@ function renderTournamentSignupPhase(t, box){
     });
     const gotoBtn = document.getElementById('btn-goto-format');
     if(gotoBtn) gotoBtn.addEventListener('click', () => { tourneySetupStep = 'format'; renderTurnajPage(); });
+    const mailtoTourneyBtn = document.getElementById('btn-mailto-tourney');
+    if(mailtoTourneyBtn) mailtoTourneyBtn.addEventListener('click', async () => {
+      const emails = await getAllUserEmails();
+      const subject = `Nový turnaj: ${t.name}`;
+      const body = `Ahoj,\n\nje otevřený nový turnaj "${t.name}"${t.game ? ' (' + t.game + ')' : ''}. Přihlas se:\n\n${location.origin}${location.pathname}#turnaj/${t.id}`;
+      openMailtoAll(emails, subject, body);
+    });
   }
 }
 
@@ -5192,6 +5218,22 @@ document.getElementById('btn-change-password').addEventListener('click', async (
   }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se odeslat odkaz. Zkus to znovu.'; }
 });
 
+// Hromadné e-maily - posílá se přes mailto: odkaz, který otevře uživatelův vlastní e-mailový klient
+// (Gmail, Outlook, Apple Mail...) s předvyplněnými adresami v BCC. E-mail tak skutečně odejde
+// z jeho vlastní adresy, appka sama žádné e-maily neposílá (na to by byl potřeba vlastní e-mailový
+// server/službu a appka na GitHub Pages ho nemá).
+async function getAllUserEmails(){
+  try{
+    const snap = await getDocs(collection(db,'users'));
+    return [...new Set(snap.docs.map(d => d.data().email).filter(Boolean))];
+  }catch(err){ console.error(err); return []; }
+}
+function openMailtoAll(emails, subject, body){
+  if(emails.length === 0){ alert('Nemám žádné e-mailové adresy k dispozici.'); return; }
+  const url = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = url;
+}
+
 function closeAllAccountPanels(){
   document.getElementById('form-change-nick').style.display = 'none';
   document.getElementById('form-change-email').style.display = 'none';
@@ -5210,7 +5252,13 @@ async function renderUsersList(){
     if(users.length === 0){ box.innerHTML = '<div class="empty">Zatím žádní uživatelé.</div>'; return; }
 
     const showPerms = currentIsSuperAdmin;
+    const allEmails = [...new Set(users.map(u => u.email).filter(Boolean))];
     box.innerHTML = `
+      <div class="row" style="margin-bottom:16px; gap:10px;">
+        <button type="button" class="btn-ghost btn-sm" id="btn-copy-emails">📋 Kopírovat e-maily (${allEmails.length})</button>
+        <button type="button" class="btn-ghost btn-sm" id="btn-mailto-all">✉️ Napsat e-mail všem</button>
+        <span class="small-msg" id="copy-emails-msg"></span>
+      </div>
       <div style="overflow-x:auto;">
       <table style="width:100%; border-collapse:collapse; font-size:14px;">
         <thead><tr style="text-align:left; color:var(--text-muted); font-size:12px;">
@@ -5242,10 +5290,8 @@ async function renderUsersList(){
         </tbody>
       </table>
       </div>
-      ${showPerms ? '<p class="lede" style="margin-top:10px; font-size:12px;">Zaškrtnutí oprávnění se ukládá spolu s ostatními údaji tlačítkem "Uložit" u daného uživatele.</p>' : ''}
 
       <div class="section-title" style="font-size:16px; margin-top:36px;">Přezdívky — duplicity a osamocené záznamy</div>
-      <p class="lede" style="margin-top:0;">Tady se zobrazují jen přezdívky, které buď nemají odpovídající účet (osamocené, třeba po nepovedené registraci), nebo jich je pro stejný účet víc (duplicity). Běžné, správně fungující přezdívky se tu nezobrazují.</p>
       <div id="usernames-list" style="margin-top:12px;"></div>
     `;
     if(showPerms){
@@ -5292,6 +5338,15 @@ async function renderUsersList(){
           renderUsersList();
         }catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
       });
+    });
+
+    document.getElementById('btn-copy-emails').addEventListener('click', async () => {
+      const msg = document.getElementById('copy-emails-msg');
+      try{ await navigator.clipboard.writeText(allEmails.join(', ')); msg.textContent = 'Zkopírováno!'; }
+      catch(err){ msg.textContent = 'Kopírování se nepovedlo — zkopíruj ručně: ' + allEmails.join(', '); }
+    });
+    document.getElementById('btn-mailto-all').addEventListener('click', () => {
+      openMailtoAll(allEmails, '', '');
     });
 
     const unameBox = document.getElementById('usernames-list');
