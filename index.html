@@ -214,11 +214,11 @@
               </div>
               <div class="map-embed ed-header-map" id="ed-map"></div>
               <div class="tab-switch" id="ed-tabs">
-                <button type="button" class="tab-btn active" data-tab="prehled">Přehled</button>
-                <button type="button" class="tab-btn" data-tab="rozvrh">Rozvrh</button>
-                <button type="button" class="tab-btn" data-tab="jidlo">Jídlo</button>
-                <button type="button" class="tab-btn" data-tab="turnaj">Turnaje</button>
-                <button type="button" class="tab-btn" data-tab="foto">Foto</button>
+                <button type="button" class="tab-btn active" data-tab="prehled">📋 Přehled</button>
+                <button type="button" class="tab-btn" data-tab="rozvrh">🕐 Rozvrh</button>
+                <button type="button" class="tab-btn" data-tab="jidlo">🍔 Jídlo</button>
+                <button type="button" class="tab-btn" data-tab="turnaj">🏆 Turnaje</button>
+                <button type="button" class="tab-btn" data-tab="foto">📷 Foto</button>
               </div>
             </div>
             <div class="ed-right-col">
@@ -281,20 +281,11 @@
       <div id="auth-logged-in" style="display:none; margin-top:20px;">
         <button type="button" class="btn-ghost" id="btn-logout">Odhlásit se</button>
 
-        <div style="margin-top:28px; max-width:480px;">
+        <div style="margin-top:28px; max-width:760px;">
           <div class="section-title" style="font-size:16px;">Účet</div>
 
-          <div style="text-align:center; margin-bottom:26px;">
-            <div class="account-avatar-big-wrap">
-              <img id="account-avatar-big" src="" alt="" style="display:none;">
-              <div id="account-avatar-placeholder" class="account-avatar-placeholder">🙂</div>
-            </div>
-            <label for="new-avatar-input" class="btn-sm account-avatar-upload-label">📤 Nahrát fotku</label>
-            <input type="file" id="new-avatar-input" accept="image/*" style="display:none;">
-            <div><button type="button" class="btn-ghost btn-sm" id="btn-remove-avatar" style="margin-top:8px; display:none;">Odebrat fotku</button></div>
-            <div id="avatar-change-msg" class="small-msg"></div>
-          </div>
-
+          <div class="account-layout">
+          <div class="account-fields-col">
           <div class="account-row">
             <div class="account-row-label">Přezdívka</div>
             <div class="account-row-value" id="account-nick-display">—</div>
@@ -365,6 +356,19 @@
               <button type="button" class="btn-ghost" id="btn-cancel-password">Zrušit</button>
             </div>
             <div id="pw-reset-msg" class="small-msg"></div>
+          </div>
+          </div>
+
+          <div class="account-avatar-col">
+            <div class="account-avatar-big-wrap">
+              <img id="account-avatar-big" src="" alt="" style="display:none;">
+              <div id="account-avatar-placeholder" class="account-avatar-placeholder">🙂</div>
+            </div>
+            <label for="new-avatar-input" class="btn-sm account-avatar-upload-label">📤 Nahrát fotku</label>
+            <input type="file" id="new-avatar-input" accept="image/*" style="display:none;">
+            <div><button type="button" class="btn-ghost btn-sm" id="btn-remove-avatar" style="margin-top:8px; display:none;">Odebrat fotku</button></div>
+            <div id="avatar-change-msg" class="small-msg"></div>
+          </div>
           </div>
         </div>
       </div>
