@@ -101,9 +101,19 @@ function avatarTag(avatar, size){
   size = size || 20;
   return `<img src="${avatar.replace(/"/g,'&quot;')}" alt="" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; vertical-align:middle; margin-right:5px; flex-shrink:0;">`;
 }
+// Emotikon může být krátký textový znak, nebo URL vlastního obrázku (nahraného/vloženého) - v obou
+// případech se zobrazí ve stejné standardní velikosti.
+function emojiTag(emoji, size){
+  if(!emoji) return '';
+  size = size || 18;
+  if(/^https?:\/\//i.test(emoji)){
+    return `<img src="${emoji.replace(/"/g,'&quot;')}" alt="" style="width:${size}px; height:${size}px; object-fit:cover; border-radius:4px; vertical-align:middle; display:inline-block;">`;
+  }
+  return `<span style="font-size:${size}px; vertical-align:middle; display:inline-block; line-height:1;">${escapeHtml(emoji)}</span>`;
+}
 function authorLabel(author, emoji, avatar){
   if(avatar) return `${avatarTag(avatar)}${escapeHtml(author)}`;
-  return `${emoji ? escapeHtml(emoji)+' ' : ''}${escapeHtml(author)}`;
+  return `${emoji ? emojiTag(emoji)+' ' : ''}${escapeHtml(author)}`;
 }
 const CHAT_EMOJIS = ['😀','😂','😎','👍','👎','🔥','🎉','❤️','😢','🤔','🎮','🕹️','👾','💻','🖱️','⌨️','🍕','🍺','🌙','⚡','💀','👑','🐉','🚗'];
 function setupChatEmojiRow(btnId, panelId, inputId){
@@ -181,8 +191,17 @@ onSnapshot(eventsQuery, (snapshot) => {
 const navItems = document.querySelectorAll('.nav-item');
 const views = document.querySelectorAll('.view');
 function showView(name){
+  if(name === 'ucet' && (!currentUser || !currentNick)){ openLoginModal(); return; }
   navItems.forEach(n => n.classList.toggle('active', n.dataset.view === name));
   views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+}
+
+function openLoginModal(){
+  document.getElementById('login-modal-overlay').style.display = 'flex';
+}
+function closeLoginModal(){
+  const overlay = document.getElementById('login-modal-overlay');
+  if(overlay) overlay.style.display = 'none';
 }
 
 function setRoute(hash){
@@ -193,6 +212,7 @@ function setRoute(hash){
 function applyRoute(){
   closeEventForm();
   closeContactForm();
+  closeAllAccountPanels();
   const raw = location.hash.replace(/^#/, '');
   const [view, id, sub] = raw.split('/');
   turnajProjectorMode = (view === 'turnaj' && !!id && sub === 'projektor');
@@ -233,6 +253,8 @@ function tryInitialRoute(){
 }
 
 navItems.forEach(n => n.addEventListener('click', () => setRoute('#' + n.dataset.view)));
+document.getElementById('login-modal-close').addEventListener('click', closeLoginModal);
+document.getElementById('login-modal-overlay').addEventListener('click', (e) => { if(e.target.id === 'login-modal-overlay') closeLoginModal(); });
 document.getElementById('brand-home-link').addEventListener('click', () => setRoute('#home'));
 
 // ---- Kontakty / Tablo ----
@@ -1322,7 +1344,7 @@ function renderAttendees(){
         : '';
       return `
         <div class="attendee-row">
-          <span style="display:flex; align-items:center; gap:6px;">${coinHtml}${r.avatar ? avatarTag(r.avatar) : (r.emoji ? escapeHtml(r.emoji)+' ' : '')}${escapeHtml(r.nick || '(bez jména)')}</span>
+          <span style="display:flex; align-items:center; gap:6px;">${coinHtml}${r.avatar ? avatarTag(r.avatar) : (r.emoji ? emojiTag(r.emoji) : '')}${escapeHtml(r.nick || '(bez jména)')}</span>
           <span style="display:flex; align-items:center; gap:6px;">
             ${statusHtml}
             ${(hasPerm('akce') && !isSelf) ? `<button type="button" class="btn-ghost btn-sm" data-remove-attendee="${r._docId}" title="Odebrat" style="padding:2px 7px; color:var(--crimson); border-color:var(--crimson);">×</button>` : ''}
@@ -4934,24 +4956,47 @@ const EMOJI_PRESETS = ['🎮','🕹️','👾','💻','🖱️','🔥','💀','�
 document.getElementById('emoji-preset-row').innerHTML = EMOJI_PRESETS.map(e => `<span class="chip" data-emoji-pick="${e}" style="cursor:pointer; font-size:16px;">${e}</span>`).join('');
 document.getElementById('emoji-preset-row').addEventListener('click', (e) => {
   const target = e.target.closest('[data-emoji-pick]');
-  if(target) document.getElementById('new-emoji-input').value = target.dataset.emojiPick;
+  if(target){
+    document.getElementById('new-emoji-input').value = target.dataset.emojiPick;
+    document.getElementById('new-emoji-url-input').value = '';
+  }
 });
 document.getElementById('btn-toggle-emoji').addEventListener('click', () => {
   const form = document.getElementById('form-change-emoji');
   const opening = form.style.display === 'none';
   closeAllAccountPanels();
   if(opening){
-    document.getElementById('new-emoji-input').value = currentEmoji || '';
+    const isUrl = /^https?:\/\//i.test(currentEmoji || '');
+    document.getElementById('new-emoji-input').value = isUrl ? '' : (currentEmoji || '');
+    document.getElementById('new-emoji-url-input').value = isUrl ? currentEmoji : '';
+    document.getElementById('emoji-upload-msg').textContent = '';
     form.style.display = 'flex';
   }
 });
 document.getElementById('btn-cancel-emoji').addEventListener('click', () => {
   document.getElementById('form-change-emoji').style.display = 'none';
 });
+document.getElementById('new-emoji-file-input').addEventListener('change', async () => {
+  const fileInput = document.getElementById('new-emoji-file-input');
+  const msg = document.getElementById('emoji-upload-msg');
+  const file = fileInput.files[0];
+  if(!file || !currentUser) return;
+  if(file.size > 5 * 1024 * 1024){ msg.textContent = 'Soubor je moc velký (max 5 MB).'; return; }
+  msg.textContent = 'Nahrávám...';
+  try{
+    const fileRef = ref(storage, `custom-emoji/${currentUser.uid}-${Date.now()}`);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    document.getElementById('new-emoji-url-input').value = url;
+    document.getElementById('new-emoji-input').value = '';
+    msg.textContent = 'Nahráno — teď klikni na Uložit.';
+  }catch(err){ console.error(err); msg.textContent = 'Nahrání se nepovedlo.'; }
+});
 document.getElementById('form-change-emoji').addEventListener('submit', async (e) => {
   e.preventDefault();
   const msg = document.getElementById('emoji-change-msg');
-  const newEmoji = document.getElementById('new-emoji-input').value.trim();
+  const urlVal = document.getElementById('new-emoji-url-input').value.trim();
+  const newEmoji = urlVal || document.getElementById('new-emoji-input').value.trim();
   if(!currentUser) return;
   msg.textContent = '';
   try{
@@ -5191,10 +5236,11 @@ function updateAuthUI(){
     loggedOutBox.style.display = 'none';
     loggedInBox.style.display = 'block';
     googleNickPrompt.style.display = 'none';
+    closeLoginModal();
     document.getElementById('account-nick-display').textContent = currentNick + (currentIsSuperAdmin ? ' (hlavní admin)' : (currentIsAdmin ? ' (admin)' : ''));
     document.getElementById('account-email-display').textContent = currentUser.email || '';
     document.getElementById('account-phone-display').textContent = currentPhone || '—';
-    document.getElementById('account-emoji-display').textContent = currentEmoji || '—';
+    document.getElementById('account-emoji-display').innerHTML = currentEmoji ? emojiTag(currentEmoji, 22) : '—';
     document.getElementById('account-avatar-big').style.display = currentAvatar ? 'block' : 'none';
     document.getElementById('account-avatar-big').src = currentAvatar || '';
     document.getElementById('account-avatar-placeholder').style.display = currentAvatar ? 'none' : 'flex';
