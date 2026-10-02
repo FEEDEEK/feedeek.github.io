@@ -968,12 +968,12 @@ let currentFoodComments = [];
 let currentPhotos = [];
 
 function renderTournamentSignupCta(ev){
-  const box = document.getElementById('ed-tourney-cta');
+  const box = document.getElementById('prehled-tourney-cta');
   if(!box) return;
   const list = allTournaments.filter(x => x.eventId === ev.id && x.status === 'signup');
   if(list.length === 0){ box.innerHTML = ''; return; }
   box.innerHTML = `
-    <div class="tourney-signup-panel">
+    <div class="tourney-signup-panel tourney-signup-panel-inline">
       <div class="tourney-signup-panel-title">Otevřené turnaje</div>
       ${list.map(t => `
         <button type="button" class="tourney-signup-cta-btn" data-cta-open="${t.id}">
@@ -999,7 +999,6 @@ function renderEventDetailStatic(ev){
 
   renderEntryFeeBlock(ev);
   renderDateVoteBlock(ev);
-  renderTournamentSignupCta(ev);
 
   const mapBox = document.getElementById('ed-map');
   const q = encodeURIComponent(ev.place || '');
@@ -1094,15 +1093,11 @@ async function renderPersonalPaymentQr(ev, uid, nick, box){
   const iban = czAccountToIban(ev.accPrefix, ev.accNumber, ev.accBank);
   if(!iban){ box.innerHTML = ''; return; }
   const vs = vsFromUid(uid);
-  const spayd = buildSpaydString(iban, ev.fee, vs, `${ev.name || 'LAN'} ${nick}`);
+  const spayd = buildSpaydString(iban, ev.fee, vs, `LAN-${nick}`);
   box.innerHTML = `
-    <div class="payment-qr-box">
+    <div class="payment-qr-box payment-qr-box-compact">
       <div id="payment-qr-canvas" class="payment-qr-canvas-wrap"></div>
-      <div class="payment-qr-info">
-        <div><b>${ev.fee} Kč</b></div>
-        <div>VS: <b>${vs}</b></div>
-        <div class="status-hint">Naskenuj v bankovní appce (QR Platba)</div>
-      </div>
+      <div class="payment-qr-info">VS: <b>${vs}</b></div>
     </div>
   `;
   try{
@@ -1396,13 +1391,16 @@ function renderTabPrehled(ev){
   const votingSlots = ev.foodVotingSlots || {};
   const activeVotingSlots = MEAL_SLOTS.filter(s => votingSlots[s.key] && schedule[s.key] && schedule[s.key].length > 0);
   const votingAnnounceHtml = activeVotingSlots.length ? `
-    <button type="button" class="tourney-signup-cta-btn food-vote-announce" id="food-vote-announce-btn" style="margin-bottom:18px;">
+    <button type="button" class="tourney-signup-cta-btn food-vote-announce" id="food-vote-announce-btn">
       <span class="tourney-cta-sparkles"></span>
       <span>🗳️ Probíhá hlasování: ${activeVotingSlots.map(s => escapeHtml(s.label)).join(', ')}</span>
     </button>
   ` : '';
   box.innerHTML = `
-    ${votingAnnounceHtml}
+    <div class="prehled-announce-row">
+      ${votingAnnounceHtml}
+      <div id="prehled-tourney-cta"></div>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:28px;">
       <div>
         <div class="section-title" style="font-size:16px;">🎮 Co se bude hrát</div>
@@ -1499,6 +1497,8 @@ function renderTabPrehled(ev){
       input.value = '';
     }catch(err){ console.error(err); }
   });
+
+  renderTournamentSignupCta(ev);
 
   const voteAnnounceBtn = document.getElementById('food-vote-announce-btn');
   if(voteAnnounceBtn) voteAnnounceBtn.addEventListener('click', () => {
@@ -1872,7 +1872,7 @@ onSnapshot(collection(db, 'tournaments'), (snap) => {
   if(currentDetailEventId){
     const ev = events.find(x=>x.id===currentDetailEventId);
     if(ev){
-      renderTournamentSignupCta(ev);
+      if(currentTab === 'prehled') renderTabPrehled(ev);
       if(currentTab === 'turnaj') renderTabTurnaj(ev);
     }
   }
