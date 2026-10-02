@@ -2716,8 +2716,18 @@ function openDirectDrawTournamentForm(){
 function openEditTournamentForm(existing){
   const slot = document.getElementById('turnaj-form-slot');
   const evOptions = [...events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
+  const isTeamFormat = existing.format !== 'ffa';
+  const alreadyDrawn = isTeamFormat && (existing.teams||[]).some(t => (t.members||[]).length > 0);
+
+  tbDraw = { players: [], teams: null };
+  if(isTeamFormat){
+    (existing.teams||[]).forEach(t => (t.members||[]).forEach(name => {
+      if(!tbDraw.players.some(p => p.name === name)) tbAddDrawPlayer(name, 50, { persist:false });
+    }));
+  }
+
   slot.innerHTML = `
-    <form class="panel" id="form-new-tourney">
+    <form class="panel" id="form-new-tourney" style="max-width:940px;">
       <div class="field"><label>Název turnaje</label><input type="text" id="new-tourney-name" placeholder="Hlavní Dota turnaj" value="${escapeHtml(existing.name)}" required></div>
       ${gameFieldHtml(existing.game || '', existing.gameImage || '')}
       <div class="field"><label>Akce (nepovinné)</label><select id="new-tourney-event">
@@ -2725,15 +2735,59 @@ function openEditTournamentForm(existing){
         ${evOptions.map(e=>`<option value="${e.id}" ${existing.eventId===e.id?'selected':''}>${escapeHtml(e.name)}${e.dateEnd < todayIso() ? ' (proběhlo)' : ''}</option>`).join('')}
       </select></div>
       <div class="field"><label>URL obrázku turnaje (nepovinné)</label><input type="url" id="new-tourney-image" value="${escapeHtml(existing.imageUrl||'')}"></div>
-      <div style="display:flex; gap:10px;">
+
+      ${isTeamFormat ? `
+      <div class="tb-form-row">
+        <div class="field"><label>Hráčů v týmu</label><input type="number" id="tb-team-size" min="1" max="6" value="${existing.teamSize || 3}"></div>
+        <div class="field"><label>Počet týmů</label><input type="number" id="tb-team-count" min="2" value="${(existing.teams||[]).length || ''}" placeholder="auto"></div>
+      </div>
+      <div class="tb-draw-section">
+        <div class="section-title" style="font-size:15px;">Hráči do losování</div>
+        ${alreadyDrawn ? '<small style="display:block; color:var(--text-muted); margin-bottom:8px;">Týmy už jsou vylosované (hráči níž jsou předvyplnění ze současných týmů). Losovat znovu přepíše současné rozdělení.</small>' : ''}
+        <div class="tb-draw-addrow">
+          <input type="text" id="tb-add-name" placeholder="Přidat hráče ručně (jméno)">
+          <input type="number" id="tb-add-skill" min="1" max="100" placeholder="Skill (50)">
+          <button type="button" class="btn-sm" id="tb-add-btn">Přidat</button>
+        </div>
+        <div id="tb-draw-players"></div>
+        <button type="button" class="btn-ghost" id="tb-draw-btn" style="margin-top:12px;">🎰 ${alreadyDrawn ? 'Losovat týmy znovu' : 'Losovat týmy'}</button>
+      </div>
+      <div id="tb-drawn-teams"></div>
+      ` : ''}
+
+      <div style="display:flex; gap:10px; margin-top:8px;">
         <button type="submit">Uložit změny</button>
         <button type="button" class="btn-ghost" id="btn-cancel-new-tourney">Zrušit</button>
       </div>
     </form>
   `;
   slot.scrollIntoView({ behavior:'smooth', block:'start' });
-  document.getElementById('btn-cancel-new-tourney').addEventListener('click', () => { slot.innerHTML = ''; });
+  document.getElementById('btn-cancel-new-tourney').addEventListener('click', () => { slot.innerHTML = ''; tbDraw = { players: [], teams: null }; });
   const getGameImage3 = setupGameField(existing.gameImage || '');
+
+  if(isTeamFormat){
+    tbRenderDrawPlayers();
+    document.getElementById('tb-team-size').addEventListener('input', () => { tbUpdateTeamCountHint(); tbInvalidateDraw(); });
+    document.getElementById('tb-team-count').addEventListener('input', () => tbInvalidateDraw());
+    document.getElementById('tb-add-btn').addEventListener('click', () => {
+      const nameInput = document.getElementById('tb-add-name');
+      const skillInput = document.getElementById('tb-add-skill');
+      const name = nameInput.value.trim();
+      if(!name){ alert('Vyplň jméno hráče.'); return; }
+      const skill = Math.min(100, Math.max(1, parseInt(skillInput.value, 10) || 50));
+      tbAddDrawPlayer(name, skill, { persist:false });
+      nameInput.value = ''; skillInput.value = '';
+      tbRenderDrawPlayers();
+      tbInvalidateDraw();
+    });
+    document.getElementById('tb-draw-btn').addEventListener('click', () => {
+      if(alreadyDrawn && !tbDraw.teams){
+        if(!confirm('Týmy už byly vylosované. Opravdu chceš losovat znovu? Přepíše to současné rozdělení.')) return;
+      }
+      tbStartDrawFromForm();
+    });
+  }
+
   document.getElementById('form-new-tourney').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('new-tourney-name').value.trim();
@@ -2742,9 +2796,20 @@ function openEditTournamentForm(existing){
     const game = document.getElementById('new-tourney-game').value.trim();
     const gameImage = getGameImage3();
     if(!name) return;
+    const update = { name, eventId, imageUrl, game, gameImage };
+    let skillsToSeed = {};
+    if(isTeamFormat){
+      update.teamSize = tbTeamSizeVal();
+      if(tbDraw.teams){
+        update.teams = tbDraw.teams.map((t, i) => ({ name: (t.name || '').trim() || `Tým ${i+1}`, members: t.members, emblem: t.emblem || '', ...(t.color ? { color: t.color } : {}) }));
+        tbDraw.players.forEach(p => { skillsToSeed[tbKey(p.name)] = p.baseSkill; });
+      }
+    }
     try{
-      await updateDoc(doc(db,'tournaments',existing.id), { name, eventId, imageUrl, game, gameImage });
+      await updateDoc(doc(db,'tournaments',existing.id), update);
+      await seedHandicapSkills(existing, skillsToSeed);
       slot.innerHTML = '';
+      tbDraw = { players: [], teams: null };
       renderTurnajPage();
     }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
   });
