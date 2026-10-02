@@ -829,12 +829,13 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 
 .ed-tourney-cta{ position:absolute; top:16px; right:20px; z-index:2; }
 .tourney-signup-panel{ display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
-.prehled-announce-row{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+.prehled-announce-row{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:stretch; margin-bottom:24px; }
+@media (max-width:640px){ .prehled-announce-row{ grid-template-columns:1fr; } }
 .tourney-signup-panel-inline{ align-items:flex-start; }
 .tourney-signup-panel-title{ font-size:15px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold); font-weight:800; text-shadow:0 0 10px rgba(240,201,76,.5); }
 .tourney-signup-cta-btn{
-  position:relative; overflow:visible; display:flex; align-items:center; gap:10px; width:max-content;
-  padding:11px 22px; font-size:16px; font-weight:800; cursor:pointer; border-radius:5px;
+  position:relative; overflow:visible; display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  padding:10px 14px; font-size:13px; font-weight:800; cursor:pointer; border-radius:5px; text-align:center; line-height:1.3;
   background:linear-gradient(135deg, #f2c94c, #c88a1e); color:#2a1702; border:1px solid #f2c94c;
   box-shadow:0 0 16px rgba(242,201,76,.6); animation:tourneyCtaFlicker 2.6s ease-in-out infinite;
 }
