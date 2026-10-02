@@ -973,18 +973,14 @@ function renderTournamentSignupCta(ev){
   const list = allTournaments.filter(x => x.eventId === ev.id && x.status === 'signup');
   if(list.length === 0){ box.innerHTML = ''; return; }
   box.innerHTML = `
-    <div class="tourney-signup-panel tourney-signup-panel-inline">
-      <div class="tourney-signup-panel-title">Otevřené turnaje</div>
-      ${list.map(t => `
-        <button type="button" class="tourney-signup-cta-btn" data-cta-open="${t.id}">
-          ${t.gameImage ? `<img src="${t.gameImage.replace(/"/g,'&quot;')}" alt="" class="tourney-cta-logo">` : ''}
-          <span>${escapeHtml(t.name)}</span>
-        </button>
-      `).join('')}
-    </div>
+    <button type="button" class="tourney-signup-cta-btn" id="tourney-vote-announce-btn">
+      <span class="tourney-cta-sparkles"></span>
+      <span>📝 Jsou otevřené přihlášky do ${list.length > 1 ? 'turnajů' : 'turnaje'}</span>
+    </button>
   `;
-  box.querySelectorAll('[data-cta-open]').forEach(btn => {
-    btn.addEventListener('click', () => setRoute('#turnaj/' + btn.dataset.ctaOpen));
+  document.getElementById('tourney-vote-announce-btn').addEventListener('click', () => {
+    const turnajTabBtn = document.querySelector('#ed-tabs [data-tab="turnaj"]');
+    if(turnajTabBtn) turnajTabBtn.click();
   });
 }
 
@@ -1113,7 +1109,6 @@ function renderEntryFeeBlock(ev){
   box.innerHTML = `
     ${showSharedQr ? `<img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu" style="margin-bottom:8px;">` : ''}
     ${ev.fee ? `<div style="font-size:28px; font-weight:700; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,0.8);">${ev.fee} Kč</div><div style="font-size:13px; font-weight:600; color:var(--gold); text-transform:uppercase; letter-spacing:.08em; text-shadow:0 1px 4px rgba(0,0,0,0.8);">Vstupné</div>` : ''}
-    ${eventHasOwnPaymentAccount(ev) ? `<div class="status-hint" style="margin-top:4px;">Po přihlášení uvidíš svůj osobní QR s variabilním symbolem</div>` : ''}
   `;
 }
 
@@ -1393,7 +1388,7 @@ function renderTabPrehled(ev){
   const votingAnnounceHtml = activeVotingSlots.length ? `
     <button type="button" class="tourney-signup-cta-btn food-vote-announce" id="food-vote-announce-btn">
       <span class="tourney-cta-sparkles"></span>
-      <span>🗳️ Probíhá hlasování: ${activeVotingSlots.map(s => escapeHtml(s.label)).join(', ')}</span>
+      <span>🗳️ V sekci Jídlo probíhá hlasování</span>
     </button>
   ` : '';
   box.innerHTML = `
@@ -2235,6 +2230,7 @@ function renderTurnajPage(){
         <h3>${escapeHtml(t.name)}</h3>
         <div class="meta">${ev ? escapeHtml(ev.name) : 'Bez přiřazené akce'}${t.game ? ' · ' + escapeHtml(t.game) : ''}</div>
         <p class="desc">${statusTxt}</p>
+        ${(t.status === 'signup' && currentNick && !(t.signups||[]).includes(currentNick)) ? `<button type="button" class="btn-sm" data-quick-signup="${t.id}" style="width:100%; margin-top:4px;">✅ Přihlásit se do turnaje</button>` : ''}
         ${hasPerm('turnaj') ? `
         <div class="row" style="margin-top:2px;">
           <button type="button" class="btn-ghost btn-sm" data-edit-tourney="${t.id}" style="flex:1;">Upravit</button>
@@ -2243,9 +2239,16 @@ function renderTurnajPage(){
       </div>
     `;
   }).join('');
+  grid.querySelectorAll('[data-quick-signup]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try{ await updateDoc(doc(db,'tournaments',btn.dataset.quickSignup), { signups: arrayUnion(currentNick) }); }
+      catch(err){ console.error(err); }
+    });
+  });
   grid.querySelectorAll('[data-open-tourney]').forEach(card => {
     card.addEventListener('click', (e) => {
-      if(e.target.closest('[data-edit-tourney]') || e.target.closest('[data-delete-tourney]')) return;
+      if(e.target.closest('[data-edit-tourney]') || e.target.closest('[data-delete-tourney]') || e.target.closest('[data-quick-signup]')) return;
       setRoute('#turnaj/' + card.dataset.openTourney);
     });
   });
@@ -4561,13 +4564,22 @@ function renderTabTurnaj(ev){
         </div>
         <h3>${escapeHtml(t.name)}</h3>
         <p class="desc">${statusTxt}</p>
-        <span class="status-hint">${t.status === 'signup' ? 'Přihlásit se →' : 'Zobrazit celý pavouk →'}</span>
+        ${(t.status === 'signup' && currentNick && !(t.signups||[]).includes(currentNick)) ? `<button type="button" class="btn-sm" data-quick-signup-compact="${t.id}" style="width:100%; margin-top:4px;">✅ Přihlásit se do turnaje</button>` : ''}
+        <span class="status-hint">${t.status === 'signup' ? 'Zobrazit přihlášené →' : 'Zobrazit celý pavouk →'}</span>
       </div>
     `;
   }).join('') + `</div>`;
   box.innerHTML = html;
+  box.querySelectorAll('[data-quick-signup-compact]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try{ await updateDoc(doc(db,'tournaments',btn.dataset.quickSignupCompact), { signups: arrayUnion(currentNick) }); }
+      catch(err){ console.error(err); }
+    });
+  });
   box.querySelectorAll('[data-open-tourney-compact]').forEach(card => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', (e) => {
+      if(e.target.closest('[data-quick-signup-compact]')) return;
       setRoute('#turnaj/' + card.dataset.openTourneyCompact);
     });
   });
