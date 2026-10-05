@@ -1065,11 +1065,16 @@ function vsFromUid(uid){
 }
 
 // Odstranění diakritiky a nepovolených znaků (SPAYD musí být čisté ASCII, bez hvězdiček)
+// Do zprávy QR platby se pustí jen písmena A-Z, číslice, mezera, pomlčka a tečka. Diakritika se převede
+// na základní písmeno (Ř -> R), všechno ostatní (emoji, speciální znaky, hvězdičky...) se prostě vynechá,
+// protože bankovní appky s takovými znaky QR platbu odmítají.
 function spaydSafe(str){
   return String(str || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/\*/g, '')
-    .toUpperCase();
+    .toUpperCase()
+    .replace(/[^A-Z0-9 .\-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function buildSpaydString(iban, amount, vs, msg){
@@ -1089,7 +1094,8 @@ async function renderPersonalPaymentQr(ev, uid, nick, box){
   const iban = czAccountToIban(ev.accPrefix, ev.accNumber, ev.accBank);
   if(!iban){ box.innerHTML = ''; return; }
   const vs = vsFromUid(uid);
-  const spayd = buildSpaydString(iban, ev.fee, vs, `LAN-${nick}`);
+  const safeNick = spaydSafe(nick);
+  const spayd = buildSpaydString(iban, ev.fee, vs, safeNick ? `LAN-${safeNick}` : 'LAN');
   box.innerHTML = `
     <div class="payment-qr-box payment-qr-box-compact">
       <div id="payment-qr-canvas" class="payment-qr-canvas-wrap"></div>
@@ -1878,6 +1884,12 @@ let currentTournamentId = null;
 let turnajProjectorMode = false;
 const TEAM_EMBLEMS = ['🛡️','⚔️','🐺','🦅','🔥','💀','👑','🌙','⭐','🐉','🦁','🍀','🐍','🦂','⚡','🎯'];
 const TEAM_COLORS = ['#e8e3d8','#c9a24b','#8b2635','#2f8f8f','#4a90d9','#9b59b6','#e67e22','#2ecc71','#e84393','#95a5a6'];
+// Automatický výchozí znak a barva podle pořadí, ať jsou týmy/hráči v pavouku hned rozlišitelní
+// (tvůrce je může kdykoli změnit). První barva v paletě je neutrální výchozí, ta se nepřiděluje.
+function autoStyle(i){
+  const colors = TEAM_COLORS.slice(1);
+  return { emblem: TEAM_EMBLEMS[i % TEAM_EMBLEMS.length], color: colors[i % colors.length] };
+}
 
 onSnapshot(collection(db, 'tournaments'), (snap) => {
   allTournaments = snap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -1967,13 +1979,27 @@ function avatarOrPlaceholder(name){
   return av ? `<img src="${av.replace(/"/g,'&quot;')}" alt="" class="podium-avatar">` : `<div class="podium-avatar podium-avatar-blank">🎮</div>`;
 }
 
+// Styl (barva + znak) jednotlivce ve "všichni proti všem": uložený při nastavení turnaje,
+// jinak se dopočítá podle pořadí hráče (ať fungují i starší turnaje).
+function ffaStyleOf(t, name){
+  const stored = t.ffa && t.ffa.styles && t.ffa.styles[name];
+  if(stored && (stored.color || stored.emblem)) return stored;
+  const parts = (t.ffa && t.ffa.participants) || [];
+  const idx = parts.indexOf(name);
+  return autoStyle(idx < 0 ? 0 : idx);
+}
+function ffaNameHtml(t, name){
+  const st = ffaStyleOf(t, name);
+  return `<span style="${st.color ? `color:${st.color};` : ''}">${st.emblem ? escapeHtml(st.emblem) + ' ' : ''}${escapeHtml(name)}</span>`;
+}
+
 function buildFfaPodiumHtml(t, standings, big){
   const byRank = r => standings.placements.filter(p => p.rank === r);
   const p1 = byRank(1), p2 = byRank(2), p3 = byRank(3);
   const rest = standings.placements.filter(p => p.rank > 3);
   const step = (entries, rankClass, rank) => entries.map(p => `
     <div class="podium-step podium-${rank}">
-      <div class="podium-team">${trophySvg(rank)}${escapeHtml(p.name)}</div>
+      <div class="podium-team">${trophySvg(rank)}${ffaNameHtml(t, p.name)}</div>
       ${podiumCupHtml(t, rankClass, rank, p.name)}
       <div class="podium-members"><span>${p.total} bodů</span></div>
     </div>`).join('');
@@ -1983,7 +2009,7 @@ function buildFfaPodiumHtml(t, standings, big){
   html += step(p3, 'bronze', 3);
   html += `</div>`;
   if(rest.length){
-    html += rest.map(p => `<div class="bracket-slot" style="margin-top:8px;"><span>${p.rank}. ${escapeHtml(p.name)} — ${p.total} bodů</span></div>`).join('');
+    html += rest.map(p => `<div class="bracket-slot" style="margin-top:8px;"><span>${p.rank}. ${ffaNameHtml(t, p.name)} — ${p.total} bodů</span></div>`).join('');
   }
   return html;
 }
@@ -2003,7 +2029,7 @@ function renderFfaBody(t, box){
         <table class="ffa-rounds-table">
           <thead><tr><th>Hráč</th>${rounds.map((r,ri) => `<th ${canEdit ? `class="ffa-round-head" data-ffa-rename="${ri}" title="Klikni pro přejmenování"` : ''}>${escapeHtml(r.label || ('Kolo '+(ri+1)))}${canEdit ? ' ✏️' : ''}</th>`).join('')}<th>Celkem</th></tr></thead>
           <tbody>
-            ${participants.map(name => `<tr><td>${escapeHtml(name)}</td>${rounds.map((r,ri) => `<td>${canEdit
+            ${participants.map(name => `<tr><td>${ffaNameHtml(t, name)}</td>${rounds.map((r,ri) => `<td>${canEdit
                 ? `<input type="number" value="${(r.scores||{})[name] ?? ''}" data-ffa-score="${ri}|${escapeHtml(name)}">`
                 : ((r.scores||{})[name] ?? '0')}</td>`).join('')}<td class="ffa-total">${standings.placements.find(p=>p.name===name)?.total ?? 0}</td></tr>`).join('')}
           </tbody>
@@ -2490,7 +2516,7 @@ function tbStartDrawFromFormNoPersist(onDone){
     players: tbDraw.players.map(p => ({ name: p.name, baseSkill: p.baseSkill })),
     teamSize: size, numTeams,
     onConfirm: (teams) => {
-      tbDraw.teams = teams.map((tm, i) => ({ name: `Tým ${i+1}`, members: tm.members }));
+      tbDraw.teams = teams.map((tm, i) => ({ name: `Tým ${i+1}`, members: tm.members, ...autoStyle(i) }));
       tbRenderDrawnTeams();
       if(onDone) onDone();
     }
@@ -2535,7 +2561,7 @@ function renderFfaFormatSetup(t, box){
   });
   document.getElementById('btn-confirm-ffa-setup').addEventListener('click', async () => {
     try{
-      await updateDoc(doc(db,'tournaments',t.id), { format:'ffa', status:'ready', 'ffa.participants': localList, 'ffa.rounds': [{ label:'Kolo 1', scores:{} }] });
+      await updateDoc(doc(db,'tournaments',t.id), { format:'ffa', status:'ready', 'ffa.participants': localList, 'ffa.styles': Object.fromEntries(localList.map((n, i) => [n, autoStyle(i)])), 'ffa.rounds': [{ label:'Kolo 1', scores:{} }] });
       tourneySetupStep = null;
     }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
   });
@@ -2722,7 +2748,7 @@ function openDirectDrawTournamentForm(){
       tbDraw.players.forEach(p => { skills[tbKey(p.name)] = p.baseSkill; });
     }else{
       const count = Math.max(2, parseInt(document.getElementById('tb-team-count').value, 10) || 4);
-      for(let i = 0; i < count; i++) teams.push({ name: `Tým ${i+1}`, members: [], emblem: '' });
+      for(let i = 0; i < count; i++) teams.push({ name: `Tým ${i+1}`, members: [], ...autoStyle(i) });
     }
     const createdAt = new Date().toISOString();
     try{
@@ -3584,7 +3610,7 @@ function tbStartDrawFromForm(){
     numTeams,
     onConfirm: (teams) => {
       tbDraw.players.forEach(p => tbSaveSkill(p.name, p.baseSkill));
-      tbDraw.teams = teams.map((t, i) => ({ name: `Tým ${i+1}`, members: t.members }));
+      tbDraw.teams = teams.map((t, i) => ({ name: `Tým ${i+1}`, members: t.members, ...autoStyle(i) }));
       tbRenderDrawnTeams();
     }
   });
@@ -5055,84 +5081,6 @@ document.getElementById('btn-remove-avatar').addEventListener('click', async () 
   }catch(err){ console.error(err); }
 });
 
-// ---- Emotikon: změna ----
-const EMOJI_PRESETS = ['🎮','🕹️','👾','💻','🖱️','🔥','💀','👑','😎','🍺','🍕','⚡','🌙','🐉','👻','🎲'];
-document.getElementById('emoji-preset-row').innerHTML = EMOJI_PRESETS.map(e => `<span class="chip" data-emoji-pick="${e}" style="cursor:pointer; font-size:16px;">${e}</span>`).join('');
-document.getElementById('emoji-preset-row').addEventListener('click', (e) => {
-  const target = e.target.closest('[data-emoji-pick]');
-  if(target){
-    document.getElementById('new-emoji-input').value = target.dataset.emojiPick;
-    document.getElementById('new-emoji-url-input').value = '';
-  }
-});
-document.getElementById('btn-toggle-emoji').addEventListener('click', () => {
-  const form = document.getElementById('form-change-emoji');
-  const opening = form.style.display === 'none';
-  closeAllAccountPanels();
-  if(opening){
-    const isUrl = /^https?:\/\//i.test(currentEmoji || '');
-    document.getElementById('new-emoji-input').value = isUrl ? '' : (currentEmoji || '');
-    document.getElementById('new-emoji-url-input').value = isUrl ? currentEmoji : '';
-    document.getElementById('emoji-upload-msg').textContent = '';
-    form.style.display = 'flex';
-  }
-});
-document.getElementById('btn-cancel-emoji').addEventListener('click', () => {
-  document.getElementById('form-change-emoji').style.display = 'none';
-});
-// Zmenší libovolně velký obrázek (ořízne na čtverec) na standardní velikost emotikonu přes canvas,
-// ať jde nahrát fotka z mobilu v plné velikosti a appka si z ní sama udělá malou ikonku.
-function resizeImageToBlob(file, targetSize){
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const side = Math.min(img.width, img.height);
-      const sx = (img.width - side) / 2;
-      const sy = (img.height - side) / 2;
-      const canvas = document.createElement('canvas');
-      canvas.width = targetSize;
-      canvas.height = targetSize;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, targetSize, targetSize);
-      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('canvas.toBlob selhal')), 'image/png', 0.9);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Obrázek se nepodařilo načíst')); };
-    img.src = url;
-  });
-}
-document.getElementById('new-emoji-file-input').addEventListener('change', async () => {
-  const fileInput = document.getElementById('new-emoji-file-input');
-  const msg = document.getElementById('emoji-upload-msg');
-  const file = fileInput.files[0];
-  if(!file || !currentUser) return;
-  msg.textContent = 'Zmenšuji a nahrávám...';
-  try{
-    const resized = await resizeImageToBlob(file, 128);
-    const fileRef = ref(storage, `custom-emoji/${currentUser.uid}-${Date.now()}.png`);
-    await uploadBytes(fileRef, resized);
-    const url = await getDownloadURL(fileRef);
-    document.getElementById('new-emoji-url-input').value = url;
-    document.getElementById('new-emoji-input').value = '';
-    msg.textContent = 'Nahráno — teď klikni na Uložit.';
-  }catch(err){ console.error(err); msg.textContent = 'Nahrání se nepovedlo.'; }
-});
-document.getElementById('form-change-emoji').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const msg = document.getElementById('emoji-change-msg');
-  const urlVal = document.getElementById('new-emoji-url-input').value.trim();
-  const newEmoji = urlVal || document.getElementById('new-emoji-input').value.trim();
-  if(!currentUser) return;
-  msg.textContent = '';
-  try{
-    await updateDoc(doc(db,'users',currentUser.uid), { emoji: newEmoji });
-    currentEmoji = newEmoji;
-    document.getElementById('form-change-emoji').style.display = 'none';
-    updateAuthUI();
-  }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se — zkus to prosím znovu.'; }
-});
-
 // ---- Telefon: změna ----
 document.getElementById('btn-toggle-phone').addEventListener('click', () => {
   const form = document.getElementById('form-change-phone');
@@ -5238,7 +5186,6 @@ function closeAllAccountPanels(){
   document.getElementById('form-change-nick').style.display = 'none';
   document.getElementById('form-change-email').style.display = 'none';
   document.getElementById('form-change-phone').style.display = 'none';
-  document.getElementById('form-change-emoji').style.display = 'none';
   document.getElementById('pw-reset-panel').style.display = 'none';
 }
 
@@ -5395,7 +5342,6 @@ function updateAuthUI(){
     document.getElementById('account-nick-display').textContent = currentNick + (currentIsSuperAdmin ? ' (hlavní admin)' : (currentIsAdmin ? ' (admin)' : ''));
     document.getElementById('account-email-display').textContent = currentUser.email || '';
     document.getElementById('account-phone-display').textContent = currentPhone || '—';
-    document.getElementById('account-emoji-display').innerHTML = currentEmoji ? emojiTag(currentEmoji, 22) : '—';
     document.getElementById('account-avatar-big').style.display = currentAvatar ? 'block' : 'none';
     document.getElementById('account-avatar-big').src = currentAvatar || '';
     document.getElementById('account-avatar-placeholder').style.display = currentAvatar ? 'none' : 'flex';
