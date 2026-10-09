@@ -889,3 +889,8 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .mc-rec input{ width:auto !important; }
 .mc-status{ font-size:13px; min-height:18px; }
 .mc-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+
+/* výrazné tlačítko pro e-maily (vpravo nahoře) */
+.mail-btn{ background:linear-gradient(180deg,#f0c94a,#c99a1c); color:#1a1304; border:1px solid #f6dc7a; font-weight:700; padding:9px 16px; cursor:pointer; box-shadow:0 0 14px rgba(240,201,74,.35); letter-spacing:.3px; }
+.mail-btn:hover{ filter:brightness(1.1); box-shadow:0 0 20px rgba(240,201,74,.55); }
+.mail-btn-row{ display:flex; justify-content:flex-end; margin-bottom:12px; }
