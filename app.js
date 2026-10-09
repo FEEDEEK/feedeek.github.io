@@ -1398,7 +1398,7 @@ function renderTabPrehled(ev){
     </button>
   ` : '';
   box.innerHTML = `
-    ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" id="btn-mailto-event" style="margin-bottom:16px;">✉️ Pozvat e-mailem na tuhle akci</button>` : ''}
+    ${hasPerm('akce') ? `<div class="mail-btn-row"><button type="button" class="mail-btn" id="btn-mailto-event">✉️ Poslat e-mail k akci</button></div>` : ''}
     <div class="prehled-announce-row">
       ${votingAnnounceHtml}
       <div id="prehled-tourney-cta"></div>
@@ -1504,11 +1504,11 @@ function renderTabPrehled(ev){
   const mailtoEventBtn = document.getElementById('btn-mailto-event');
   if(mailtoEventBtn) mailtoEventBtn.addEventListener('click', async () => {
     const users = await getAllUsersForMail();
-    const body = `Ahoj {nick},\n\nchystá se akce "${ev.name}" (${fmtDateRange(ev)}${ev.place ? ', ' + ev.place : ''}).\n\n${ev.desc ? ev.desc + '\n\n' : ''}Přihlas se tady: ${mailLink('event/' + ev.id)}`;
+    const body = `Zdar, tady FEEDEEK LAN!\n\nchystá se akce "${ev.name}" (${fmtDateRange(ev)}${ev.place ? ', ' + ev.place : ''}).\n\n${ev.desc ? ev.desc + '\n\n' : ''}Přihlas se tady: ${mailLink('event/' + ev.id)}`;
     const going = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
     openMailComposer('E-mail k akci', [
       { label:'Nová akce – pozvánka', subject:`Nová akce: ${ev.name}`, body, recipients: users, hint:'Pozvánka pro všechny registrované.' },
-      { label:'Připomínka – ještě nejsi přihlášený', subject:`Přihlas se na: ${ev.name}`, body:`Ahoj {nick},\n\nještě jsi se nepřihlásil na akci "${ev.name}" (${fmtDateRange(ev)}). Dej vědět, jestli jedeš:\n\n${mailLink('event/' + ev.id)}`, recipients: users.filter(u => !going.has(u.uid)), hint:'Jen ti, kdo se na akci ještě nepřihlásili.' }
+      { label:'Připomínka – ještě nejsi přihlášený', subject:`Přihlas se na: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nještě jsi se nepřihlásil na akci "${ev.name}" (${fmtDateRange(ev)}). Dej vědět, jestli jedeš:\n\n${mailLink('event/' + ev.id)}`, recipients: users.filter(u => !going.has(u.uid)), hint:'Jen ti, kdo se na akci ještě nepřihlásili.' }
     ]);
   });
 
@@ -1773,8 +1773,8 @@ function renderTabJidlo(ev){
 
   const activeVotingSlots = MEAL_SLOTS.filter(slot => votingSlots[slot.key] && schedule[slot.key] && schedule[slot.key].length > 0);
   box.innerHTML = `
+    ${(hasPerm('jidlo') && activeVotingSlots.length > 0) ? `<div class="mail-btn-row"><button type="button" class="mail-btn" id="btn-mailto-vote">✉️ Poslat e-mail o hlasování</button></div>` : ''}
     <div class="section-title" style="font-size:16px;">🍔 Plán jídla</div>
-    ${(hasPerm('jidlo') && activeVotingSlots.length > 0) ? `<button type="button" class="btn-ghost btn-sm" id="btn-mailto-vote" style="margin-bottom:12px;">✉️ Poslat e-mail o hlasování</button>` : ''}
     <p class="lede" style="margin-top:0;">${escapeHtml(ev.foodPlan || 'Zatím nic naplánováno.')}</p>
     ${deadlinePassed ? '<p class="status-hint">Uzávěrka změn proběhla — výběr už nejde měnit.</p>' : ''}
     ${slotsHtml}
@@ -1829,8 +1829,8 @@ function renderTabJidlo(ev){
     const voted = (uid) => slotKeys.every(k => { const a = (ev.foodVotes || {})[k]?.[uid]; return Array.isArray(a) && a.length > 0; });
     const link = mailLink('event/' + ev.id);
     openMailComposer('E-mail o hlasování', [
-      { label:'Nové hlasování', subject:`Hlasování: ${ev.name}`, body:`Ahoj {nick},\n\nu akce "${ev.name}" je otevřené nové hlasování o jídle/pivu. Pojď hlasovat:\n\n${link}`, recipients: reg, hint:'Všichni přihlášení na akci.' },
-      { label:'Připomínka – ještě nehlasoval', subject:`Pořád ti chybí hlasování: ${ev.name}`, body:`Ahoj {nick},\n\nještě sis nehlasoval u akce "${ev.name}". Hlasuj prosím co nejdřív:\n\n${link}`, recipients: reg.filter(u => !voted(u.uid)), hint:'Jen přihlášení na akci, kteří ještě nehlasovali.' }
+      { label:'Nové hlasování', subject:`Hlasování: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nu akce "${ev.name}" je otevřené nové hlasování o jídle/pivu. Pojď hlasovat:\n\n${link}`, recipients: reg, hint:'Všichni přihlášení na akci.' },
+      { label:'Připomínka – ještě nehlasoval', subject:`Pořád ti chybí hlasování: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nještě sis nehlasoval u akce "${ev.name}". Hlasuj prosím co nejdřív:\n\n${link}`, recipients: reg.filter(u => !voted(u.uid)), hint:'Jen přihlášení na akci, kteří ještě nehlasovali.' }
     ]);
   });
 
@@ -2244,12 +2244,24 @@ function renderTurnajPage(){
   // seznam turnajů
   tbStopLive();
   let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaje</h1></div><div style="display:flex; gap:10px;">`;
-  html += hasPerm('turnaj') ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
+  html += hasPerm('turnaj') ? `<button type="button" class="mail-btn" id="btn-mailto-tourneys">✉️ Poslat e-mail o turnajích</button><button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
   html += `</div></div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
   box.innerHTML = html;
 
   const newBtn = document.getElementById('btn-new-tourney-page');
   if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm());
+  const mailTourneysBtn = document.getElementById('btn-mailto-tourneys');
+  if(mailTourneysBtn) mailTourneysBtn.addEventListener('click', async () => {
+    const users = await getAllUsersForMail();
+    const open = allTournaments.filter(t => t.status === 'signup');
+    const list = open.length ? open.map(t => `• ${t.name}${t.game ? ' (' + t.game + ')' : ''}`).join('\n') : '';
+    const link = mailLink('turnaj');
+    const signed = new Set(open.flatMap(t => (t.signups || []).map(n => String(n).toLowerCase())));
+    openMailComposer('E-mail o turnajích', [
+      { label:'Otevřené přihlášky', subject:'Jsou otevřené přihlášky do turnajů', body:`Zdar, tady FEEDEEK LAN!\n\nJsou otevřené přihlášky do turnajů${list ? ':\n\n' + list : '.'}\n\nPřihlas se tady: ${link}`, recipients: users, hint:'Všichni registrovaní.' },
+      { label:'Připomínka – nejsi nikde přihlášený', subject:'Přihlas se do turnaje', body:`Zdar, tady FEEDEEK LAN!\n\nJeště nejsi přihlášený v žádném otevřeném turnaji${list ? ':\n\n' + list : '.'}\n\nPřihlas se tady: ${link}`, recipients: users.filter(u => !signed.has(String(u.nick).toLowerCase())), hint:'Jen ti, kdo nejsou v žádných přihláškách.' }
+    ]);
+  });
 
   const grid = document.getElementById('turnaj-list-grid');
   if(allTournaments.length === 0){
@@ -2341,7 +2353,6 @@ function renderTournamentSignupPhase(t, box){
       <h1 class="headline" style="font-size:26px; margin-top:10px;">${escapeHtml(t.name)}</h1>
       ${t.game ? `<div class="status-hint">${escapeHtml(t.game)}</div>` : ''}
     </div>
-    ${hasPerm('turnaj') ? `<button type="button" class="btn-ghost btn-sm" id="btn-mailto-tourney" style="margin-bottom:14px;">✉️ Poslat e-mail o turnaji</button>` : ''}
     <p class="lede" style="margin-top:0;">Klikni na "Zúčastním se", pokud chceš hrát. Formát (týmy, nebo všichni proti všem) nastaví admin, až se přihlásí dost lidí.</p>
     <div id="signup-cta"></div>
     <div class="section-title" style="font-size:15px;">Přihlášení (${signups.length})</div>
@@ -2401,16 +2412,6 @@ function renderTournamentSignupPhase(t, box){
     });
     const gotoBtn = document.getElementById('btn-goto-format');
     if(gotoBtn) gotoBtn.addEventListener('click', () => { tourneySetupStep = 'format'; renderTurnajPage(); });
-    const mailtoTourneyBtn = document.getElementById('btn-mailto-tourney');
-    if(mailtoTourneyBtn) mailtoTourneyBtn.addEventListener('click', async () => {
-      const users = await getAllUsersForMail();
-      const link = mailLink('turnaj/' + t.id);
-      const signed = new Set((t.signups || []).map(n => String(n).toLowerCase()));
-      openMailComposer('E-mail k turnaji', [
-        { label:'Nový turnaj – přihlášky', subject:`Nový turnaj: ${t.name}`, body:`Ahoj {nick},\n\nje otevřený nový turnaj "${t.name}"${t.game ? ' (' + t.game + ')' : ''}. Přihlas se:\n\n${link}`, recipients: users, hint:'Všichni registrovaní.' },
-        { label:'Připomínka – ještě nejsi přihlášený', subject:`Přihlas se do turnaje: ${t.name}`, body:`Ahoj {nick},\n\nještě nejsi přihlášený do turnaje "${t.name}". Přihlas se:\n\n${link}`, recipients: users.filter(u => !signed.has(String(u.nick).toLowerCase())), hint:'Jen ti, kdo ještě nejsou v přihláškách.' }
-      ]);
-    });
   }
 }
 
@@ -5188,6 +5189,7 @@ async function getAllUsersForMail(){
     return snap.docs.map(d => ({ uid: d.id, nick: d.data().nick || '', email: d.data().email || '' })).filter(u => u.email);
   }catch(err){ console.error(err); return []; }
 }
+function mailSig(t){ return t.replace(/\s+$/,'') + '\n\nZdar,\nFEEDEEK'; }
 function mailLink(hash){ return `${location.origin}${location.pathname}#${hash}`; }
 function mailTextToHtml(text){
   const safe = escapeHtml(text).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>').replace(/\n/g, '<br>');
@@ -5238,7 +5240,7 @@ function openMailComposer(title, presets){
   const updCount = () => { $('mc-count').textContent = `(vybráno ${checked.size} z ${presets[cur].recipients.length})`; };
   const loadPreset = (i) => {
     cur = i; const p = presets[i];
-    $('mc-subject').value = p.subject; $('mc-body').value = p.body;
+    $('mc-subject').value = p.subject; $('mc-body').value = p.noSig ? p.body : mailSig(p.body);
     $('mc-hint').textContent = p.hint || '';
     checked = new Set(p.recipients.map(r => r.uid));
     $('mc-presets').querySelectorAll('button').forEach((b,j) => b.classList.toggle('active', j === i));
@@ -5396,7 +5398,7 @@ async function renderUsersList(){
     });
     document.getElementById('btn-mailto-all').addEventListener('click', () => {
       const list = users.filter(u => u.email).map(u => ({ uid: u.uid, nick: u.nick || '', email: u.email }));
-      openMailComposer('E-mail uživatelům', [{ label:'Zpráva', subject:'', body:'Ahoj {nick},\n\n', recipients: list, hint:'Libovolná zpráva.' }]);
+      openMailComposer('E-mail uživatelům', [{ label:'Zpráva', subject:'', body:'Zdar, tady FEEDEEK LAN!\n\n', recipients: list, hint:'Libovolná zpráva.' }]);
     });
 
     const unameBox = document.getElementById('usernames-list');
