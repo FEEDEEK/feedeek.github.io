@@ -1032,7 +1032,60 @@ function updateHeaderVisibility(){
   if(grid) grid.classList.toggle('no-sidebar', !onPrehled);
 }
 
+// ---------- E-maily z detailu akce (tlačítko vpravo nahoře, mění se podle záložky) ----------
+async function openEventMail(ev){
+    const users = await getAllUsersForMail();
+    const body = `Zdar, tady FEEDEEK LAN!\n\nchystá se akce "${ev.name}" (${fmtDateRange(ev)}${ev.place ? ', ' + ev.place : ''}).\n\n${ev.desc ? ev.desc + '\n\n' : ''}Přihlas se tady: ${mailLink('event/' + ev.id)}`;
+    const going = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
+    openMailComposer('E-mail k akci', [
+      { label:'Nová akce – pozvánka', subject:`Nová akce: ${ev.name}`, body, recipients: users, hint:'Pozvánka pro všechny registrované.' },
+      { label:'Připomínka – ještě nejsi přihlášený', subject:`Přihlas se na: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nještě jsi se nepřihlásil na akci "${ev.name}" (${fmtDateRange(ev)}). Dej vědět, jestli jedeš:\n\n${mailLink('event/' + ev.id)}`, recipients: users.filter(u => !going.has(u.uid)), hint:'Jen ti, kdo se na akci ještě nepřihlásili.' }
+    ]);
+  }
+async function openVoteMail(ev){
+    const users = await getAllUsersForMail();
+    const regUids = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
+    const reg = users.filter(u => regUids.has(u.uid));
+    const schedule = ev.foodSchedule || {}; const votingSlots = ev.foodVotingSlots || {};
+    const activeVotingSlots = MEAL_SLOTS.filter(s => votingSlots[s.key] && schedule[s.key] && schedule[s.key].length > 0);
+    const slotKeys = activeVotingSlots.map(s => s.key);
+    const voted = (uid) => slotKeys.every(k => { const a = (ev.foodVotes || {})[k]?.[uid]; return Array.isArray(a) && a.length > 0; });
+    const link = mailLink('event/' + ev.id);
+    openMailComposer('E-mail o hlasování', [
+      { label:'Nové hlasování', subject:`Hlasování: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nu akce "${ev.name}" je otevřené nové hlasování o jídle/pivu. Pojď hlasovat:\n\n${link}`, recipients: reg, hint:'Všichni přihlášení na akci.' },
+      { label:'Připomínka – ještě nehlasoval', subject:`Pořád ti chybí hlasování: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nještě sis nehlasoval u akce "${ev.name}". Hlasuj prosím co nejdřív:\n\n${link}`, recipients: reg.filter(u => !voted(u.uid)), hint:'Jen přihlášení na akci, kteří ještě nehlasovali.' }
+    ]);
+  }
+async function openEventTourneysMail(ev){
+  const users = await getAllUsersForMail();
+  const regUids = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
+  const reg = users.filter(u => regUids.has(u.uid));
+  const open = allTournaments.filter(t => t.eventId === ev.id && t.status === 'signup');
+  const list = open.length ? open.map(t => `• ${t.name}${t.game ? ' (' + t.game + ')' : ''}`).join('\n') : '';
+  const link = mailLink('event/' + ev.id);
+  const signed = new Set(open.flatMap(t => (t.signups || []).map(n => String(n).toLowerCase())));
+  openMailComposer('E-mail o turnajích', [
+    { label:'Otevřené přihlášky', subject:`Přihlášky do turnajů: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nU akce "${ev.name}" jsou otevřené přihlášky do turnajů${list ? ':\n\n' + list : '.'}\n\nPřihlas se tady: ${link}`, recipients: reg, hint:'Všichni přihlášení na akci.' },
+    { label:'Připomínka – nejsi nikde přihlášený', subject:`Přihlas se do turnaje: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nJeště nejsi přihlášený v žádném otevřeném turnaji u akce "${ev.name}"${list ? ':\n\n' + list : '.'}\n\nPřihlas se tady: ${link}`, recipients: reg.filter(u => !signed.has(String(u.nick).toLowerCase())), hint:'Jen přihlášení na akci, kteří nejsou v žádných přihláškách.' }
+  ]);
+}
+function updateMailSlot(ev){
+  const slot = document.getElementById('ed-mail-slot');
+  if(!slot) return;
+  let label = '', fn = null;
+  if(currentTab === 'prehled' && hasPerm('akce')){ label = '✉️ Poslat e-mail k akci'; fn = openEventMail; }
+  else if(currentTab === 'jidlo' && hasPerm('jidlo')){
+    const sc = ev.foodSchedule || {}, vs = ev.foodVotingSlots || {};
+    if(MEAL_SLOTS.some(m => vs[m.key] && sc[m.key] && sc[m.key].length > 0)){ label = '✉️ Poslat e-mail o hlasování'; fn = openVoteMail; }
+  }
+  else if(currentTab === 'turnaj' && hasPerm('turnaj')){ label = '✉️ Poslat e-mail o turnajích'; fn = openEventTourneysMail; }
+  if(!fn){ slot.innerHTML = ''; return; }
+  slot.innerHTML = `<button type="button" class="mail-btn">${label}</button>`;
+  slot.firstChild.addEventListener('click', () => fn(events.find(x => x.id === ev.id) || ev));
+}
+
 function renderActiveTab(ev){
+  updateMailSlot(ev);
   if(currentTab === 'prehled') renderTabPrehled(ev);
   else if(currentTab === 'rozvrh') renderTabRozvrh(ev);
   else if(currentTab === 'jidlo') renderTabJidlo(ev);
@@ -1398,7 +1451,6 @@ function renderTabPrehled(ev){
     </button>
   ` : '';
   box.innerHTML = `
-    ${hasPerm('akce') ? `<div class="mail-btn-row"><button type="button" class="mail-btn" id="btn-mailto-event">✉️ Poslat e-mail k akci</button></div>` : ''}
     <div class="prehled-announce-row">
       ${votingAnnounceHtml}
       <div id="prehled-tourney-cta"></div>
@@ -1501,17 +1553,6 @@ function renderTabPrehled(ev){
   });
 
   renderTournamentSignupCta(ev);
-  const mailtoEventBtn = document.getElementById('btn-mailto-event');
-  if(mailtoEventBtn) mailtoEventBtn.addEventListener('click', async () => {
-    const users = await getAllUsersForMail();
-    const body = `Zdar, tady FEEDEEK LAN!\n\nchystá se akce "${ev.name}" (${fmtDateRange(ev)}${ev.place ? ', ' + ev.place : ''}).\n\n${ev.desc ? ev.desc + '\n\n' : ''}Přihlas se tady: ${mailLink('event/' + ev.id)}`;
-    const going = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
-    openMailComposer('E-mail k akci', [
-      { label:'Nová akce – pozvánka', subject:`Nová akce: ${ev.name}`, body, recipients: users, hint:'Pozvánka pro všechny registrované.' },
-      { label:'Připomínka – ještě nejsi přihlášený', subject:`Přihlas se na: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nještě jsi se nepřihlásil na akci "${ev.name}" (${fmtDateRange(ev)}). Dej vědět, jestli jedeš:\n\n${mailLink('event/' + ev.id)}`, recipients: users.filter(u => !going.has(u.uid)), hint:'Jen ti, kdo se na akci ještě nepřihlásili.' }
-    ]);
-  });
-
   const voteAnnounceBtn = document.getElementById('food-vote-announce-btn');
   if(voteAnnounceBtn) voteAnnounceBtn.addEventListener('click', () => {
     const jidloTabBtn = document.querySelector('#ed-tabs [data-tab="jidlo"]');
@@ -1773,7 +1814,6 @@ function renderTabJidlo(ev){
 
   const activeVotingSlots = MEAL_SLOTS.filter(slot => votingSlots[slot.key] && schedule[slot.key] && schedule[slot.key].length > 0);
   box.innerHTML = `
-    ${(hasPerm('jidlo') && activeVotingSlots.length > 0) ? `<div class="mail-btn-row"><button type="button" class="mail-btn" id="btn-mailto-vote">✉️ Poslat e-mail o hlasování</button></div>` : ''}
     <div class="section-title" style="font-size:16px;">🍔 Plán jídla</div>
     <p class="lede" style="margin-top:0;">${escapeHtml(ev.foodPlan || 'Zatím nic naplánováno.')}</p>
     ${deadlinePassed ? '<p class="status-hint">Uzávěrka změn proběhla — výběr už nejde měnit.</p>' : ''}
@@ -1818,20 +1858,6 @@ function renderTabJidlo(ev){
         await updateDoc(doc(db,'events',ev.id), { [`foodVotes.${slotKey}.${currentUser.uid}`]: next });
       }catch(err){ console.error(err); }
     });
-  });
-
-  const mailtoVoteBtn = document.getElementById('btn-mailto-vote');
-  if(mailtoVoteBtn) mailtoVoteBtn.addEventListener('click', async () => {
-    const users = await getAllUsersForMail();
-    const regUids = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
-    const reg = users.filter(u => regUids.has(u.uid));
-    const slotKeys = activeVotingSlots.map(s => s.key);
-    const voted = (uid) => slotKeys.every(k => { const a = (ev.foodVotes || {})[k]?.[uid]; return Array.isArray(a) && a.length > 0; });
-    const link = mailLink('event/' + ev.id);
-    openMailComposer('E-mail o hlasování', [
-      { label:'Nové hlasování', subject:`Hlasování: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nu akce "${ev.name}" je otevřené nové hlasování o jídle/pivu. Pojď hlasovat:\n\n${link}`, recipients: reg, hint:'Všichni přihlášení na akci.' },
-      { label:'Připomínka – ještě nehlasoval', subject:`Pořád ti chybí hlasování: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nještě sis nehlasoval u akce "${ev.name}". Hlasuj prosím co nejdřív:\n\n${link}`, recipients: reg.filter(u => !voted(u.uid)), hint:'Jen přihlášení na akci, kteří ještě nehlasovali.' }
-    ]);
   });
 
   const confirmBtn = document.getElementById('btn-confirm-food');
@@ -2244,24 +2270,12 @@ function renderTurnajPage(){
   // seznam turnajů
   tbStopLive();
   let html = `<div class="toolbar"><div><h1 class="headline" style="font-size:28px;">Turnaje</h1></div><div style="display:flex; gap:10px;">`;
-  html += hasPerm('turnaj') ? `<button type="button" class="mail-btn" id="btn-mailto-tourneys">✉️ Poslat e-mail o turnajích</button><button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
+  html += hasPerm('turnaj') ? `<button type="button" id="btn-new-tourney-page">+ Nový turnaj</button>` : '';
   html += `</div></div><div id="turnaj-form-slot"></div><div class="grid" id="turnaj-list-grid" style="margin-top:24px;"></div>`;
   box.innerHTML = html;
 
   const newBtn = document.getElementById('btn-new-tourney-page');
   if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm());
-  const mailTourneysBtn = document.getElementById('btn-mailto-tourneys');
-  if(mailTourneysBtn) mailTourneysBtn.addEventListener('click', async () => {
-    const users = await getAllUsersForMail();
-    const open = allTournaments.filter(t => t.status === 'signup');
-    const list = open.length ? open.map(t => `• ${t.name}${t.game ? ' (' + t.game + ')' : ''}`).join('\n') : '';
-    const link = mailLink('turnaj');
-    const signed = new Set(open.flatMap(t => (t.signups || []).map(n => String(n).toLowerCase())));
-    openMailComposer('E-mail o turnajích', [
-      { label:'Otevřené přihlášky', subject:'Jsou otevřené přihlášky do turnajů', body:`Zdar, tady FEEDEEK LAN!\n\nJsou otevřené přihlášky do turnajů${list ? ':\n\n' + list : '.'}\n\nPřihlas se tady: ${link}`, recipients: users, hint:'Všichni registrovaní.' },
-      { label:'Připomínka – nejsi nikde přihlášený', subject:'Přihlas se do turnaje', body:`Zdar, tady FEEDEEK LAN!\n\nJeště nejsi přihlášený v žádném otevřeném turnaji${list ? ':\n\n' + list : '.'}\n\nPřihlas se tady: ${link}`, recipients: users.filter(u => !signed.has(String(u.nick).toLowerCase())), hint:'Jen ti, kdo nejsou v žádných přihláškách.' }
-    ]);
-  });
 
   const grid = document.getElementById('turnaj-list-grid');
   if(allTournaments.length === 0){
@@ -5307,7 +5321,7 @@ async function renderUsersList(){
     box.innerHTML = `
       <div class="row" style="margin-bottom:16px; gap:10px;">
         <button type="button" class="btn-ghost btn-sm" id="btn-copy-emails">📋 Kopírovat e-maily (${allEmails.length})</button>
-        <button type="button" class="btn-ghost btn-sm" id="btn-mailto-all">✉️ Napsat e-mail všem</button>
+        <button type="button" class="mail-btn" id="btn-mailto-all">✉️ Napsat e-mail všem</button>
         <span class="small-msg" id="copy-emails-msg"></span>
       </div>
       <div style="overflow-x:auto;">
