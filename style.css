@@ -873,3 +873,19 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 #login-modal-overlay .panel{ width:100%; max-width:100%; box-sizing:border-box; }
 #login-modal-overlay .field{ width:100%; box-sizing:border-box; }
 #login-modal-overlay input{ width:100%; text-align:left; box-sizing:border-box; }
+
+/* ---------- okno pro psaní e-mailů ---------- */
+.mail-composer{ background:var(--bg-panel); border:1px solid var(--gold-dim); padding:20px; width:min(560px,94vw); max-height:90vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+.mail-composer input[type=text], .mail-composer input[type=email], .mail-composer textarea{ width:100%; box-sizing:border-box; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:8px; font:inherit; text-align:left; }
+.mail-composer textarea{ resize:vertical; }
+.mc-label{ font-size:12px; color:var(--text-dim,#aaa); display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px; }
+.mc-dim{ opacity:.6; font-size:11px; }
+.mc-hint{ font-size:12px; color:var(--gold,#d4af37); }
+.mc-presets{ display:flex; gap:6px; flex-wrap:wrap; }
+.mc-preset{ background:transparent; border:1px solid var(--line); color:var(--text); padding:5px 10px; cursor:pointer; font-size:12px; }
+.mc-preset.active{ border-color:var(--gold-dim); background:rgba(212,175,55,.15); }
+.mc-recipients{ max-height:170px; overflow-y:auto; border:1px solid var(--line); padding:6px; display:flex; flex-direction:column; gap:3px; }
+.mc-rec{ display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+.mc-rec input{ width:auto !important; }
+.mc-status{ font-size:13px; min-height:18px; }
+.mc-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
