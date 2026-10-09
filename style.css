@@ -1028,3 +1028,14 @@ button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):n
 #turnaj-list-grid .event-card .meta, #turnaj-list-grid .event-card .desc{ font-size:12.5px; }
 .tourney-compact-grid{ grid-auto-rows:190px; align-items:stretch; }
 .tourney-compact-grid .event-card{ height:100%; }
+
+/* ===== turnaje: menší karty, větší loga her ===== */
+#turnaj-list-grid{ grid-template-columns:repeat(auto-fill, minmax(240px, 270px)); grid-auto-rows:285px; gap:14px; }
+#turnaj-list-grid .event-card{ padding:10px 28px 12px; gap:5px; }
+#turnaj-list-grid .tourney-card-banner{ height:100px; margin:-10px -28px 0; }
+#turnaj-list-grid .tourney-card-banner img{ max-width:92%; max-height:90px; }
+#turnaj-list-grid .event-card .meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tourney-compact-grid{ grid-template-columns:repeat(auto-fill, minmax(230px, 260px)); grid-auto-rows:218px; }
+.tourney-compact-grid .tourney-card-banner{ height:78px; margin:-12px -26px 0; }
+.tourney-compact-grid .tourney-card-banner img{ max-width:92%; max-height:68px; }
+.tourney-compact-grid .event-card .meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
