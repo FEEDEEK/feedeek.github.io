@@ -1503,10 +1503,13 @@ function renderTabPrehled(ev){
   renderTournamentSignupCta(ev);
   const mailtoEventBtn = document.getElementById('btn-mailto-event');
   if(mailtoEventBtn) mailtoEventBtn.addEventListener('click', async () => {
-    const emails = await getAllUserEmails();
-    const subject = `Nová akce: ${ev.name}`;
-    const body = `Ahoj,\n\nchystá se akce "${ev.name}" (${fmtDateRange(ev)}, ${ev.place || ''}).\n\n${ev.desc || ''}\n\nPřihlas se na: ${location.origin}${location.pathname}#event/${ev.id}`;
-    openMailtoAll(emails, subject, body);
+    const users = await getAllUsersForMail();
+    const body = `Ahoj {nick},\n\nchystá se akce "${ev.name}" (${fmtDateRange(ev)}${ev.place ? ', ' + ev.place : ''}).\n\n${ev.desc ? ev.desc + '\n\n' : ''}Přihlas se tady: ${mailLink('event/' + ev.id)}`;
+    const going = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
+    openMailComposer('E-mail k akci', [
+      { label:'Nová akce – pozvánka', subject:`Nová akce: ${ev.name}`, body, recipients: users, hint:'Pozvánka pro všechny registrované.' },
+      { label:'Připomínka – ještě nejsi přihlášený', subject:`Přihlas se na: ${ev.name}`, body:`Ahoj {nick},\n\nještě jsi se nepřihlásil na akci "${ev.name}" (${fmtDateRange(ev)}). Dej vědět, jestli jedeš:\n\n${mailLink('event/' + ev.id)}`, recipients: users.filter(u => !going.has(u.uid)), hint:'Jen ti, kdo se na akci ještě nepřihlásili.' }
+    ]);
   });
 
   const voteAnnounceBtn = document.getElementById('food-vote-announce-btn');
@@ -1819,10 +1822,16 @@ function renderTabJidlo(ev){
 
   const mailtoVoteBtn = document.getElementById('btn-mailto-vote');
   if(mailtoVoteBtn) mailtoVoteBtn.addEventListener('click', async () => {
-    const emails = await getAllUserEmails();
-    const subject = `Probíhá hlasování: ${ev.name}`;
-    const body = `Ahoj,\n\nu akce "${ev.name}" právě probíhá hlasování o jídle/pivu. Zajdi se podívat a hlasuj:\n\n${location.origin}${location.pathname}#event/${ev.id}`;
-    openMailtoAll(emails, subject, body);
+    const users = await getAllUsersForMail();
+    const regUids = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
+    const reg = users.filter(u => regUids.has(u.uid));
+    const slotKeys = activeVotingSlots.map(s => s.key);
+    const voted = (uid) => slotKeys.every(k => { const a = (ev.foodVotes || {})[k]?.[uid]; return Array.isArray(a) && a.length > 0; });
+    const link = mailLink('event/' + ev.id);
+    openMailComposer('E-mail o hlasování', [
+      { label:'Nové hlasování', subject:`Hlasování: ${ev.name}`, body:`Ahoj {nick},\n\nu akce "${ev.name}" je otevřené nové hlasování o jídle/pivu. Pojď hlasovat:\n\n${link}`, recipients: reg, hint:'Všichni přihlášení na akci.' },
+      { label:'Připomínka – ještě nehlasoval', subject:`Pořád ti chybí hlasování: ${ev.name}`, body:`Ahoj {nick},\n\nještě sis nehlasoval u akce "${ev.name}". Hlasuj prosím co nejdřív:\n\n${link}`, recipients: reg.filter(u => !voted(u.uid)), hint:'Jen přihlášení na akci, kteří ještě nehlasovali.' }
+    ]);
   });
 
   const confirmBtn = document.getElementById('btn-confirm-food');
@@ -2394,10 +2403,13 @@ function renderTournamentSignupPhase(t, box){
     if(gotoBtn) gotoBtn.addEventListener('click', () => { tourneySetupStep = 'format'; renderTurnajPage(); });
     const mailtoTourneyBtn = document.getElementById('btn-mailto-tourney');
     if(mailtoTourneyBtn) mailtoTourneyBtn.addEventListener('click', async () => {
-      const emails = await getAllUserEmails();
-      const subject = `Nový turnaj: ${t.name}`;
-      const body = `Ahoj,\n\nje otevřený nový turnaj "${t.name}"${t.game ? ' (' + t.game + ')' : ''}. Přihlas se:\n\n${location.origin}${location.pathname}#turnaj/${t.id}`;
-      openMailtoAll(emails, subject, body);
+      const users = await getAllUsersForMail();
+      const link = mailLink('turnaj/' + t.id);
+      const signed = new Set((t.signups || []).map(n => String(n).toLowerCase()));
+      openMailComposer('E-mail k turnaji', [
+        { label:'Nový turnaj – přihlášky', subject:`Nový turnaj: ${t.name}`, body:`Ahoj {nick},\n\nje otevřený nový turnaj "${t.name}"${t.game ? ' (' + t.game + ')' : ''}. Přihlas se:\n\n${link}`, recipients: users, hint:'Všichni registrovaní.' },
+        { label:'Připomínka – ještě nejsi přihlášený', subject:`Přihlas se do turnaje: ${t.name}`, body:`Ahoj {nick},\n\nještě nejsi přihlášený do turnaje "${t.name}". Přihlas se:\n\n${link}`, recipients: users.filter(u => !signed.has(String(u.nick).toLowerCase())), hint:'Jen ti, kdo ještě nejsou v přihláškách.' }
+      ]);
     });
   }
 }
@@ -5166,20 +5178,110 @@ document.getElementById('btn-change-password').addEventListener('click', async (
   }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se odeslat odkaz. Zkus to znovu.'; }
 });
 
-// Hromadné e-maily - posílá se přes mailto: odkaz, který otevře uživatelův vlastní e-mailový klient
-// (Gmail, Outlook, Apple Mail...) s předvyplněnými adresami v BCC. E-mail tak skutečně odejde
-// z jeho vlastní adresy, appka sama žádné e-maily neposílá (na to by byl potřeba vlastní e-mailový
-// server/službu a appka na GitHub Pages ho nemá).
-async function getAllUserEmails(){
+// ---------- Okno pro psaní e-mailů ----------
+// E-maily se neposílají z prohlížeče: appka pro každého příjemce založí dokument v kolekci `mail`
+// a rozšíření Firebase "Trigger Email from Firestore" ho odešle přes SMTP účet nastavený v konzoli Firebase
+// (odesílatel = ta jedna reálná adresa, kterou tam nastavíš; heslo se zadává jen tam, nikdy do kódu).
+async function getAllUsersForMail(){
   try{
     const snap = await getDocs(collection(db,'users'));
-    return [...new Set(snap.docs.map(d => d.data().email).filter(Boolean))];
+    return snap.docs.map(d => ({ uid: d.id, nick: d.data().nick || '', email: d.data().email || '' })).filter(u => u.email);
   }catch(err){ console.error(err); return []; }
 }
-function openMailtoAll(emails, subject, body){
-  if(emails.length === 0){ alert('Nemám žádné e-mailové adresy k dispozici.'); return; }
-  const url = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = url;
+function mailLink(hash){ return `${location.origin}${location.pathname}#${hash}`; }
+function mailTextToHtml(text){
+  const safe = escapeHtml(text).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>').replace(/\n/g, '<br>');
+  return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;">${safe}</div>`;
+}
+// presets: [{label, subject, body, recipients:[{uid,nick,email}], hint}]
+function openMailComposer(title, presets){
+  const old = document.getElementById('mail-composer-overlay'); if(old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'mail-composer-overlay';
+  overlay.className = 'score-modal-backdrop';
+  overlay.innerHTML = `
+    <div class="mail-composer">
+      <div class="section-title" style="font-size:16px;margin:0;">✉️ ${escapeHtml(title)}</div>
+      <div class="mc-presets" id="mc-presets"></div>
+      <div class="mc-hint" id="mc-hint"></div>
+      <label class="mc-label">Předmět</label>
+      <input type="text" id="mc-subject">
+      <label class="mc-label">Zpráva <span class="mc-dim">({nick} se nahradí přezdívkou příjemce)</span></label>
+      <textarea id="mc-body" rows="8"></textarea>
+      <div class="mc-label">Komu <span class="mc-dim" id="mc-count"></span>
+        <button type="button" class="btn-ghost btn-sm" id="mc-all">Všichni</button>
+        <button type="button" class="btn-ghost btn-sm" id="mc-none">Nikdo</button>
+      </div>
+      <div class="mc-recipients" id="mc-recipients"></div>
+      <label class="mc-label">Odpovědi chodí na <span class="mc-dim">(Reply-To; odesílatel je adresa nastavená v rozšíření)</span></label>
+      <input type="email" id="mc-replyto" value="${escapeHtml(currentUser?.email || '')}">
+      <div class="mc-status" id="mc-status"></div>
+      <div class="mc-actions">
+        <button type="button" class="btn-ghost" id="mc-cancel">Zavřít</button>
+        <button type="button" class="btn-primary" id="mc-send">Odeslat</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const $ = id => overlay.querySelector('#'+id);
+  let cur = 0;
+  let checked = new Set();
+  const renderRecipients = () => {
+    const rec = presets[cur].recipients;
+    $('mc-recipients').innerHTML = rec.length ? rec.map((r,i) => `
+      <label class="mc-rec"><input type="checkbox" data-i="${i}" ${checked.has(r.uid) ? 'checked' : ''}> ${escapeHtml(r.nick || '?')} <span class="mc-dim">${escapeHtml(r.email)}</span></label>`).join('')
+      : '<div class="empty">Nikdo takový není.</div>';
+    $('mc-recipients').querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
+      const r = rec[+cb.dataset.i]; cb.checked ? checked.add(r.uid) : checked.delete(r.uid); updCount();
+    }));
+    updCount();
+  };
+  const updCount = () => { $('mc-count').textContent = `(vybráno ${checked.size} z ${presets[cur].recipients.length})`; };
+  const loadPreset = (i) => {
+    cur = i; const p = presets[i];
+    $('mc-subject').value = p.subject; $('mc-body').value = p.body;
+    $('mc-hint').textContent = p.hint || '';
+    checked = new Set(p.recipients.map(r => r.uid));
+    $('mc-presets').querySelectorAll('button').forEach((b,j) => b.classList.toggle('active', j === i));
+    renderRecipients();
+  };
+  $('mc-presets').innerHTML = presets.length > 1 ? presets.map((p,i) => `<button type="button" class="mc-preset" data-i="${i}">${escapeHtml(p.label)}</button>`).join('') : '';
+  $('mc-presets').querySelectorAll('button').forEach(b => b.addEventListener('click', () => loadPreset(+b.dataset.i)));
+  $('mc-all').addEventListener('click', () => { presets[cur].recipients.forEach(r => checked.add(r.uid)); renderRecipients(); });
+  $('mc-none').addEventListener('click', () => { checked.clear(); renderRecipients(); });
+  $('mc-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('mousedown', e => { if(e.target === overlay) overlay.remove(); });
+  $('mc-send').addEventListener('click', async () => {
+    const subject = $('mc-subject').value.trim();
+    const body = $('mc-body').value;
+    const replyTo = $('mc-replyto').value.trim();
+    const list = presets[cur].recipients.filter(r => checked.has(r.uid));
+    if(!subject || !body.trim()){ $('mc-status').textContent = 'Vyplň předmět i zprávu.'; return; }
+    if(list.length === 0){ $('mc-status').textContent = 'Vyber aspoň jednoho příjemce.'; return; }
+    if(!confirm(`Odeslat e-mail ${list.length} lidem?`)) return;
+    $('mc-send').disabled = true; $('mc-status').textContent = 'Zakládám zprávy…';
+    const states = {};
+    const report = () => {
+      const v = Object.values(states);
+      const ok = v.filter(x => x === 'SUCCESS').length, err = v.filter(x => x === 'ERROR').length;
+      $('mc-status').textContent = `Odesláno: ${ok} z ${list.length}` + (err ? ` · chyba: ${err} (zkontroluj nastavení rozšíření)` : (ok < list.length ? ' …čekám na odeslání' : ' ✓'));
+    };
+    try{
+      for(const r of list){
+        const text = body.replace(/\{nick\}/g, r.nick || '');
+        const docData = { to: [r.email], message: { subject, text, html: mailTextToHtml(text) }, createdBy: currentUser.uid, createdAt: new Date().toISOString() };
+        if(replyTo) docData.replyTo = replyTo;
+        const ref = await addDoc(collection(db,'mail'), docData);
+        states[ref.id] = 'PENDING';
+        onSnapshot(ref, snap => { const st = snap.data()?.delivery?.state; if(st){ states[ref.id] = st; report(); } });
+      }
+      report();
+    }catch(err){
+      console.error(err);
+      $('mc-status').textContent = 'Zpráv se nepovedlo založit (chybí oprávnění / pravidla Firestore?).';
+      $('mc-send').disabled = false;
+    }
+  });
+  loadPreset(0);
 }
 
 function closeAllAccountPanels(){
@@ -5293,7 +5395,8 @@ async function renderUsersList(){
       catch(err){ msg.textContent = 'Kopírování se nepovedlo — zkopíruj ručně: ' + allEmails.join(', '); }
     });
     document.getElementById('btn-mailto-all').addEventListener('click', () => {
-      openMailtoAll(allEmails, '', '');
+      const list = users.filter(u => u.email).map(u => ({ uid: u.uid, nick: u.nick || '', email: u.email }));
+      openMailComposer('E-mail uživatelům', [{ label:'Zpráva', subject:'', body:'Ahoj {nick},\n\n', recipients: list, hint:'Libovolná zpráva.' }]);
     });
 
     const unameBox = document.getElementById('usernames-list');
