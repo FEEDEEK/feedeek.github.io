@@ -988,10 +988,33 @@ button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):n
 .history-card .info{ padding:10px 22px 14px; }
 
 /* turnaje: širší a nižší karty */
-#turnaj-list-grid, .tourney-compact-grid{ grid-template-columns:repeat(auto-fill, minmax(380px,1fr)); }
+#turnaj-list-grid{ grid-template-columns:repeat(auto-fill, minmax(380px,1fr)); }
 #turnaj-list-grid .event-card{ padding-top:16px; padding-bottom:18px; gap:8px; }
 .tourney-card-banner{ height:64px; }
 .tourney-card-banner img{ max-height:52px; }
 .event-card .tourney-signup-badge{ color:#06251f; }
 .event-card .tourney-card-banner{ margin:-20px -34px 0; }
 #turnaj-list-grid .event-card .tourney-card-banner{ margin:-16px -34px 0; }
+
+/* ===== kontakty, hlavní akce na úvodní stránce, menší karty turnajů v akci ===== */
+.contact-card, .hero-big{ --sl:16px; --ring:#2c3140; position:relative; isolation:isolate; border:0 !important; border-radius:0; clip-path:polygon(var(--sl) 0,100% 0,calc(100% - var(--sl)) 100%,0 100%); }
+.contact-card::after, .hero-big::after{
+  content:''; position:absolute; inset:0; z-index:5; pointer-events:none; background:var(--ring);
+  clip-path:polygon(
+    var(--sl) 0, 100% 0, calc(100% - var(--sl)) 100%, 0 100%, var(--sl) 0,
+    calc(var(--sl) + 2px) 2px, 2px calc(100% - 2px), calc(100% - var(--sl) - 2px) calc(100% - 2px), calc(100% - 2px) 2px, calc(var(--sl) + 2px) 2px);
+}
+.contact-card{ background:linear-gradient(180deg,#1b1f2b 0%,#12151d 100%); box-shadow:inset 0 -2px 0 -1px var(--gold-dim); padding:20px 34px; transition:background .18s ease; }
+.contact-card:hover{ background:linear-gradient(180deg,#232838 0%,#171a24 100%); --ring:var(--gold-dim); }
+.hero-big{ --sl:26px; --ring:var(--gold-dim); box-shadow:inset 0 -2px 0 -1px var(--gold); }
+.hero-big:hover{ --ring:var(--gold); }
+.hero-big-inner{ padding-left:60px; padding-right:60px; }
+
+.tourney-compact-grid{ grid-template-columns:repeat(auto-fill, minmax(250px, 300px)); gap:14px; }
+.tourney-compact-grid .event-card{ --sl:12px; padding:12px 26px 14px; gap:6px; }
+.tourney-compact-grid .event-card h3{ font-size:15px; }
+.tourney-compact-grid .event-card .meta, .tourney-compact-grid .event-card .desc{ font-size:12px; }
+.tourney-compact-grid .tourney-card-banner{ height:48px; margin:-12px -26px 0; }
+.tourney-compact-grid .tourney-card-banner img{ max-height:38px; }
+@media (max-width:640px){ .tourney-compact-grid{ grid-template-columns:1fr; } }
+.tourney-compact-grid{ align-items:start; }
