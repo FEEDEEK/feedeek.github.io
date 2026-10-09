@@ -960,3 +960,38 @@ button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):n
   0%,100%{ box-shadow:inset 0 0 8px rgba(255,240,170,.35), inset 0 -2px 0 -1px #fff3b0; filter:brightness(1); }
   50%{ box-shadow:inset 0 0 24px rgba(255,240,170,.85), inset 0 -2px 0 -1px #fff3b0; filter:brightness(1.12); }
 }
+
+/* ===== šikmé bloky – opravená verze: obrys i na šikmých stranách, i Proběhlé akce, hlavní akce ===== */
+.event-card, .featured-card, .history-card{
+  --sl:16px; --ring:#2c3140;
+  position:relative; isolation:isolate; border:0 !important; border-radius:0;
+  clip-path:polygon(var(--sl) 0,100% 0,calc(100% - var(--sl)) 100%,0 100%);
+}
+.event-card::after, .featured-card::after, .history-card::after{
+  content:''; position:absolute; inset:0; z-index:5; pointer-events:none; background:var(--ring);
+  clip-path:polygon(
+    var(--sl) 0, 100% 0, calc(100% - var(--sl)) 100%, 0 100%, var(--sl) 0,
+    calc(var(--sl) + 2px) 2px, 2px calc(100% - 2px), calc(100% - var(--sl) - 2px) calc(100% - 2px), calc(100% - 2px) 2px, calc(var(--sl) + 2px) 2px);
+}
+.event-card:hover, .history-card:hover{ --ring:var(--gold-dim); }
+.featured-card{ --ring:var(--gold-dim); }
+.featured-card:hover{ --ring:var(--gold); }
+.event-card-signup-open{ --ring:#f2c94c; }
+
+/* hlavní (nejbližší) akce – překryv s fotkou musí sahat až po šikmé okraje */
+.featured-card{ padding:26px 28px; }
+.featured-card > div{ padding-left:48px !important; padding-right:48px !important; }
+
+/* Proběhlé akce */
+.history-card{ --sl:12px; background:linear-gradient(180deg,#1b1f2b 0%,#12151d 100%); box-shadow:inset 0 -2px 0 -1px var(--gold-dim); }
+.history-card:hover{ background:linear-gradient(180deg,#232838 0%,#171a24 100%); }
+.history-card .info{ padding:10px 22px 14px; }
+
+/* turnaje: širší a nižší karty */
+#turnaj-list-grid, .tourney-compact-grid{ grid-template-columns:repeat(auto-fill, minmax(380px,1fr)); }
+#turnaj-list-grid .event-card{ padding-top:16px; padding-bottom:18px; gap:8px; }
+.tourney-card-banner{ height:64px; }
+.tourney-card-banner img{ max-height:52px; }
+.event-card .tourney-signup-badge{ color:#06251f; }
+.event-card .tourney-card-banner{ margin:-20px -34px 0; }
+#turnaj-list-grid .event-card .tourney-card-banner{ margin:-16px -34px 0; }
