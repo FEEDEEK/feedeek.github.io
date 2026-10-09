@@ -4684,7 +4684,7 @@ function renderTabTurnaj(ev){
     box.innerHTML = html;
     return;
   }
-  html += `<div class="grid" style="margin-top:14px;">` + linked.map(t => {
+  html += `<div class="grid tourney-compact-grid" style="margin-top:14px;">` + linked.map(t => {
     let badgeTag = '', statusTxt = '';
     if(t.status === 'signup'){
       badgeTag = `<span class="tag tourney-signup-badge">Přihlášky otevřeny</span>`;
