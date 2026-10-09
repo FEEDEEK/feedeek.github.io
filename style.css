@@ -891,6 +891,20 @@ body.projector-mode .ttp-card{ font-size:1.12em; }
 .mc-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
 
 /* výrazné tlačítko pro e-maily (vpravo nahoře) */
-.mail-btn{ background:linear-gradient(180deg,#f0c94a,#c99a1c); color:#1a1304; border:1px solid #f6dc7a; font-weight:700; padding:9px 16px; cursor:pointer; box-shadow:0 0 14px rgba(240,201,74,.35); letter-spacing:.3px; }
-.mail-btn:hover{ filter:brightness(1.1); box-shadow:0 0 20px rgba(240,201,74,.55); }
+.mail-btn{ position:relative; display:inline-flex; align-items:center; gap:8px; height:46px; padding:0 30px; cursor:pointer;
+  font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--gold);
+  background:linear-gradient(180deg,#3a3320 0%,#1c1912 100%); border:1px solid var(--gold-dim);
+  clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);
+  box-shadow:0 0 14px rgba(201,162,75,.25), inset 0 0 10px rgba(201,162,75,.08); transition:background .18s ease, color .18s ease; }
+.mail-btn::after{ content:''; position:absolute; left:12px; right:12px; bottom:-1px; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); box-shadow:0 0 8px rgba(201,162,75,.7); }
+.mail-btn:hover{ background:linear-gradient(180deg,#4d4326 0%,#2a2416 100%); color:#f0d27a; }
+.mail-btn:disabled{ opacity:.5; cursor:default; }
 .mail-btn-row{ display:flex; justify-content:flex-end; margin-bottom:12px; }
+#view-event{ position:relative; }
+.ed-mail-slot{ position:absolute; top:0; right:0; z-index:5; }
+@media (max-width:700px){ .ed-mail-slot{ position:static; display:flex; justify-content:flex-end; margin-bottom:8px; } }
+
+/* skosená tlačítka v okně e-mailu stejně jako v hlavičce */
+.mail-composer .btn-primary, .mail-composer .btn-ghost{ clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%); padding:10px 26px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:12px; }
+.ed-page-title{ padding-right:300px; }
+@media (max-width:700px){ .ed-page-title{ padding-right:0; } }
