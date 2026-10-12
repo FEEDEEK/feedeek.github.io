@@ -1079,9 +1079,14 @@ function updateMailSlot(ev){
     if(MEAL_SLOTS.some(m => vs[m.key] && sc[m.key] && sc[m.key].length > 0)){ label = '✉️ Poslat e-mail o hlasování'; fn = openVoteMail; }
   }
   else if(currentTab === 'turnaj' && hasPerm('turnaj')){ label = '✉️ Poslat e-mail o turnajích'; fn = openEventTourneysMail; }
-  if(!fn){ slot.innerHTML = ''; return; }
-  slot.innerHTML = `<button type="button" class="mail-btn">${label}</button>`;
-  slot.firstChild.addEventListener('click', () => fn(events.find(x => x.id === ev.id) || ev));
+  const canEditEv = hasPerm('akce');
+  if(!fn && !canEditEv){ slot.innerHTML = ''; return; }
+  slot.innerHTML = (canEditEv ? `<button type="button" class="btn-ghost mail-slot-edit">✏️ Upravit akci</button>` : '') + (fn ? `<button type="button" class="mail-btn">${label}</button>` : '');
+  const liveEv = () => events.find(x => x.id === ev.id) || ev;
+  const editB = slot.querySelector('.mail-slot-edit');
+  if(editB) editB.addEventListener('click', () => startEditEvent(liveEv()));
+  const mailB = slot.querySelector('.mail-btn');
+  if(mailB) mailB.addEventListener('click', () => fn(liveEv()));
 }
 
 function renderActiveTab(ev){
