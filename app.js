@@ -3100,21 +3100,80 @@ function tbShuffleArray(arr) {
 function tbSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 
-// ---- Zvuk výherního automatu (nahrávka z videa, assets/slot.mp3) ----
-let tbSlotAudio = null;
-function tbSlotAudioGet(){
-    if(!tbSlotAudio){ try{ tbSlotAudio = new Audio('slot.mp3'); tbSlotAudio.preload = 'auto'; }catch(e){ tbSlotAudio = null; } }
-    return tbSlotAudio;
+// ---- Zvuk výherního automatu (nahrávka z videa): točení ve smyčce -> rána při každém hráči -> závěr ----
+const TB_SLOT_FILES = { spin: 'slot-spin.wav', hit1: 'slot-hit1.mp3', hit2: 'slot-hit2.mp3', hit3: 'slot-hit3.mp3', end: 'slot-end.mp3' };
+const tbSlotBuffers = {};
+let tbSlotLoading = false, tbSpinNode = null, tbEndNode = null;
+function tbLoadSlotSounds(){
+    if(tbSlotLoading) return;
+    tbEnsureAudio();
+    if(!tbAudioCtx) return;
+    tbSlotLoading = true;
+    Object.entries(TB_SLOT_FILES).forEach(([name, file]) => {
+        fetch(file).then(r => r.arrayBuffer())
+            .then(b => new Promise((res, rej) => tbAudioCtx.decodeAudioData(b, res, rej)))
+            .then(buf => { tbSlotBuffers[name] = buf; })
+            .catch(() => { tbSlotLoading = false; });
+    });
 }
-function tbPlaySlotSample(){
+function tbFadeStopNode(node, fadeSec){
+    if(!node) return;
+    try{
+        const t = tbAudioCtx.currentTime;
+        node.gain.gain.cancelScheduledValues(t);
+        node.gain.gain.setValueAtTime(node.gain.gain.value, t);
+        node.gain.gain.linearRampToValueAtTime(0.0001, t + Math.max(0.02, fadeSec));
+        node.src.stop(t + Math.max(0.02, fadeSec) + 0.02);
+    }catch(e){}
+}
+function tbSlotPlayBuffer(name, loop, vol){
+    const buf = tbSlotBuffers[name];
+    if(!buf || !tbAudioCtx) return null;
+    const src = tbAudioCtx.createBufferSource();
+    const gain = tbAudioCtx.createGain();
+    src.buffer = buf; src.loop = !!loop;
+    gain.gain.value = vol;
+    src.connect(gain); gain.connect(tbAudioCtx.destination);
+    src.start();
+    return { src, gain };
+}
+function tbSlotSpinStart(){
     if(!tbSoundEnabled) return;
-    const au = tbSlotAudioGet(); if(!au) return;
-    try{ au.pause(); au.currentTime = 0; au.volume = 1; const p = au.play(); if(p && p.catch) p.catch(() => {}); }catch(e){}
+    tbEnsureAudio(); tbLoadSlotSounds();
+    tbFadeStopNode(tbSpinNode, 0.05); tbFadeStopNode(tbEndNode, 0.1);
+    tbSpinNode = tbSlotPlayBuffer('spin', true, 0.9);
 }
-function tbStopSlotSample(fadeMs){
-    const au = tbSlotAudio; if(!au || au.paused) return;
-    const steps = 10, dt = Math.max(20, (fadeMs || 300) / steps); let i = 0;
-    const iv = setInterval(() => { i++; au.volume = Math.max(0, 1 - i / steps); if(i >= steps){ clearInterval(iv); au.pause(); au.volume = 1; } }, dt);
+function tbSlotSpinStop(fadeSec){ tbFadeStopNode(tbSpinNode, fadeSec); tbSpinNode = null; }
+function tbSlotFinale(){
+    if(!tbSoundEnabled) return;
+    tbEndNode = tbSlotPlayBuffer('end', false, 1);
+}
+// "rána" při vybrání hráče - hluboký úder + krátký prasknutí
+function tbSlotBang(stage){
+    if(!tbSoundEnabled) return;
+    if(tbSlotBuffers['hit'+stage]){ tbSlotPlayBuffer('hit'+stage, false, 1); return; }
+    try{
+        tbEnsureAudio();
+        if(!tbAudioCtx) return;
+        const t0 = tbAudioCtx.currentTime;
+        const up = 1 + ((stage || 1) - 1) * 0.18;
+        const osc = tbAudioCtx.createOscillator(), og = tbAudioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(190 * up, t0);
+        osc.frequency.exponentialRampToValueAtTime(42, t0 + 0.22);
+        og.gain.setValueAtTime(0.0001, t0);
+        og.gain.exponentialRampToValueAtTime(0.9, t0 + 0.008);
+        og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.34);
+        osc.connect(og); og.connect(tbAudioCtx.destination);
+        osc.start(t0); osc.stop(t0 + 0.36);
+        const len = Math.floor(tbAudioCtx.sampleRate * 0.09);
+        const nb = tbAudioCtx.createBuffer(1, len, tbAudioCtx.sampleRate);
+        const d = nb.getChannelData(0);
+        for(let i = 0; i < len; i++){ d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+        const ns = tbAudioCtx.createBufferSource(), ng = tbAudioCtx.createGain(), nf = tbAudioCtx.createBiquadFilter();
+        ns.buffer = nb; nf.type = 'lowpass'; nf.frequency.value = 2800; ng.gain.value = 0.5;
+        ns.connect(nf); nf.connect(ng); ng.connect(tbAudioCtx.destination); ns.start(t0);
+    }catch(e){ /* ticho */ }
 }
 
 function tbEnsureAudio() {
@@ -3265,7 +3324,7 @@ function tbPlayReelTick() {
     } catch (e) { /* ticho */ }
 }
 function tbPlayMulticastCharge(){
-    tbPlaySlotSample(); return;
+    tbSlotSpinStart(); return;
     if (!tbSoundEnabled) return;
     try{
         tbEnsureAudio();
@@ -3286,7 +3345,7 @@ function tbPlayMulticastCharge(){
 
 // Elektrický "multicast" zásah - eskaluje s parametrem stage (1., 2., 3. zásah v jednom kole losování)
 function tbPlayMulticastZap(stage, announce){
-    return; // zvuk řeší nahrávka
+    tbSlotBang(stage); return;
     if (!tbSoundEnabled) return;
     try{
         tbEnsureAudio();
@@ -3814,10 +3873,11 @@ async function tbSpinCurrentTeam() {
         spins[k].stop();
         const target = team.members[k] ? team.members[k].name : '—';
         await tbDecelerateAndLand(strips[k], pools[k], target, 1500);
-        if(tbDraftCancelled){ for(let j = k + 1; j < N; j++) spins[j].stop(); tbStopSlotSample(100); return; }
+        if(tbDraftCancelled){ for(let j = k + 1; j < N; j++) spins[j].stop(); tbSlotSpinStop(0.1); return; }
         tbPlayMulticastZap(k + 1, k === N - 1 && N > 1);
     }
-    tbStopSlotSample(350);
+    tbSlotSpinStop(0.12);
+    setTimeout(tbSlotFinale, 500);
 
     const names = team.members.filter(Boolean).map(m => m.name);
     const line = document.createElement('div');
@@ -3853,7 +3913,7 @@ function tbCloseOverlay(){
 }
 function tbCancelDraft() {
     tbDraftCancelled = true;
-    tbStopSlotSample(100);
+    tbSlotSpinStop(0.1); tbFadeStopNode(tbEndNode, 0.1);
     tbCloseOverlay();
     tbCurrentDraft = null;
     tbDraftInProgress = false;
@@ -3873,6 +3933,7 @@ function tbRerollTeams() {
 }
 
 function tbStartDraft(cfg) {
+    try{ tbLoadSlotSounds(); }catch(e){}
     tbDraftCancelled = false;
     tbDraftInProgress = true;
     const N = cfg.teamSize, T = cfg.numTeams;
