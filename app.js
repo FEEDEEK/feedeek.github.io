@@ -3099,6 +3099,24 @@ function tbShuffleArray(arr) {
 }
 function tbSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+
+// ---- Zvuk výherního automatu (nahrávka z videa, assets/slot.mp3) ----
+let tbSlotAudio = null;
+function tbSlotAudioGet(){
+    if(!tbSlotAudio){ try{ tbSlotAudio = new Audio('assets/slot.mp3'); tbSlotAudio.preload = 'auto'; }catch(e){ tbSlotAudio = null; } }
+    return tbSlotAudio;
+}
+function tbPlaySlotSample(){
+    if(!tbSoundEnabled) return;
+    const au = tbSlotAudioGet(); if(!au) return;
+    try{ au.pause(); au.currentTime = 0; au.volume = 1; const p = au.play(); if(p && p.catch) p.catch(() => {}); }catch(e){}
+}
+function tbStopSlotSample(fadeMs){
+    const au = tbSlotAudio; if(!au || au.paused) return;
+    const steps = 10, dt = Math.max(20, (fadeMs || 300) / steps); let i = 0;
+    const iv = setInterval(() => { i++; au.volume = Math.max(0, 1 - i / steps); if(i >= steps){ clearInterval(iv); au.pause(); au.volume = 1; } }, dt);
+}
+
 function tbEnsureAudio() {
     if (!tbAudioCtx) {
         const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -3230,6 +3248,7 @@ async function tbDrinkWithGulps(totalMs, gulps) {
     }
 }
 function tbPlayReelTick() {
+    return; // místo cvakání hraje nahrávka (tbPlaySlotSample)
     if (!tbSoundEnabled) return;
     try {
         tbEnsureAudio();
@@ -3246,6 +3265,7 @@ function tbPlayReelTick() {
     } catch (e) { /* ticho */ }
 }
 function tbPlayMulticastCharge(){
+    tbPlaySlotSample(); return;
     if (!tbSoundEnabled) return;
     try{
         tbEnsureAudio();
@@ -3266,6 +3286,7 @@ function tbPlayMulticastCharge(){
 
 // Elektrický "multicast" zásah - eskaluje s parametrem stage (1., 2., 3. zásah v jednom kole losování)
 function tbPlayMulticastZap(stage, announce){
+    return; // zvuk řeší nahrávka
     if (!tbSoundEnabled) return;
     try{
         tbEnsureAudio();
@@ -3793,9 +3814,10 @@ async function tbSpinCurrentTeam() {
         spins[k].stop();
         const target = team.members[k] ? team.members[k].name : '—';
         await tbDecelerateAndLand(strips[k], pools[k], target, 1500);
-        if(tbDraftCancelled){ for(let j = k + 1; j < N; j++) spins[j].stop(); return; }
+        if(tbDraftCancelled){ for(let j = k + 1; j < N; j++) spins[j].stop(); tbStopSlotSample(100); return; }
         tbPlayMulticastZap(k + 1, k === N - 1 && N > 1);
     }
+    tbStopSlotSample(350);
 
     const names = team.members.filter(Boolean).map(m => m.name);
     const line = document.createElement('div');
@@ -3831,6 +3853,7 @@ function tbCloseOverlay(){
 }
 function tbCancelDraft() {
     tbDraftCancelled = true;
+    tbStopSlotSample(100);
     tbCloseOverlay();
     tbCurrentDraft = null;
     tbDraftInProgress = false;
