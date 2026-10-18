@@ -3101,7 +3101,10 @@ function tbSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 
 // ---- Zvuk výherního automatu (nahrávka z videa): točení ve smyčce -> rána při každém hráči -> závěr ----
-const TB_SLOT_FILES = { spin: 'slot-spin.wav', hit1: 'slot-hit1.mp3', hit2: 'slot-hit2.mp3', hit3: 'slot-hit3.mp3', end: 'slot-end.mp3' };
+const TB_SLOT_FILES = { draw: 'slot-draw.mp3' };
+// časy (s od začátku slot-draw.mp3), kdy v nahrávce cinknou 3 hráči - podle nich se zastavují válce
+const TB_SLOT_HITS = [1.37, 2.37, 2.96];
+let tbSlotT0 = 0;
 const tbSlotBuffers = {};
 let tbSlotLoading = false, tbSpinNode = null, tbEndNode = null;
 function tbLoadSlotSounds(){
@@ -3141,15 +3144,18 @@ function tbSlotSpinStart(){
     if(!tbSoundEnabled) return;
     tbEnsureAudio(); tbLoadSlotSounds();
     tbFadeStopNode(tbSpinNode, 0.05); tbFadeStopNode(tbEndNode, 0.1);
-    tbSpinNode = tbSlotPlayBuffer('spin', true, 0.35);
+    tbSlotT0 = performance.now();
+    tbSpinNode = tbSlotPlayBuffer('draw', false, 0.9);
 }
 function tbSlotSpinStop(fadeSec){ tbFadeStopNode(tbSpinNode, fadeSec); tbSpinNode = null; }
 function tbSlotFinale(){
+    return;
     if(!tbSoundEnabled) return;
     tbEndNode = tbSlotPlayBuffer('end', false, 1);
 }
 // "rána" při vybrání hráče - hluboký úder + krátký prasknutí
 function tbSlotBang(stage){
+    return;
     if(!tbSoundEnabled) return;
     if(tbSlotBuffers['hit'+stage]){ tbSlotPlayBuffer('hit'+stage, false, 1); return; }
     try{
@@ -3867,17 +3873,20 @@ async function tbSpinCurrentTeam() {
         pools.push(draft.tiers[k].filter(p => !placed.has(p.name) && p !== team.members[k]).map(p => p.name));
     }
     const spins = strips.map((s, k) => tbStartConstantSpin(s, pools[k]));
-    await tbSleep(600);
+    // pokud je načtená nahrávka, válce se zastavují přesně na cinknutí
+    const synced = !!(tbSpinNode && tbSlotBuffers.draw);
+    if(!synced) await tbSleep(600);
 
     for(let k = 0; k < N; k++){
+        const hitAt = TB_SLOT_HITS[Math.max(0, TB_SLOT_HITS.length - N + k)] * 1000;
+        const DEC = synced ? 650 : 950;
+        if(synced){ const wait = hitAt - DEC - (performance.now() - tbSlotT0); if(wait > 0) await tbSleep(wait); }
         spins[k].stop();
         const target = team.members[k] ? team.members[k].name : '—';
-        await tbDecelerateAndLand(strips[k], pools[k], target, 950);
+        await tbDecelerateAndLand(strips[k], pools[k], target, DEC);
         if(tbDraftCancelled){ for(let j = k + 1; j < N; j++) spins[j].stop(); tbSlotSpinStop(0.1); return; }
         tbPlayMulticastZap(k + 1, k === N - 1 && N > 1);
     }
-    tbSlotSpinStop(0.12);
-    setTimeout(tbSlotFinale, 500);
 
     const names = team.members.filter(Boolean).map(m => m.name);
     const line = document.createElement('div');
