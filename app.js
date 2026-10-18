@@ -3103,7 +3103,7 @@ function tbSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 // ---- Zvuk výherního automatu (nahrávka z videa, assets/slot.mp3) ----
 let tbSlotAudio = null;
 function tbSlotAudioGet(){
-    if(!tbSlotAudio){ try{ tbSlotAudio = new Audio('assets/slot.mp3'); tbSlotAudio.preload = 'auto'; }catch(e){ tbSlotAudio = null; } }
+    if(!tbSlotAudio){ try{ tbSlotAudio = new Audio('slot.mp3'); tbSlotAudio.preload = 'auto'; }catch(e){ tbSlotAudio = null; } }
     return tbSlotAudio;
 }
 function tbPlaySlotSample(){
