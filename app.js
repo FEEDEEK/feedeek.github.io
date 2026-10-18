@@ -3103,7 +3103,7 @@ function tbSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 // ---- Zvuk výherního automatu (nahrávka z videa): točení ve smyčce -> rána při každém hráči -> závěr ----
 const TB_SLOT_FILES = { draw: 'slot-draw.mp3' };
 // časy (s od začátku slot-draw.mp3), kdy v nahrávce cinknou 3 hráči - podle nich se zastavují válce
-const TB_SLOT_HITS = [1.37, 2.37, 2.96];
+const TB_SLOT_HITS = [1.37, 2.12, 2.84];
 let tbSlotT0 = 0;
 const tbSlotBuffers = {};
 let tbSlotLoading = false, tbSpinNode = null, tbEndNode = null;
@@ -3145,7 +3145,7 @@ function tbSlotSpinStart(){
     tbEnsureAudio(); tbLoadSlotSounds();
     tbFadeStopNode(tbSpinNode, 0.05); tbFadeStopNode(tbEndNode, 0.1);
     tbSlotT0 = performance.now();
-    tbSpinNode = tbSlotPlayBuffer('draw', false, 0.9);
+    tbSpinNode = tbSlotPlayBuffer('draw', false, 1.5);
 }
 function tbSlotSpinStop(fadeSec){ tbFadeStopNode(tbSpinNode, fadeSec); tbSpinNode = null; }
 function tbSlotFinale(){
