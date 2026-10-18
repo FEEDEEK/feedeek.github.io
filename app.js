@@ -3141,7 +3141,7 @@ function tbSlotSpinStart(){
     if(!tbSoundEnabled) return;
     tbEnsureAudio(); tbLoadSlotSounds();
     tbFadeStopNode(tbSpinNode, 0.05); tbFadeStopNode(tbEndNode, 0.1);
-    tbSpinNode = tbSlotPlayBuffer('spin', true, 0.9);
+    tbSpinNode = tbSlotPlayBuffer('spin', true, 0.35);
 }
 function tbSlotSpinStop(fadeSec){ tbFadeStopNode(tbSpinNode, fadeSec); tbSpinNode = null; }
 function tbSlotFinale(){
@@ -3867,12 +3867,12 @@ async function tbSpinCurrentTeam() {
         pools.push(draft.tiers[k].filter(p => !placed.has(p.name) && p !== team.members[k]).map(p => p.name));
     }
     const spins = strips.map((s, k) => tbStartConstantSpin(s, pools[k]));
-    await tbSleep(900);
+    await tbSleep(600);
 
     for(let k = 0; k < N; k++){
         spins[k].stop();
         const target = team.members[k] ? team.members[k].name : '—';
-        await tbDecelerateAndLand(strips[k], pools[k], target, 1500);
+        await tbDecelerateAndLand(strips[k], pools[k], target, 950);
         if(tbDraftCancelled){ for(let j = k + 1; j < N; j++) spins[j].stop(); tbSlotSpinStop(0.1); return; }
         tbPlayMulticastZap(k + 1, k === N - 1 && N > 1);
     }
