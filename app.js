@@ -1082,11 +1082,14 @@ function updateMailSlot(ev){
   }
   else if(currentTab === 'turnaj' && hasPerm('turnaj')){ label = '✉️ Poslat e-mail o turnajích'; fn = openEventTourneysMail; }
   const canEditEv = hasPerm('akce');
-  if(!fn && !canEditEv){ slot.innerHTML = ''; return; }
-  slot.innerHTML = (canEditEv ? `<button type="button" class="btn-ghost mail-slot-edit">✏️ Upravit akci</button>` : '') + (fn ? `<button type="button" class="mail-btn">${label}</button>` : '');
+  const canEditFood = currentTab === 'jidlo' && hasPerm('jidlo');
+  if(!fn && !canEditEv && !canEditFood){ slot.innerHTML = ''; return; }
+  slot.innerHTML = (canEditFood ? `<button type="button" class="btn-ghost mail-slot-edit mail-slot-food">🍔 Upravit jídlo</button>` : '') + (canEditEv ? `<button type="button" class="btn-ghost mail-slot-edit mail-slot-ev">✏️ Upravit akci</button>` : '') + (fn ? `<button type="button" class="mail-btn">${label}</button>` : '');
   const liveEv = () => events.find(x => x.id === ev.id) || ev;
-  const editB = slot.querySelector('.mail-slot-edit');
+  const editB = slot.querySelector('.mail-slot-ev');
   if(editB) editB.addEventListener('click', () => startEditEvent(liveEv()));
+  const foodB = slot.querySelector('.mail-slot-food');
+  if(foodB) foodB.addEventListener('click', () => openFoodEditor(liveEv()));
   const mailB = slot.querySelector('.mail-btn');
   if(mailB) mailB.addEventListener('click', () => fn(liveEv()));
 }
@@ -2813,7 +2816,12 @@ function openEditTournamentForm(existing){
   tbDraw = { players: [], teams: null };
   if(isTeamFormat){
     (existing.teams||[]).forEach(t => (t.members||[]).forEach(name => {
-      if(!tbDraw.players.some(p => p.name === name)) tbAddDrawPlayer(name, 50, { persist:false });
+      if(!tbDraw.players.some(p => p.name === name)){
+        const cur = tbGetPlayerStats(existing, name).base;   // aktuální základní skill hráče v tomto turnaji
+        tbAddDrawPlayer(name, cur === null ? 50 : cur, { persist:false });
+        const pl = tbDraw.players.find(p => p.name === name);
+        if(pl && cur !== null) pl.hadBase = true;
+      }
     }));
   }
 
@@ -2867,6 +2875,7 @@ function openEditTournamentForm(existing){
       if(!name){ alert('Vyplň jméno hráče.'); return; }
       const skill = Math.min(100, Math.max(1, parseInt(skillInput.value, 10) || 50));
       tbAddDrawPlayer(name, skill, { persist:false });
+      { const np = tbDraw.players.find(p => p.name.toLowerCase() === name.toLowerCase()); if(np) np.touched = true; }
       nameInput.value = ''; skillInput.value = '';
       tbRenderDrawPlayers();
       tbInvalidateDraw();
@@ -2894,6 +2903,9 @@ function openEditTournamentForm(existing){
       if(tbDraw.teams){
         update.teams = tbDraw.teams.map((t, i) => ({ name: (t.name || '').trim() || `Tým ${i+1}`, members: t.members, emblem: t.emblem || '', ...(t.color ? { color: t.color } : {}) }));
         tbDraw.players.forEach(p => { skillsToSeed[tbKey(p.name)] = p.baseSkill; });
+      }else{
+        // týmy se nelosovaly znovu, ale skilly upravené ve formuláři se musí uložit
+        tbDraw.players.forEach(p => { if(p.touched) skillsToSeed[tbKey(p.name)] = p.baseSkill; });
       }
     }
     try{
@@ -3654,6 +3666,7 @@ function tbRenderDrawPlayers(){
     const pl = tbDraw.players.find(x => String(x.id) === inp.dataset.tbDskill);
     if(!pl) return;
     pl.baseSkill = Math.min(100, Math.max(1, parseInt(inp.value, 10) || 50));
+    pl.touched = true;
     inp.value = pl.baseSkill;
     tbSaveSkill(pl.name, pl.baseSkill);
     tbInvalidateDraw();
@@ -5690,3 +5703,74 @@ window.addEventListener('resize', () => {
     document.querySelectorAll('.bracket-wrap:not(.bracket-compact)').forEach(w => { w.style.transform = 'none'; layoutBracketRounds(w); drawBracketConnectors(w); fitBracketToScreen(w); });
   }, 150);
 });
+
+
+// ==================== Editor jídla (oprávnění "Jídlo") ====================
+// Upravuje jen plán jídla, jídelní bloky a hlasování - ostatní údaje akce zůstávají nedotčené.
+function openFoodEditor(ev){
+  if(!hasPerm('jidlo') && !hasPerm('akce')) return;
+  const old = document.getElementById('food-editor-overlay'); if(old) old.remove();
+  const sched = emptyFoodSchedule();
+  MEAL_SLOTS.forEach(s => { if(ev.foodSchedule && Array.isArray(ev.foodSchedule[s.key])) sched[s.key] = [...ev.foodSchedule[s.key]]; });
+  const voting = ev.foodVotingSlots ? { ...ev.foodVotingSlots } : {};
+  const overlay = document.createElement('div');
+  overlay.id = 'food-editor-overlay';
+  overlay.className = 'score-modal-backdrop';
+  overlay.innerHTML = `
+    <div class="mail-composer food-editor">
+      <div class="section-title" style="font-size:16px;margin:0;">🍔 Upravit jídlo – ${escapeHtml(ev.name || '')}</div>
+      <label class="mc-label">Plán jídla (obecné info / poznámka)</label>
+      <textarea id="fe-plan" rows="3" placeholder="Platí se na místě...">${escapeHtml(ev.foodPlan || '')}</textarea>
+      <div id="fe-slots"></div>
+      <div class="mc-label">Přidat položku</div>
+      <div class="tag-input-row">
+        <select id="fe-meal">${MEAL_SLOTS.map(s => `<option value="${s.key}">${escapeHtml(s.label)}</option>`).join('')}</select>
+        <input type="text" id="fe-input" placeholder="Např. Svíčková" style="flex:1;">
+        <button type="button" id="fe-add">Přidat</button>
+      </div>
+      <div class="mc-status" id="fe-status"></div>
+      <div class="mc-actions">
+        <button type="button" class="btn-ghost" id="fe-cancel">Zrušit</button>
+        <button type="button" class="btn-primary" id="fe-save">Uložit</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const $ = id => overlay.querySelector('#' + id);
+  function renderSlots(){
+    $('fe-slots').innerHTML = MEAL_SLOTS.map(slot => {
+      const items = sched[slot.key] || [];
+      const chips = items.length
+        ? items.map((f, i) => `<span class="tag-chip">${escapeHtml(f)}<span class="x" data-rm="${slot.key}|${i}">×</span></span>`).join(' ')
+        : '<span style="color:var(--text-muted);">Žádné položky</span>';
+      return `<div class="meal-slot-block">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <b>${escapeHtml(slot.label)}:</b>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer; white-space:nowrap;">
+            <input type="checkbox" data-vote="${slot.key}" ${voting[slot.key] ? 'checked' : ''}> Hlasování místo pevné nabídky
+          </label>
+        </div>
+        <div class="chip-row" style="margin-top:6px;">${chips}</div>
+      </div>`;
+    }).join('');
+    overlay.querySelectorAll('[data-rm]').forEach(el => el.addEventListener('click', () => {
+      const [k, i] = el.dataset.rm.split('|'); sched[k].splice(parseInt(i, 10), 1); renderSlots();
+    }));
+    overlay.querySelectorAll('[data-vote]').forEach(el => el.addEventListener('change', () => { voting[el.dataset.vote] = el.checked; }));
+  }
+  renderSlots();
+  const add = () => {
+    const v = $('fe-input').value.trim(); if(!v) return;
+    sched[$('fe-meal').value].push(v); $('fe-input').value = ''; renderSlots();
+  };
+  $('fe-add').addEventListener('click', add);
+  $('fe-input').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); add(); } });
+  $('fe-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+  $('fe-save').addEventListener('click', async () => {
+    $('fe-status').textContent = 'Ukládám...';
+    try{
+      await updateDoc(doc(db, 'events', ev.id), { foodPlan: $('fe-plan').value.trim(), foodSchedule: sched, foodVotingSlots: voting });
+      overlay.remove();
+    }catch(err){ console.error(err); $('fe-status').textContent = 'Uložení se nepovedlo (nemáš oprávnění nebo chybí aktualizovaná pravidla Firestore).'; }
+  });
+}
