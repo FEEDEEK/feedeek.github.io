@@ -2747,9 +2747,9 @@ function openDirectDrawTournamentForm(){
       const regs = snap.docs.map(d=>d.data()).filter(r => r.status !== 'maybe' && r.nick).sort((a,b)=>(a.nick||'').localeCompare(b.nick||''));
       const rows = await Promise.all(regs.map(async r => {
         const saved = await tbLoadSkill(r.nick);
-        return { nick: r.nick, skill: saved !== null ? saved : 50 };
+        return { nick: r.nick, skill: saved !== null ? saved : 50, saved: saved !== null };
       }));
-      rows.forEach(r => tbAddDrawPlayer(r.nick, r.skill, { fromEvent:true, persist:false }));
+      rows.forEach(r => { tbAddDrawPlayer(r.nick, r.skill, { fromEvent:true, persist:false }); if(r.saved){ const pl = tbDraw.players.find(p => p.name === r.nick); if(pl) pl.hadBase = true; } });
       tbRenderDrawPlayers();
       msg.textContent = rows.length ? `Načteno ${rows.length} hráčů, kteří určitě jedou.` : 'Na téhle akci zatím nikdo určitě nejede.';
     }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se načíst přihlášené.'; }
@@ -2762,6 +2762,7 @@ function openDirectDrawTournamentForm(){
     if(!name){ alert('Vyplň jméno hráče.'); return; }
     const skill = Math.min(100, Math.max(1, parseInt(skillInput.value, 10) || 50));
     tbAddDrawPlayer(name, skill);
+    { const np = tbDraw.players.find(p => p.name.toLowerCase() === name.toLowerCase()); if(np) np.manual = true; }
     nameInput.value = ''; skillInput.value = '';
     tbRenderDrawPlayers();
     tbInvalidateDraw();
@@ -2789,6 +2790,7 @@ function openDirectDrawTournamentForm(){
       });
       tbDraw.players.forEach(p => { skills[tbKey(p.name)] = p.baseSkill; });
     }else{
+      tbDraw.players.forEach(p => { if(p.touched || p.hadBase) skills[tbKey(p.name)] = p.baseSkill; });
       const count = Math.max(2, parseInt(document.getElementById('tb-team-count').value, 10) || 4);
       for(let i = 0; i < count; i++) teams.push({ name: `Tým ${i+1}`, members: [], ...autoStyle(i) });
     }
@@ -2797,7 +2799,8 @@ function openDirectDrawTournamentForm(){
       const docRef = await addDoc(collection(db,'tournaments'), {
         name, game, gameImage, eventId, teams, results:{}, swissResults:{}, imageUrl,
         status:'ready', format:'teams', signups:[], ffa:{ participants:[], rounds:[] },
-        teamSize: tbTeamSizeVal(), createdAt
+        teamSize: tbTeamSizeVal(), createdAt,
+        drawExtra: tbDraw.players.filter(p => p.manual).map(p => p.name)
       });
       await seedHandicapSkills({ id:docRef.id, eventId, createdAt }, skills);
       slot.innerHTML = '';
@@ -2848,6 +2851,7 @@ function openEditTournamentForm(existing){
           <input type="number" id="tb-add-skill" min="1" max="100" placeholder="Skill (50)">
           <button type="button" class="btn-sm" id="tb-add-btn">Přidat</button>
         </div>
+        <small id="tb-event-msg" style="display:block; color:var(--text-muted); margin-bottom:8px;"></small>
         <div id="tb-draw-players"></div>
         <button type="button" class="btn-ghost" id="tb-draw-btn" style="margin-top:12px;">🎰 ${alreadyDrawn ? 'Losovat týmy znovu' : 'Losovat týmy'}</button>
       </div>
@@ -2865,7 +2869,42 @@ function openEditTournamentForm(existing){
   const getGameImage3 = setupGameField(existing.gameImage || '');
 
   if(isTeamFormat){
+    // ručně přidaní hráči (mimo akci), kteří se uložili při předchozím uložení turnaje
+    (existing.drawExtra || []).forEach(n => {
+      if(!tbDraw.players.some(p => p.name.toLowerCase() === n.toLowerCase())){
+        const cur = tbGetPlayerStats(existing, n).base;
+        tbAddDrawPlayer(n, cur === null ? 50 : cur, { persist:false });
+        const pl = tbDraw.players.find(p => p.name === n); if(pl){ pl.manual = true; if(cur !== null) pl.hadBase = true; }
+      }
+    });
     tbRenderDrawPlayers();
+    // přihlášení na akci se načítají stejně jako při tvorbě (a aktualizují se při každém otevření úpravy)
+    const loadEventPlayers = async (eventId) => {
+      const msg = document.getElementById('tb-event-msg');
+      if(!eventId){ if(msg) msg.textContent = ''; return; }
+      if(msg) msg.textContent = 'Načítám přihlášené na akci...';
+      try{
+        const snap = await getDocs(collection(db,'events',eventId,'registrations'));
+        const regs = snap.docs.map(d=>d.data()).filter(r => r.status !== 'maybe' && r.nick).sort((x,y)=>(x.nick||'').localeCompare(y.nick||''));
+        let added = 0;
+        for(const r of regs){
+          if(tbDraw.players.some(p => p.name.toLowerCase() === r.nick.toLowerCase())) continue;
+          let cur = tbGetPlayerStats(existing, r.nick).base;
+          if(cur === null){ const saved = await tbLoadSkill(r.nick); cur = saved; }
+          tbAddDrawPlayer(r.nick, cur === null || cur === undefined ? 50 : cur, { fromEvent:true, persist:false });
+          const pl = tbDraw.players.find(p => p.name === r.nick); if(pl && cur !== null && cur !== undefined) pl.hadBase = true;
+          added++;
+        }
+        tbRenderDrawPlayers();
+        if(msg) msg.textContent = `Z akce načteno ${regs.length} hráčů${added ? `, nově přidáno ${added}` : ''}.`;
+      }catch(err){ console.error(err); if(msg) msg.textContent = 'Nepovedlo se načíst přihlášené.'; }
+    };
+    loadEventPlayers(existing.eventId || '');
+    document.getElementById('new-tourney-event').addEventListener('change', (e) => {
+      tbDraw.players = tbDraw.players.filter(p => !p.fromEvent);
+      tbRenderDrawPlayers(); tbInvalidateDraw();
+      loadEventPlayers(e.target.value);
+    });
     document.getElementById('tb-team-size').addEventListener('input', () => { tbUpdateTeamCountHint(); tbInvalidateDraw(); });
     document.getElementById('tb-team-count').addEventListener('input', () => tbInvalidateDraw());
     document.getElementById('tb-add-btn').addEventListener('click', () => {
@@ -2875,7 +2914,7 @@ function openEditTournamentForm(existing){
       if(!name){ alert('Vyplň jméno hráče.'); return; }
       const skill = Math.min(100, Math.max(1, parseInt(skillInput.value, 10) || 50));
       tbAddDrawPlayer(name, skill, { persist:false });
-      { const np = tbDraw.players.find(p => p.name.toLowerCase() === name.toLowerCase()); if(np) np.touched = true; }
+      { const np = tbDraw.players.find(p => p.name.toLowerCase() === name.toLowerCase()); if(np){ np.touched = true; np.manual = true; } }
       nameInput.value = ''; skillInput.value = '';
       tbRenderDrawPlayers();
       tbInvalidateDraw();
@@ -2900,12 +2939,13 @@ function openEditTournamentForm(existing){
     let skillsToSeed = {};
     if(isTeamFormat){
       update.teamSize = tbTeamSizeVal();
+      update.drawExtra = tbDraw.players.filter(p => p.manual).map(p => p.name);
       if(tbDraw.teams){
         update.teams = tbDraw.teams.map((t, i) => ({ name: (t.name || '').trim() || `Tým ${i+1}`, members: t.members, emblem: t.emblem || '', ...(t.color ? { color: t.color } : {}) }));
         tbDraw.players.forEach(p => { skillsToSeed[tbKey(p.name)] = p.baseSkill; });
       }else{
         // týmy se nelosovaly znovu, ale skilly upravené ve formuláři se musí uložit
-        tbDraw.players.forEach(p => { if(p.touched) skillsToSeed[tbKey(p.name)] = p.baseSkill; });
+        tbDraw.players.forEach(p => { if(p.touched || p.hadBase) skillsToSeed[tbKey(p.name)] = p.baseSkill; });
       }
     }
     try{
