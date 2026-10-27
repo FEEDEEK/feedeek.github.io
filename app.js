@@ -717,6 +717,7 @@ formEvent.addEventListener('submit', async (e) => {
     desc: document.getElementById('ev-desc').value.trim(),
     imageUrl: document.getElementById('ev-image').value.trim(),
     fee: parseInt(document.getElementById('ev-fee').value, 10) || 0,
+    feeNote: document.getElementById('ev-fee-note').value.trim(),
     qrUrl: document.getElementById('ev-qr').value.trim(),
     accPrefix: document.getElementById('ev-acc-prefix').value.trim(),
     accNumber: document.getElementById('ev-acc-number').value.trim(),
@@ -757,6 +758,7 @@ function startEditEvent(ev){
   document.getElementById('ev-desc').value = ev.desc || '';
   document.getElementById('ev-image').value = ev.imageUrl || '';
   document.getElementById('ev-fee').value = ev.fee || '';
+  document.getElementById('ev-fee-note').value = ev.feeNote || '';
   document.getElementById('ev-qr').value = ev.qrUrl || '';
   document.getElementById('ev-acc-prefix').value = ev.accPrefix || '';
   document.getElementById('ev-acc-number').value = ev.accNumber || '';
@@ -1168,11 +1170,12 @@ async function renderPersonalPaymentQr(ev, uid, nick, box){
 
 function renderEntryFeeBlock(ev){
   const box = document.getElementById('ed-entryfee');
-  if(!ev.fee && !ev.qrUrl){ box.innerHTML = ''; return; }
+  if(!ev.fee && !ev.qrUrl && !ev.feeNote){ box.innerHTML = ''; return; }
   const showSharedQr = ev.qrUrl && !eventHasOwnPaymentAccount(ev);
   box.innerHTML = `
     ${showSharedQr ? `<img class="qr-code-img" src="${ev.qrUrl.replace(/"/g,'&quot;')}" alt="QR kód pro platbu" style="margin-bottom:8px;">` : ''}
     ${ev.fee ? `<div style="font-size:28px; font-weight:700; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,0.8);">${ev.fee} Kč</div><div style="font-size:13px; font-weight:600; color:var(--gold); text-transform:uppercase; letter-spacing:.08em; text-shadow:0 1px 4px rgba(0,0,0,0.8);">Vstupné</div>` : ''}
+    ${ev.feeNote ? `<div style="margin-top:6px; max-width:260px; margin-left:auto; font-size:13px; font-weight:600; line-height:1.35; color:var(--text); text-shadow:0 1px 4px rgba(0,0,0,0.8);">${escapeHtml(ev.feeNote)}</div>` : ''}
   `;
 }
 
