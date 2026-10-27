@@ -2679,7 +2679,11 @@ async function seedHandicapSkills(t, skillsMap){
   const key = handicapSessionKey(t);
   const payload = {};
   entries.forEach(([k, v]) => { payload[`skills.${k}`] = v; });
-  try{ await setDoc(doc(db, 'handicapSessions', key), payload, { merge:true }); }
+  try{
+    await setDoc(doc(db, 'handicapSessions', key), payload, { merge:true });
+    // základní skill platí trvale pro turnaj (denní handicap se resetuje, základ ne)
+    if(t.id){ const bs = {}; entries.forEach(([k, v]) => { bs[`baseSkills.${k}`] = v; }); await updateDoc(doc(db, 'tournaments', t.id), bs); }
+  }
   catch(err){ console.error('Nepodařilo se uložit počáteční skilly:', err); }
 }
 
@@ -2968,7 +2972,8 @@ function tbRawHandicap(beers, shots, joints){
 function tbGetPlayerStats(t, name){
   const k = tbKey(name);
   const session = handicapSessionData(t);
-  const base = (session.skills && typeof session.skills[k] === 'number') ? session.skills[k] : null;
+  let base = (session.skills && typeof session.skills[k] === 'number') ? session.skills[k] : null;
+  if(base === null && t.baseSkills && typeof t.baseSkills[k] === 'number') base = t.baseSkills[k];
   const d = (session.drinks && session.drinks[k]) || {};
   return { base, beers: d.beers || 0, shots: d.shots || 0, joints: d.joints || 0 };
 }
@@ -3986,6 +3991,14 @@ function tbEnsureLive(t){
 
     tbLiveUnsub = onSnapshot(doc(db, 'handicapSessions', key), (snap) => {
         handicapCache[key] = snap.exists() ? { skills: snap.data().skills || {}, drinks: snap.data().drinks || {} } : { skills:{}, drinks:{} };
+        // jednorázové doplnění základního skillu u starších turnajů (aby zůstal i další den)
+        try{
+            const sk = snap.exists() ? (snap.data().skills || {}) : {};
+            if(hasPerm('turnaj') && !t.baseSkills && Object.keys(sk).length){
+                const bs = {}; Object.entries(sk).forEach(([k, v]) => { if(typeof v === 'number') bs[`baseSkills.${k}`] = v; });
+                if(Object.keys(bs).length) updateDoc(doc(db, 'tournaments', t.id), bs).catch(()=>{});
+            }
+        }catch(e){}
         renderTurnajPage();
     }, (err) => console.error('Handicap session:', err));
 
@@ -4007,6 +4020,7 @@ async function tbSetSkill(t, name, raw){
     const v = Math.min(100, Math.max(1, parseInt(raw, 10) || 50));
     try{
         await setDoc(doc(db, 'handicapSessions', handicapSessionKey(t)), { [`skills.${tbKey(name)}`]: v }, { merge: true });
+        updateDoc(doc(db, 'tournaments', t.id), { [`baseSkills.${tbKey(name)}`]: v }).catch(()=>{});
         tbSaveSkill(name, v);
     }catch(err){ console.error(err); }
 }
