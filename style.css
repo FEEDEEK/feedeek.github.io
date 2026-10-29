@@ -1059,3 +1059,11 @@ button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):n
 /* QR platby je pod částkou vstupného, ať je to pohromadě */
 .ed-payment-inline:not(:empty){ margin-top:10px; }
 .ed-payment-inline .payment-qr-box-compact{ display:inline-flex; width:auto; max-width:none; }
+
+/* Záznam změn */
+.audit-row{ display:grid; grid-template-columns:150px 140px 90px 1fr; gap:12px; padding:9px 12px; border-bottom:1px solid var(--line); font-size:13px; align-items:baseline; }
+.audit-row:nth-child(odd){ background:rgba(255,255,255,0.02); }
+.audit-when{ color:var(--text-muted); white-space:nowrap; }
+.audit-by{ color:var(--gold); font-weight:600; }
+.audit-area{ color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; font-size:11px; }
+@media (max-width:760px){ .audit-row{ grid-template-columns:1fr; gap:2px; } }
