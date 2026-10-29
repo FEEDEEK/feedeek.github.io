@@ -1058,3 +1058,4 @@ button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):n
 
 /* QR platby je pod částkou vstupného, ať je to pohromadě */
 .ed-payment-inline:not(:empty){ margin-top:10px; }
+.ed-payment-inline .payment-qr-box-compact{ display:inline-flex; width:auto; max-width:none; }
