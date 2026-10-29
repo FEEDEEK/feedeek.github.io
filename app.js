@@ -5780,7 +5780,8 @@ function updateAuthUI(){
   }
 
   document.getElementById('nav-item-uzivatele').style.display = hasPerm('uzivatele') ? 'flex' : 'none';
-  document.getElementById('nav-sep-admin').style.display = hasPerm('uzivatele') ? 'block' : 'none';
+  document.getElementById('nav-sep-admin').style.display = (hasPerm('uzivatele') || hasPerm('zaznam')) ? 'block' : 'none';
+  document.getElementById('nav-sep-zaznam').style.display = (hasPerm('uzivatele') && hasPerm('zaznam')) ? 'block' : 'none';
   if(hasPerm('uzivatele')) renderUsersList();
   if(!hasPerm('uzivatele') && document.getElementById('view-uzivatele').classList.contains('active')){
     showView('akce');
