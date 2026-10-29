@@ -414,6 +414,26 @@ function setupGameField(existingImage){
 }
 
 const STEAM_SEARCH_FUNCTION_URL = 'https://steam-game-search-632018940301.europe-west3.run.app';
+// Starší / retro hry (Amiga, DOS, konzole...) Steam nezná. Druhý zdroj: RAWG (zdarma, https://rawg.io/apidocs).
+// Klíč si vytvoř zdarma na rawg.io/apidocs a vlož sem; prázdný = hledá se jen na Steamu jako dřív.
+const RAWG_API_KEY = '';
+function cleanGameQuery(q){
+  return q.replace(/\([^)]*\)/g, ' ').replace(/\b(19|20)\d\d\b/g, ' ').replace(/\b(amiga|dos|pc|c64|atari|snes|nes|sega|mega ?drive)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+}
+async function searchGames(q){
+  const steamP = fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`).then(r => r.json()).then(d => d.items || []);
+  const cq = cleanGameQuery(q) || q;
+  const rawgP = RAWG_API_KEY
+    ? fetch(`https://api.rawg.io/api/games?key=${RAWG_API_KEY}&search=${encodeURIComponent(cq)}&page_size=8`).then(r => r.json()).then(d => (d.results || []).map(g => ({ name: g.name, image: g.background_image || '' })))
+    : Promise.resolve([]);
+  const [s, r] = await Promise.allSettled([steamP, rawgP]);
+  const out = [], seen = new Set();
+  [...(s.status === 'fulfilled' ? s.value : []), ...(r.status === 'fulfilled' ? r.value : [])].forEach(g => {
+    const k = String(g.name || '').toLowerCase();
+    if(k && !seen.has(k)){ seen.add(k); out.push(g); }
+  });
+  return out;
+}
 
 // Znovupoužitelné vyhledávání hry s logem (pole "Hra" u turnajů). onPick(name, image) se zavolá při výběru z nabídky.
 function attachGameAutocomplete(inputEl, listEl, onPick){
@@ -424,9 +444,7 @@ function attachGameAutocomplete(inputEl, listEl, onPick){
     if(q.length < 2){ listEl.style.display = 'none'; return; }
     debounceTimer = setTimeout(async () => {
       try{
-        const res = await fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        const results = data.items || [];
+        const results = await searchGames(q);
         if(results.length === 0){ listEl.style.display = 'none'; return; }
         listEl.innerHTML = results.map(r => `
           <div class="game-autocomplete-item" data-pick-game-name="${escapeHtml(r.name)}" data-pick-game-image="${r.image ? r.image.replace(/"/g,'&quot;') : ''}">
@@ -508,9 +526,7 @@ document.getElementById('input-add-game').addEventListener('input', (e) => {
   if(!STEAM_SEARCH_FUNCTION_URL || q.length < 2){ box.style.display = 'none'; return; }
   gameSearchDebounce = setTimeout(async () => {
     try{
-      const res = await fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      const results = data.items || [];
+      const results = await searchGames(q);
       if(results.length === 0){ box.style.display = 'none'; return; }
       box.innerHTML = results.map(r => `
         <div class="game-autocomplete-item" data-pick-game="${escapeHtml(r.name)}" data-pick-image="${r.image ? r.image.replace(/"/g,'&quot;') : ''}">
@@ -1570,9 +1586,7 @@ function renderTabPrehled(ev){
     if(q.length < 2){ box.style.display = 'none'; return; }
     sugSearchDebounce = setTimeout(async () => {
       try{
-        const res = await fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        const results = data.items || [];
+        const results = await searchGames(q);
         if(results.length === 0){ box.style.display = 'none'; return; }
         box.innerHTML = results.map(r => `
           <div class="game-autocomplete-item" data-pick-sug="${escapeHtml(r.name)}" data-pick-sug-image="${r.image ? r.image.replace(/"/g,'&quot;') : ''}">
@@ -1686,9 +1700,7 @@ function renderSuggestions(ev){
         if(q.length < 2){ editBox.style.display = 'none'; return; }
         editSearchDebounce = setTimeout(async () => {
           try{
-            const res = await fetch(`${STEAM_SEARCH_FUNCTION_URL}?term=${encodeURIComponent(q)}`);
-            const data = await res.json();
-            const results = data.items || [];
+            const results = await searchGames(q);
             if(results.length === 0){ editBox.style.display = 'none'; return; }
             editBox.innerHTML = results.map(r => `
               <div class="game-autocomplete-item" data-pick-edit-sug="${escapeHtml(r.name)}" data-pick-edit-sug-image="${r.image ? r.image.replace(/"/g,'&quot;') : ''}">
