@@ -1185,9 +1185,6 @@ function renderEntryFeeBlock(ev){
 function renderDateVoteBlock(ev){
   const box = document.getElementById('ed-datevote');
   const options = ev.dateOptions || [];
-  if(options.length === 0 || ev.dateVotingClosed){ box.innerHTML = ''; box.style.display = 'none'; return; }
-  box.style.display = 'block';
-
   const votes = ev.dateVotes || {};
   function votesOf(uid){
     const v = votes[uid];
@@ -1195,6 +1192,37 @@ function renderDateVoteBlock(ev){
     if(typeof v === 'number') return [v];
     return [];
   }
+  if(options.length === 0){ box.innerHTML = ''; box.style.display = 'none'; return; }
+  if(ev.dateVotingClosed){
+    // uzavřené hlasování: výsledky + historie vidí jen správce akcí, který ho může znovu otevřít
+    if(!hasPerm('akce')){ box.innerHTML = ''; box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    box.className = 'panel';
+    box.style.cssText = 'flex:0 0 300px; margin-top:0;';
+    const nickMap = ev.dateVoteNicks || {};
+    const fmtTs = ts => { try{ return new Date(ts).toLocaleString('cs-CZ', { day:'numeric', month:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' }); }catch(e){ return ts || ''; } };
+    const hist = Array.isArray(ev.dateHistory) ? ev.dateHistory : [];
+    box.innerHTML = `
+      <div class="section-title" style="font-size:15px;">🗳️ Hlasování o termínu <span class="status-hint">(uzavřeno)</span></div>
+      ${options.map((opt, idx) => {
+        const nicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => nickMap[uid] || currentRegistrationsMap[uid]?.nick || '(neznámý)');
+        const chosen = ev.dateStart === opt.start && ev.dateEnd === opt.end;
+        return `<div style="margin-top:8px; font-size:13px;${chosen ? 'color:var(--gold);' : ''}">
+          ${chosen ? '✓ ' : ''}<b>${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}</b> <span class="status-hint">(${nicks.length} hlasů)</span>
+          <div class="status-hint" style="font-size:12px;">${nicks.length ? escapeHtml(nicks.join(', ')) : 'nikdo'}</div>
+        </div>`;
+      }).join('')}
+      ${hist.length ? `<div class="mc-label" style="margin-top:12px;">Historie</div>` + hist.slice().reverse().map(h => `<div class="status-hint" style="font-size:12px;">${escapeHtml(fmtTs(h.at))} – ${escapeHtml(h.by || '?')}: ${escapeHtml(h.text || '')}</div>`).join('') : '<div class="status-hint" style="font-size:12px; margin-top:10px;">Historie změn se zapisuje od teď.</div>'}
+      <button type="button" class="btn-ghost btn-sm" id="btn-reopen-datevote" style="margin-top:12px;">↩ Znovu otevřít hlasování</button>`;
+    box.querySelector('#btn-reopen-datevote').addEventListener('click', async () => {
+      if(!confirm('Znovu otevřít hlasování o termínu? Termín akce se označí jako nepotvrzený, hlasy zůstanou.')) return;
+      try{ await updateDoc(doc(db,'events',ev.id), { dateVotingClosed: false, dateUnconfirmed: true, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: 'hlasování znovu otevřeno' }) }); }
+      catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
+    });
+    return;
+  }
+  box.style.display = 'block';
+
   const myVotes = currentUser ? votesOf(currentUser.uid) : [];
   const deadlinePassedForVote = ev.dateVoteDeadline && todayIso() > ev.dateVoteDeadline;
 
@@ -1234,7 +1262,7 @@ function renderDateVoteBlock(ev){
       const idx = parseInt(btn.dataset.finalizeDate,10);
       const opt = options[idx];
       if(!confirm(`Nastavit termín akce na ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}?`)) return;
-      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true, dateUnconfirmed: false }); }
+      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true, dateUnconfirmed: false, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: `vybrán termín ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}` }) }); }
       catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
     });
   });
