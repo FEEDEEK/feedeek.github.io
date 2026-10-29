@@ -290,7 +290,7 @@ function renderContacts(){
   grid.querySelectorAll('[data-delete-contact]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if(!confirm('Smazat tento kontakt?')) return;
-      try{ await deleteDoc(doc(db,'contacts',btn.dataset.deleteContact)); }
+      try{ const cname = (contacts.find(c=>c.id===btn.dataset.deleteContact)||{}).name || ''; await deleteDoc(doc(db,'contacts',btn.dataset.deleteContact)); logAction('kontakty', `smazal kontakt „${cname}“`); }
       catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
     });
   });
@@ -354,8 +354,8 @@ formContact.addEventListener('submit', async (e) => {
   };
   if(!payload.name) return;
   try{
-    if(editingContactId) await updateDoc(doc(db,'contacts',editingContactId), payload);
-    else await addDoc(collection(db,'contacts'), payload);
+    if(editingContactId){ await updateDoc(doc(db,'contacts',editingContactId), payload); logAction('kontakty', `upravil kontakt „${payload.name}“`); }
+    else{ await addDoc(collection(db,'contacts'), payload); logAction('kontakty', `přidal kontakt „${payload.name}“`); }
     formContact.reset();
     formContact.style.display = 'none';
     editingContactId = null;
@@ -733,8 +733,10 @@ formEvent.addEventListener('submit', async (e) => {
   try{
     if(editingEventId){
       await updateDoc(doc(db, 'events', editingEventId), payload);
+      logAction('akce', `upravil akci „${payload.name}“`);
     }else{
       await addDoc(collection(db, 'events'), payload);
+      logAction('akce', `vytvořil akci „${payload.name}“`);
     }
     closeEventForm();
   }catch(err){
@@ -789,7 +791,7 @@ function startEditEvent(ev){
 
 async function deleteEvent(eventId, eventName){
   if(!confirm(`Opravdu smazat akci "${eventName}"? Tohle nejde vrátit zpět.`)) return;
-  try{ await deleteDoc(doc(db, 'events', eventId)); }
+  try{ await deleteDoc(doc(db, 'events', eventId)); logAction('akce', `smazal akci „${eventName}“`); }
   catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
 }
 
@@ -1231,7 +1233,7 @@ function renderDateVoteBlock(ev){
       <button type="button" class="btn-ghost btn-sm" id="btn-reopen-datevote" style="margin-top:12px;">↩ Znovu otevřít hlasování</button>`;
     box.querySelector('#btn-reopen-datevote').addEventListener('click', async () => {
       if(!confirm('Znovu otevřít hlasování o termínu? Termín akce se označí jako nepotvrzený, hlasy zůstanou.')) return;
-      try{ await updateDoc(doc(db,'events',ev.id), { dateVotingClosed: false, dateUnconfirmed: true, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: 'hlasování znovu otevřeno' }) }); }
+      try{ await updateDoc(doc(db,'events',ev.id), { dateVotingClosed: false, dateUnconfirmed: true, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: 'hlasování znovu otevřeno' }) }); logAction('akce', `znovu otevřel hlasování o termínu u akce „${ev.name}“`); }
       catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
     });
     return;
@@ -1277,7 +1279,7 @@ function renderDateVoteBlock(ev){
       const idx = parseInt(btn.dataset.finalizeDate,10);
       const opt = options[idx];
       if(!confirm(`Nastavit termín akce na ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}?`)) return;
-      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true, dateUnconfirmed: false, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: `vybrán termín ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}` }) }); }
+      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true, dateUnconfirmed: false, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: `vybrán termín ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}` }) }); logAction('akce', `vybral termín ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} u akce „${ev.name}“`); }
       catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
     });
   });
@@ -2278,6 +2280,7 @@ function renderTurnajPage(){
             status:'signup', format:null, teams:[], results:{}, swissResults:{},
             ffa:{ participants:[], rounds:[] }
           });
+          logAction('turnaj', `vrátil turnaj „${t.name}“ do fáze přihlašování`);
         }catch(err){ alert('Nepovedlo se vrátit.'); console.error(err); }
       });
       cornerActions.appendChild(revertBtn);
@@ -2289,7 +2292,7 @@ function renderTurnajPage(){
       delBtn.textContent = 'Smazat turnaj';
       delBtn.addEventListener('click', async () => {
         if(!confirm(`Opravdu smazat turnaj "${t.name}"? Tohle nejde vrátit zpět.`)) return;
-        try{ await deleteDoc(doc(db,'tournaments',t.id)); currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; }
+        try{ await deleteDoc(doc(db,'tournaments',t.id)); logAction('turnaj', `smazal turnaj „${t.name}“`); currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; }
         catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
       });
       cornerActions.appendChild(delBtn);
@@ -2398,7 +2401,7 @@ function renderTurnajPage(){
       const t = allTournaments.find(x => x.id === btn.dataset.deleteTourney);
       if(!t) return;
       if(!confirm(`Opravdu smazat turnaj "${t.name}"? Tohle nejde vrátit zpět.`)) return;
-      try{ await deleteDoc(doc(db,'tournaments',t.id)); }
+      try{ await deleteDoc(doc(db,'tournaments',t.id)); logAction('turnaj', `smazal turnaj „${t.name}“`); }
       catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
     });
   });
@@ -2574,6 +2577,7 @@ function renderTeamFormatSetup(t, box){
     try{
       await updateDoc(doc(db,'tournaments',t.id), { teams, format:'teams', status:'ready', teamSize: tbTeamSizeVal() });
       await seedHandicapSkills(t, skills);
+      logAction('turnaj', `vylosoval a potvrdil týmy v turnaji „${t.name}“`);
       tourneySetupStep = null; tbDraw = { players: [], teams: null };
     }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
   });
@@ -2713,6 +2717,7 @@ function openSignupTournamentForm(){
     };
     try{
       const docRef = await addDoc(collection(db,'tournaments'), payload);
+      logAction('turnaj', `vytvořil turnaj „${payload.name || ''}“`);
       slot.innerHTML = '';
       setRoute('#turnaj/' + docRef.id);
     }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
@@ -2846,6 +2851,7 @@ function openDirectDrawTournamentForm(){
         drawExtra: tbDraw.players.filter(p => p.manual).map(p => p.name)
       });
       await seedHandicapSkills({ id:docRef.id, eventId, createdAt }, skills);
+      logAction('turnaj', `vytvořil turnaj „${name}“` + (teams.length && teams.some(x => (x.members||[]).length) ? ' a vylosoval týmy' : ''));
       slot.innerHTML = '';
       tbDraw = { players: [], teams: null };
       setRoute('#turnaj/' + docRef.id);
@@ -2994,6 +3000,7 @@ function openEditTournamentForm(existing){
     try{
       await updateDoc(doc(db,'tournaments',existing.id), update);
       await seedHandicapSkills(existing, skillsToSeed);
+      logAction('turnaj', `upravil turnaj „${name}“` + (update.teams ? ' (nové týmy)' : '') + (Object.keys(skillsToSeed).length ? ' (skilly hráčů)' : ''));
       slot.innerHTML = '';
       tbDraw = { players: [], teams: null };
       renderTurnajPage();
@@ -4551,6 +4558,7 @@ async function renderTeamEditor(t, container, onSaved){
   document.getElementById('btn-save-teams').addEventListener('click', async () => {
     try{
       await updateDoc(doc(db,'tournaments',t.id), { teams: workingTeams });
+      logAction('turnaj', `upravil rozdělení týmů v turnaji „${t.name}“`);
       if(onSaved) onSaved(); else renderTurnajPage();
     }catch(err){ alert('Uložení týmů se nepovedlo.'); console.error(err); }
   });
@@ -5001,6 +5009,7 @@ function renderTabRozvrh(ev){
     const newSchedule = [...schedule, entry];
     try{
       await updateDoc(doc(db,'events',ev.id), { schedule: newSchedule });
+      logAction('akce', `přidal položku do rozvrhu akce „${ev.name}“`);
       formSch.reset();
     }catch(err){ alert('Nepovedlo se přidat.'); console.error(err); }
   });
@@ -5028,7 +5037,7 @@ function renderTabRozvrh(ev){
     btn.addEventListener('click', async () => {
       const idx = parseInt(btn.dataset.removeSch, 10);
       const newSchedule = schedule.filter((_,i) => i !== idx);
-      try{ await updateDoc(doc(db,'events',ev.id), { schedule: newSchedule }); }
+      try{ await updateDoc(doc(db,'events',ev.id), { schedule: newSchedule }); logAction('akce', `odebral položku z rozvrhu akce „${ev.name}“`); }
       catch(err){ console.error(err); }
     });
   });
@@ -5151,6 +5160,33 @@ function renderPhotoGrid(ev){
     });
   });
 }
+
+// ==================== ZÁZNAM ZMĚN (co který admin kdy udělal) ====================
+const AUDIT_AREAS = { akce:'Akce', turnaj:'Turnaje', jidlo:'Jídlo', kontakty:'Kontakty', uzivatele:'Uživatelé', mail:'E-maily' };
+function logAction(area, text){
+  try{
+    if(!currentUser || !currentIsAdmin) return;
+    addDoc(collection(db, 'auditLog'), { at: new Date().toISOString(), by: currentNick || '?', uid: currentUser.uid, area, text }).catch(err => console.error('Záznam změn:', err));
+  }catch(e){ /* záznam nikdy nesmí shodit akci */ }
+}
+let auditUnsub = null, auditEntries = [], auditFilter = 'all';
+function renderAuditLog(){
+  const box = document.getElementById('audit-list');
+  if(!box) return;
+  const list = auditEntries.filter(e => auditFilter === 'all' || e.area === auditFilter);
+  const fmt = ts => { try{ return new Date(ts).toLocaleString('cs-CZ', { day:'numeric', month:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' }); }catch(e){ return ts || ''; } };
+  document.getElementById('audit-filter').innerHTML = ['all', ...Object.keys(AUDIT_AREAS)].map(k => `<button type="button" class="btn-sm ${auditFilter === k ? 'btn-active' : 'btn-ghost'}" data-audit-filter="${k}">${k === 'all' ? 'Vše' : AUDIT_AREAS[k]}</button>`).join(' ');
+  document.querySelectorAll('[data-audit-filter]').forEach(b => b.addEventListener('click', () => { auditFilter = b.dataset.auditFilter; renderAuditLog(); }));
+  box.innerHTML = list.length ? list.map(e => `<div class="audit-row"><span class="audit-when">${escapeHtml(fmt(e.at))}</span><span class="audit-by">${escapeHtml(e.by || '?')}</span><span class="audit-area">${escapeHtml(AUDIT_AREAS[e.area] || e.area || '')}</span><span class="audit-text">${escapeHtml(e.text || '')}</span></div>`).join('') : '<div class="empty">Zatím žádné záznamy.</div>';
+}
+function startAuditListener(){
+  if(auditUnsub || !currentIsAdmin) return;
+  auditUnsub = onSnapshot(collection(db, 'auditLog'), snap => {
+    auditEntries = snap.docs.map(d => d.data()).sort((x, y) => (y.at || '').localeCompare(x.at || '')).slice(0, 500);
+    renderAuditLog();
+  }, err => console.error('Záznam změn:', err));
+}
+function stopAuditListener(){ if(auditUnsub){ auditUnsub(); auditUnsub = null; } auditEntries = []; }
 
 // ==================== ÚČET / AUTENTIZACE ====================
 function usernameDocRef(nick){ return doc(db, 'usernames', nick.trim().toLowerCase()); }
@@ -5533,6 +5569,7 @@ function openMailComposer(title, presets){
         states[ref.id] = 'PENDING';
         onSnapshot(ref, snap => { const st = snap.data()?.delivery?.state; if(st){ states[ref.id] = st; report(); } });
       }
+      logAction('mail', `odeslal e-mail „${subject}“ (${list.length} příjemců)`);
       report();
     }catch(err){
       console.error(err);
@@ -5630,6 +5667,8 @@ async function renderUsersList(){
         }
         try{
           await updateDoc(doc(db,'users',uid), payload);
+          { const un = (users.find(u => u.uid === uid) || {}).nick || uid;
+            logAction('uzivatele', `upravil uživatele „${un}“` + (payload.permissions ? ` (admin: ${payload.isAdmin ? 'ano' : 'ne'}, oprávnění: ${Object.keys(payload.permissions).filter(k => payload.permissions[k]).join(', ') || 'žádná'})` : '')); }
           btn.textContent = 'Uloženo!';
           setTimeout(() => { btn.textContent = 'Uložit'; }, 1200);
         }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
@@ -5643,6 +5682,7 @@ async function renderUsersList(){
         try{
           await deleteDoc(doc(db,'users',uid));
           if(nick) await deleteDoc(usernameDocRef(nick));
+          logAction('uzivatele', `odstranil uživatele „${nick}“`);
           renderUsersList();
         }catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
       });
@@ -5739,6 +5779,9 @@ function updateAuthUI(){
   if(!hasPerm('uzivatele') && document.getElementById('view-uzivatele').classList.contains('active')){
     showView('akce');
   }
+  document.getElementById('nav-item-zaznam').style.display = currentIsAdmin ? 'flex' : 'none';
+  if(currentIsAdmin) startAuditListener(); else stopAuditListener();
+  if(!currentIsAdmin && document.getElementById('view-zaznam').classList.contains('active')) showView('akce');
 
   const accWidget = document.getElementById('topbar-account-widget');
   if(currentUser && currentNick){
@@ -5885,6 +5928,7 @@ function openFoodEditor(ev){
     $('fe-status').textContent = 'Ukládám...';
     try{
       await updateDoc(doc(db, 'events', ev.id), { foodPlan: $('fe-plan').value.trim(), foodSchedule: sched, foodVotingSlots: voting });
+      logAction('jidlo', `upravil jídlo u akce „${ev.name}“`);
       overlay.remove();
     }catch(err){ console.error(err); $('fe-status').textContent = 'Uložení se nepovedlo (nemáš oprávnění nebo chybí aktualizovaná pravidla Firestore).'; }
   });
