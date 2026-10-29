@@ -52,7 +52,8 @@ const PERMISSION_AREAS = [
   { key:'turnaj', label:'Turnaje' },
   { key:'jidlo', label:'Jídlo' },
   { key:'kontakty', label:'Kontakty' },
-  { key:'uzivatele', label:'Uživatelé (správa profilů)' }
+  { key:'uzivatele', label:'Uživatelé (správa profilů)' },
+  { key:'zaznam', label:'Záznam změn (vidí historii akcí adminů)' }
 ];
 function hasPerm(area){
   if(!currentUser) return false;
@@ -5180,7 +5181,7 @@ function renderAuditLog(){
   box.innerHTML = list.length ? list.map(e => `<div class="audit-row"><span class="audit-when">${escapeHtml(fmt(e.at))}</span><span class="audit-by">${escapeHtml(e.by || '?')}</span><span class="audit-area">${escapeHtml(AUDIT_AREAS[e.area] || e.area || '')}</span><span class="audit-text">${escapeHtml(e.text || '')}</span></div>`).join('') : '<div class="empty">Zatím žádné záznamy.</div>';
 }
 function startAuditListener(){
-  if(auditUnsub || !currentIsAdmin) return;
+  if(auditUnsub || !hasPerm('zaznam')) return;
   auditUnsub = onSnapshot(collection(db, 'auditLog'), snap => {
     auditEntries = snap.docs.map(d => d.data()).sort((x, y) => (y.at || '').localeCompare(x.at || '')).slice(0, 500);
     renderAuditLog();
@@ -5593,7 +5594,7 @@ async function renderUsersList(){
   box.innerHTML = '<div class="empty">Načítám...</div>';
   try{
     const snap = await getDocs(collection(db, 'users'));
-    const users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    const users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a,b) => (a.nick||'').localeCompare(b.nick||'', 'cs', { sensitivity:'base' }));
     if(users.length === 0){ box.innerHTML = '<div class="empty">Zatím žádní uživatelé.</div>'; return; }
 
     const showPerms = currentIsSuperAdmin;
@@ -5771,7 +5772,12 @@ function updateAuthUI(){
   }
   renderEvents();
   renderContacts();
-  if(currentDetailEventId){ renderStatsAndRsvp(); renderAttendees(); }
+  if(currentDetailEventId){
+    renderStatsAndRsvp(); renderAttendees();
+    // po přihlášení/odhlášení musí odpovídat právům i zbytek detailu akce (panel hlasování, tlačítka správce, záložky)
+    const dEv = events.find(x => x.id === currentDetailEventId);
+    if(dEv){ renderEntryFeeBlock(dEv); renderDateVoteBlock(dEv); renderActiveTab(dEv); }
+  }
 
   document.getElementById('nav-item-uzivatele').style.display = hasPerm('uzivatele') ? 'flex' : 'none';
   document.getElementById('nav-sep-admin').style.display = hasPerm('uzivatele') ? 'block' : 'none';
@@ -5779,9 +5785,9 @@ function updateAuthUI(){
   if(!hasPerm('uzivatele') && document.getElementById('view-uzivatele').classList.contains('active')){
     showView('akce');
   }
-  document.getElementById('nav-item-zaznam').style.display = currentIsAdmin ? 'flex' : 'none';
-  if(currentIsAdmin) startAuditListener(); else stopAuditListener();
-  if(!currentIsAdmin && document.getElementById('view-zaznam').classList.contains('active')) showView('akce');
+  document.getElementById('nav-item-zaznam').style.display = hasPerm('zaznam') ? 'flex' : 'none';
+  if(hasPerm('zaznam')) startAuditListener(); else stopAuditListener();
+  if(!hasPerm('zaznam') && document.getElementById('view-zaznam').classList.contains('active')) showView('akce');
 
   const accWidget = document.getElementById('topbar-account-widget');
   if(currentUser && currentNick){
@@ -5838,6 +5844,13 @@ onAuthStateChanged(auth, async (user) => {
     }
   }else{
     updateAuthUI();
+    // skutečné odhlášení (ne první načtení stránky): zpět na úvodní stranu a překreslit, ať nezůstane
+    // nic, co vidí jen přihlášený/admin (např. panel hlasování o termínu)
+    if(initialAuthSettled){
+      stopAuditListener();
+      try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+      applyRoute();
+    }
   }
   // Přihlášení se ověřuje na pozadí a stránka se mohla vykreslit dřív, než bylo hotovo
   // (např. tlačítka podle práv). Jakmile ověření poprvé doběhne, aktuální pohled se
