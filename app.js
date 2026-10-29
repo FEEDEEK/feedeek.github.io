@@ -934,6 +934,7 @@ function openEventDetail(eventId){
     snap.forEach(d => currentRegistrationsMap[d.id] = { ...d.data(), _docId: d.id });
     renderStatsAndRsvp();
     renderAttendees();
+    { const liveEv = events.find(x => x.id === eventId) || ev; renderDateVoteBlock(liveEv); }
     if(currentTab === 'jidlo') renderTabJidlo(ev);
   });
   detailUnsubs.push(unsubReg);
@@ -1182,7 +1183,21 @@ function renderEntryFeeBlock(ev){
   `;
 }
 
+let usersNickCache = null, usersNickLoading = false;
+function ensureUsersNickCache(){
+  if(usersNickCache || usersNickLoading || !hasPerm('akce')) return;
+  usersNickLoading = true;
+  getAllUsersForMail().then(list => {
+    usersNickCache = {}; list.forEach(u => { usersNickCache[u.uid] = u.nick; });
+    const ev = events.find(x => x.id === currentDetailEventId);
+    if(ev) renderDateVoteBlock(ev);
+  }).finally(() => { usersNickLoading = false; });
+}
+function dateVoterNick(ev, uid){
+  return (ev.dateVoteNicks || {})[uid] || currentRegistrationsMap[uid]?.nick || (usersNickCache && usersNickCache[uid]) || '(neznámý)';
+}
 function renderDateVoteBlock(ev){
+  ensureUsersNickCache();
   const box = document.getElementById('ed-datevote');
   const options = ev.dateOptions || [];
   const votes = ev.dateVotes || {};
@@ -1205,7 +1220,7 @@ function renderDateVoteBlock(ev){
     box.innerHTML = `
       <div class="section-title" style="font-size:15px;">🗳️ Hlasování o termínu <span class="status-hint">(uzavřeno)</span></div>
       ${options.map((opt, idx) => {
-        const nicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => nickMap[uid] || currentRegistrationsMap[uid]?.nick || '(neznámý)');
+        const nicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => dateVoterNick(ev, uid));
         const chosen = ev.dateStart === opt.start && ev.dateEnd === opt.end;
         return `<div style="margin-top:8px; font-size:13px;${chosen ? 'color:var(--gold);' : ''}">
           ${chosen ? '✓ ' : ''}<b>${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}</b> <span class="status-hint">(${nicks.length} hlasů)</span>
@@ -1234,7 +1249,7 @@ function renderDateVoteBlock(ev){
     ${ev.dateVoteDeadline ? `<p class="lede" style="margin-top:0; font-size:13px;">Hlasování otevřené do ${fmtDate(ev.dateVoteDeadline)}.</p>` : ''}
     ${options.map((opt, idx) => {
       const voteNickMap = ev.dateVoteNicks || {};
-      const voterNicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => voteNickMap[uid] || currentRegistrationsMap[uid]?.nick || '(neznámý)');
+      const voterNicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => dateVoterNick(ev, uid));
       const isMine = myVotes.includes(idx);
       const countTitle = hasPerm('akce') ? (voterNicks.length ? voterNicks.join('\n') : 'Zatím nikdo') : '';
       return `
