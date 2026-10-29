@@ -5157,18 +5157,13 @@ formAuth.addEventListener('submit', async (e) => {
   setAuthMessage('');
   try{
     if(authStep === 1){
+      // krok 1 = pouze PŘIHLÁŠENÍ; registrace má vlastní tlačítko
       const unameSnap = await getDoc(usernameDocRef(nick));
-      if(unameSnap.exists()){
+      if(!unameSnap.exists()){
+        setAuthMessage(`Přezdívka "${nick}" neexistuje. Zkontroluj ji, nebo klikni na Registrovat.`);
+      }else{
         const { email } = unameSnap.data();
         await signInWithEmailAndPassword(auth, email, password);
-      }else{
-        authStep = 2;
-        pendingNickForRegistration = nick;
-        authEmailField.style.display = 'block';
-        document.getElementById('auth-nick').readOnly = true;
-        authSubmitBtn.textContent = 'Dokončit registraci';
-        document.getElementById('auth-phone-field').style.display = 'block';
-        setAuthMessage(`Přezdívka "${nick}" je volná — doplň e-mail a založíme ti účet.`);
       }
     }else{
       const email = document.getElementById('auth-email').value.trim();
@@ -5201,14 +5196,51 @@ formAuth.addEventListener('submit', async (e) => {
   }
 });
 
+document.getElementById('auth-register-btn').addEventListener('click', async () => {
+  const nick = document.getElementById('auth-nick').value.trim();
+  const password = document.getElementById('auth-password').value;
+  if(!nick){ setAuthMessage('Vyplň přezdívku.'); return; }
+  if(password.length < 6){ setAuthMessage('Heslo musí mít aspoň 6 znaků.'); return; }
+  const btn = document.getElementById('auth-register-btn');
+  btn.disabled = true;
+  try{
+    const unameSnap = await getDoc(usernameDocRef(nick));
+    if(unameSnap.exists()){ setAuthMessage(`Přezdívka "${nick}" je už obsazená. Pokud je tvoje, klikni na Přihlásit.`); return; }
+    authStep = 2;
+    pendingNickForRegistration = nick;
+    authEmailField.style.display = 'block';
+    document.getElementById('auth-phone-field').style.display = 'block';
+    document.getElementById('auth-nick').readOnly = true;
+    authSubmitBtn.textContent = 'Dokončit registraci';
+    btn.style.display = 'none';
+    document.getElementById('auth-back-btn').style.display = '';
+    setAuthMessage(`Přezdívka "${nick}" je volná — doplň e-mail a založíme ti účet.`);
+  }catch(err){ console.error(err); setAuthMessage('Něco se nepovedlo. Zkus to prosím znovu.'); }
+  finally{ btn.disabled = false; }
+});
+document.getElementById('auth-back-btn').addEventListener('click', () => {
+  // zpět na přihlášení (přezdívka a heslo zůstanou vyplněné)
+  authStep = 1;
+  pendingNickForRegistration = null;
+  authEmailField.style.display = 'none';
+  document.getElementById('auth-phone-field').style.display = 'none';
+  document.getElementById('auth-nick').readOnly = false;
+  authSubmitBtn.textContent = 'Přihlásit';
+  document.getElementById('auth-register-btn').style.display = '';
+  document.getElementById('auth-back-btn').style.display = 'none';
+  setAuthMessage('');
+});
+
 function resetAuthForm(){
   authStep = 1;
+  document.getElementById('auth-register-btn').style.display = '';
+  document.getElementById('auth-back-btn').style.display = 'none';
   pendingNickForRegistration = null;
   formAuth.reset();
   authEmailField.style.display = 'none';
   document.getElementById('auth-phone-field').style.display = 'none';
   document.getElementById('auth-nick').readOnly = false;
-  authSubmitBtn.textContent = 'Pokračovat';
+  authSubmitBtn.textContent = 'Přihlásit';
   setAuthMessage('');
 }
 
