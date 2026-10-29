@@ -1055,3 +1055,8 @@ button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):n
 /* Handicap tlačítko: kosočtverec nesmí překrývat text (šikmý ořez tlačítek ukusuje levý okraj) */
 .dota-btn{ padding:12px 30px 12px 58px !important; white-space:nowrap; }
 .dota-btn::before{ left:28px !important; }
+
+/* QR kód platby (vpravo nahoře v hlavičce akce) nesmí překrývat panel hlasování / informace */
+@media (min-width: 901px){
+  .ed-header:has(#ed-payment-qr:not(:empty)) .ed-header-inner{ padding-right:210px; }
+}
