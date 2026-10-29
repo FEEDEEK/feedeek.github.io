@@ -397,7 +397,7 @@
       <div class="score-modal" style="max-width:480px;">
         <button type="button" class="tb-modal-close-btn" id="login-modal-close">✕</button>
         <h1 class="headline" style="font-size:24px; margin-top:0;">Přihlášení / registrace</h1>
-        <p class="lede" style="margin-top:4px;">Zadej přezdívku a heslo. Pokud pod tou přezdívkou účet ještě nemáš, rovnou tě necháme jeden založit.</p>
+        <p class="lede" style="margin-top:4px;">Zadej přezdívku a heslo a klikni na Přihlásit. Pokud tu ještě účet nemáš, klikni na Registrovat.</p>
 
         <div id="auth-logged-out" style="margin-top:20px;">
           <form class="panel" id="form-auth">
@@ -405,7 +405,11 @@
             <div class="field"><label>Heslo</label><input type="password" id="auth-password" placeholder="Aspoň 6 znaků" required minlength="6"></div>
             <div class="field" id="auth-email-field" style="display:none;"><label>E-mail</label><input type="email" id="auth-email" placeholder="Potřebujeme ho pro založení účtu"></div>
             <div class="field" id="auth-phone-field" style="display:none;"><label>Telefon (nepovinné)</label><input type="tel" id="auth-phone" placeholder="+420 ..."><small>Nikde se veřejně nezobrazuje, vidí ho jen admin.</small></div>
-            <button type="submit" id="auth-submit-btn">Pokračovat</button>
+            <div id="auth-btn-row" style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button type="submit" id="auth-submit-btn">Přihlásit</button>
+              <button type="button" class="btn-ghost" id="auth-register-btn">Registrovat</button>
+              <button type="button" class="btn-ghost" id="auth-back-btn" style="display:none;">← Zpět</button>
+            </div>
             <div id="auth-message" class="small-msg"></div>
           </form>
 
