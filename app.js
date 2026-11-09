@@ -976,6 +976,12 @@ function openEventDetail(eventId){
   });
   detailUnsubs.push(unsubFood);
 
+  const unsubSched = onSnapshot(collection(db, 'events', eventId, 'scheduleComments'), (snap) => {
+    currentScheduleComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+    if(currentTab === 'rozvrh') renderScheduleComments(ev);   // jen seznam příspěvků, ať se nepřekreslí rozepsaný text
+  });
+  detailUnsubs.push(unsubSched);
+
   const unsubPhotos = onSnapshot(collection(db, 'events', eventId, 'photos'), (snap) => {
     currentPhotos = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
     if(currentTab === 'foto') renderTabFoto(ev);
@@ -987,6 +993,7 @@ let currentSuggestions = [];
 let pendingSuggestionImage = '';
 let currentComments = [];
 let currentFoodComments = [];
+let currentScheduleComments = [];
 let currentPhotos = [];
 
 function renderTournamentSignupCta(ev){
@@ -4981,7 +4988,8 @@ function renderTabRozvrh(ev){
   const schedule = ev.schedule || [];
 
   if(days.length === 0){
-    box.innerHTML = '<div class="empty">Rozvrh půjde vyplnit, až bude mít akce potvrzené konkrétní datum.</div>';
+    box.innerHTML = '<div class="empty">Rozvrh půjde vyplnit, až bude mít akce potvrzené konkrétní datum.</div>' + scheduleDiscussionHtml();
+    setupScheduleDiscussion(ev);
     return;
   }
 
@@ -5004,7 +5012,9 @@ function renderTabRozvrh(ev){
     `;
   }
   html += `</div>`;
+  html += scheduleDiscussionHtml();
   box.innerHTML = html;
+  setupScheduleDiscussion(ev);
 
   const formSch = document.getElementById('form-schedule-item');
   if(formSch) formSch.addEventListener('submit', async (e) => {
@@ -5054,6 +5064,60 @@ function renderTabRozvrh(ev){
       catch(err){ console.error(err); }
     });
   });
+}
+
+// ---- Diskuze k rozvrhu ----
+function scheduleDiscussionHtml(){
+  return `
+    <div class="section-title" style="font-size:16px; margin-top:28px;">Diskuze k rozvrhu</div>
+    <div class="discussion-block">
+      <div class="discussion-list" id="schedule-comments-list"></div>
+      <div class="discussion-input-row">
+        <div class="discussion-input-wrap">
+          <textarea class="discussion-input" id="schedule-comment-input" placeholder="Návrhy na změnu, kdy co začne..."></textarea>
+          <button type="button" class="emoji-picker-btn" id="emoji-btn-schedule" title="Vložit emotikon">🙂</button>
+          <div class="emoji-picker-panel" id="emoji-panel-schedule" style="display:none;"></div>
+        </div>
+        <button type="button" id="btn-add-schedule-comment" class="btn-sm">Odeslat</button>
+      </div>
+    </div>`;
+}
+function setupScheduleDiscussion(ev){
+  setupChatEmojiRow('emoji-btn-schedule', 'emoji-panel-schedule', 'schedule-comment-input');
+  renderScheduleComments(ev);
+  document.getElementById('btn-add-schedule-comment').addEventListener('click', async () => {
+    if(!currentUser || !currentNick){ showView('ucet'); return; }
+    const input = document.getElementById('schedule-comment-input');
+    const text = input.value.trim();
+    if(!text) return;
+    try{
+      await addDoc(collection(db,'events',ev.id,'scheduleComments'), { text, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, ts: new Date().toISOString() });
+      input.value = '';
+    }catch(err){ console.error(err); }
+  });
+}
+function renderScheduleComments(ev){
+  const list = document.getElementById('schedule-comments-list');
+  if(!list) return;
+  list.innerHTML = currentScheduleComments.length === 0
+    ? '<div class="empty">Zatím žádná diskuze.</div>'
+    : currentScheduleComments.map(c => {
+        const canEdit = currentUser && (c.uid === currentUser.uid || hasPerm('akce') || hasPerm('turnaj'));
+        return `
+        <div class="comment-row">
+          <span class="who">${authorLabel(c.author, c.authorEmoji, c.authorAvatar)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
+          <div class="txt">${escapeHtml(c.text)}</div>
+          ${canEdit ? `<div class="row-actions"><button type="button" class="btn-ghost btn-sm" data-schedule-comment-delete="${c.id}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button></div>` : ''}
+        </div>`;
+      }).join('');
+  list.querySelectorAll('[data-schedule-comment-delete]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if(!confirm('Smazat tenhle příspěvek?')) return;
+      try{ await deleteDoc(doc(db,'events',ev.id,'scheduleComments',btn.dataset.scheduleCommentDelete)); }
+      catch(err){ console.error(err); }
+    });
+  });
+  list.scrollTop = list.scrollHeight;
 }
 
 // ---- Foto ----
