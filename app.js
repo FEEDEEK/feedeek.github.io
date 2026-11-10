@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail,
+  GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail, sendEmailVerification,
   EmailAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, verifyBeforeUpdateEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
@@ -5299,6 +5299,7 @@ formAuth.addEventListener('submit', async (e) => {
       if(!email){ setAuthMessage('Doplň prosím e-mail.'); authSubmitBtn.disabled = false; return; }
       suppressAuthStateHandling = true;
       const cred = await createUserWithEmailAndPassword(auth, email, password);
+      try{ await sendEmailVerification(cred.user); }catch(e){ console.error('Ověřovací e-mail:', e); }
       await setDoc(usernameDocRef(pendingNickForRegistration), { uid: cred.user.uid, email });
       await setDoc(doc(db, 'users', cred.user.uid), { nick: pendingNickForRegistration, email, phone, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() });
       currentUser = cred.user;
@@ -5807,7 +5808,37 @@ async function renderUsersList(){
   }catch(err){ console.error(err); box.innerHTML = '<div class="empty">Nepovedlo se načíst uživatele.</div>'; }
 }
 
+// Upozornění pro uživatele s nepotvrzeným e-mailem (přihlášení heslem): bez potvrzení nejde komentovat, nahrávat ani se přihlásit na akci
+function updateVerifyBanner(){
+  let bar = document.getElementById('verify-banner');
+  const need = currentUser && currentNick && !currentUser.emailVerified && hasPasswordProvider(currentUser);
+  if(!need){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'verify-banner';
+    bar.style.cssText = 'position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#3a2c0b; color:#f3e3b0; border-top:2px solid var(--gold); padding:12px 16px; font-size:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center;';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = `<span>📧 Potvrď svůj e-mail (<b>${escapeHtml(currentUser.email || '')}</b>) odkazem, který jsme ti poslali. Do té doby nejde komentovat, nahrávat fotky ani se přihlásit na akci.</span>
+    <button type="button" class="btn-sm" id="vb-resend">Poslat odkaz znovu</button>
+    <button type="button" class="btn-sm btn-ghost" id="vb-check">Už jsem potvrdil</button>
+    <span id="vb-msg"></span>`;
+  bar.querySelector('#vb-resend').addEventListener('click', async () => {
+    try{ await sendEmailVerification(currentUser); bar.querySelector('#vb-msg').textContent = 'Odesláno, zkontroluj poštu (i spam).'; }
+    catch(e){ bar.querySelector('#vb-msg').textContent = 'Teď to nejde, zkus to za chvíli.'; }
+  });
+  bar.querySelector('#vb-check').addEventListener('click', async () => {
+    try{
+      await currentUser.reload();
+      await currentUser.getIdToken(true);
+      if(currentUser.emailVerified){ updateVerifyBanner(); }
+      else bar.querySelector('#vb-msg').textContent = 'Zatím nepotvrzeno.';
+    }catch(e){ bar.querySelector('#vb-msg').textContent = 'Nepovedlo se ověřit.'; }
+  });
+}
+
 function updateAuthUI(){
+  updateVerifyBanner();
   const loggedOutBox = document.getElementById('auth-logged-out');
   const loggedInBox = document.getElementById('auth-logged-in');
   const googleNickPrompt = document.getElementById('auth-google-nick-prompt');
