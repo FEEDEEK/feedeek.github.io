@@ -32,6 +32,7 @@ export const S = {
   usersNickCache: null,
   usersNickLoading: false,
   allTournaments: [],
+  gameLogoTargetIdx: null,
   currentTournamentId: null,
 };
 
