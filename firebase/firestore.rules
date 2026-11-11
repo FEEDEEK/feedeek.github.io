@@ -1,0 +1,143 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- pomocné funkce ----------
+    function signedIn() { return request.auth != null; }
+    // ověřený e-mail (Google přihlášení je ověřené vždy, u hesla musí uživatel kliknout na odkaz z e-mailu)
+    function verified() { return signedIn() && request.auth.token.email_verified == true; }
+    function meRef() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function haveMe() { return signedIn() && exists(meRef()); }
+    function isSuper() { return haveMe() && get(meRef()).data.get('isSuperAdmin', false) == true; }
+    function isAdminUser() { return isSuper() || (haveMe() && get(meRef()).data.get('isAdmin', false) == true); }
+    function hasPerm(area) {
+      return isSuper() || (haveMe()
+        && get(meRef()).data.get('isAdmin', false) == true
+        && get(meRef()).data.get('permissions', {}).get(area, false) == true);
+    }
+
+    // ---------- akce ----------
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, delete: if hasPerm('akce');
+      allow update: if hasPerm('akce') || (
+        signedIn()
+        && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dateVotes'])
+            && request.resource.data.dateVotes.diff(resource.data.get('dateVotes', {})).affectedKeys().hasOnly([request.auth.uid]))
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['foodVotes'])
+          || (hasPerm('jidlo') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['foodPlan', 'foodSchedule', 'foodVotingSlots']))
+        )
+      );
+
+      match /registrations/{regId} {
+        allow read: if true;
+        allow create: if verified() && (regId == request.auth.uid || hasPerm('akce'));
+        allow update: if signedIn() && (
+          (regId == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['paid']))
+          || hasPerm('akce'));
+        allow delete: if signedIn() && (regId == request.auth.uid || hasPerm('akce'));
+      }
+
+      match /suggestions/{id} {
+        allow read: if true;
+        allow create: if verified() && request.resource.data.uid == request.auth.uid;
+        allow update: if signedIn() && (
+          resource.data.uid == request.auth.uid
+          || hasPerm('akce')
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likeNicks']));
+        allow delete: if signedIn() && (resource.data.uid == request.auth.uid || hasPerm('akce'));
+      }
+
+      match /comments/{id} {
+        allow read: if true;
+        allow create: if verified() && request.resource.data.uid == request.auth.uid;
+        allow update, delete: if signedIn() && (resource.data.uid == request.auth.uid || hasPerm('akce'));
+      }
+
+      match /scheduleComments/{id} {
+        allow read: if true;
+        allow create: if verified() && request.resource.data.uid == request.auth.uid;
+        allow update, delete: if signedIn() && (resource.data.uid == request.auth.uid || hasPerm('akce') || hasPerm('turnaj'));
+      }
+
+      match /foodComments/{id} {
+        allow read: if true;
+        allow create: if verified() && request.resource.data.uid == request.auth.uid;
+        allow update, delete: if signedIn() && (resource.data.uid == request.auth.uid || hasPerm('jidlo') || hasPerm('akce'));
+      }
+
+      match /photos/{id} {
+        allow read: if true;
+        allow create: if verified() && request.resource.data.uid == request.auth.uid;
+        allow update, delete: if signedIn() && (resource.data.uid == request.auth.uid || hasPerm('akce'));
+      }
+    }
+
+    // ---------- uživatelé ----------
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdminUser());
+      allow create: if signedIn() && request.auth.uid == uid
+        && !request.resource.data.keys().hasAny(['isAdmin', 'isSuperAdmin', 'permissions']);
+      allow update: if signedIn() && (
+        (request.auth.uid == uid
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isSuperAdmin', 'permissions']))
+        || hasPerm('uzivatele'));
+      allow delete: if hasPerm('uzivatele');
+    }
+
+    match /usernames/{nick} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if signedIn() && (resource.data.uid == request.auth.uid || hasPerm('uzivatele'));
+    }
+
+    // ---------- kontakty ----------
+    match /contacts/{id} {
+      allow read: if true;
+      allow write: if hasPerm('kontakty');
+    }
+
+    // ---------- turnaje ----------
+    match /tournaments/{tid} {
+      allow read: if true;
+      // běžný přihlášený uživatel smí měnit JEN seznam přihlášených (fáze "Přihlášky otevřeny");
+      // cokoli jiného (týmy, formát, kola, skóre...) jen správce Turnaje
+      allow update: if hasPerm('turnaj') || (
+        signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signups'])
+      );
+      allow create, delete: if hasPerm('turnaj');
+    }
+
+    // sdílený handicap (skill + piva/panáky/jointy) napříč turnaji stejné akce a dne
+    match /handicapSessions/{sessionId} {
+      allow read: if true;
+      allow write: if hasPerm('turnaj');
+
+      match /drinkEvents/{eid} {
+        allow read: if true;
+        allow create: if hasPerm('turnaj');
+      }
+    }
+
+    // zapamatované skilly hráčů (losování týmů)
+    match /playerSkills/{nick} {
+      allow read, write: if hasPerm('turnaj');
+    }
+
+    // ---------- odchozí e-maily (rozšíření "Trigger Email from Firestore") ----------
+    // zakládat je smí jen správce s oprávněním; odeslání i zápis stavu "delivery" dělá rozšíření (Admin SDK)
+    // záznam změn: zapisovat smí každý admin jen za sebe, číst admini, upravovat/mazat nikdo
+    match /auditLog/{id} {
+      allow create: if isAdminUser() && request.resource.data.uid == request.auth.uid;
+      allow read: if hasPerm('zaznam');
+      allow update, delete: if false;
+    }
+
+    match /mail/{id} {
+      allow create: if hasPerm('akce') || hasPerm('turnaj') || hasPerm('jidlo') || hasPerm('uzivatele');
+      allow read: if isAdminUser();
+    }
+  }
+}

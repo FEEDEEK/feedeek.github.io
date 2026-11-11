@@ -2140,8 +2140,8 @@ function gameUsesAegis(t){
   return g === 'dota 2' || g === 'dota2' || g === 'dota';
 }
 function trophyOrAegisImg(t, rankClass){
-  if(gameUsesAegis(t)) return `<img src="AEGIS.png" alt="" class="aegis-img aegis-${rankClass}">`;
-  return `<img src="Pohar.png" alt="" class="trophy-img trophy-${rankClass}">`;
+  if(gameUsesAegis(t)) return `<img src="assets/img/aegis.webp" alt="" class="aegis-img aegis-${rankClass}">`;
+  return `<img src="assets/img/pohar.webp" alt="" class="trophy-img trophy-${rankClass}">`;
 }
 function podiumCupHtml(t, rankClass, rank, labelName){
   const isAegis = gameUsesAegis(t);
@@ -2149,7 +2149,7 @@ function podiumCupHtml(t, rankClass, rank, labelName){
     <div class="aegis-glow aegis-glow-${rankClass}"></div>${rank===1?'<div class="aegis-sparks"></div>':''}
     ${isAegis
       ? trophyOrAegisImg(t, rankClass)
-      : `<div class="trophy-podium-img"><img src="Pohar.png" alt="" class="trophy-img trophy-${rankClass}"><div class="trophy-podium-label"><span class="tp-rank">${rank}.</span><span class="tp-name">${escapeHtml(labelName)}</span></div></div>`}
+      : `<div class="trophy-podium-img"><img src="assets/img/pohar.webp" alt="" class="trophy-img trophy-${rankClass}"><div class="trophy-podium-label"><span class="tp-rank">${rank}.</span><span class="tp-name">${escapeHtml(labelName)}</span></div></div>`}
   </div>`;
 }
 
@@ -3300,7 +3300,7 @@ function tbSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 
 // ---- Zvuk výherního automatu (nahrávka z videa): točení ve smyčce -> rána při každém hráči -> závěr ----
-const TB_SLOT_FILES = { draw: 'slot-draw.mp3' };
+const TB_SLOT_FILES = { draw: 'assets/audio/slot-draw.mp3' };
 // časy (s od začátku slot-draw.mp3), kdy v nahrávce cinknou 3 hráči - podle nich se zastavují válce
 const TB_SLOT_HITS = [1.37, 2.12, 2.84];
 let tbSlotT0 = 0;

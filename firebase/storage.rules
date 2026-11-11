@@ -1,0 +1,37 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() { return request.auth != null; }
+    function verified() { return signedIn() && request.auth.token.email_verified == true; }
+
+    // avatary uživatelů - každý smí nahrát jen svůj vlastní (soubor pojmenovaný podle jeho UID)
+    match /avatars/{uid} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // vlastní emotikon - stejně jako avatar, jen jiná cesta a volný název souboru
+    match /custom-emoji/{fileName} {
+      allow read: if true;
+      allow write: if verified();
+    }
+
+    // fotky/videa z akcí
+    match /event-photos/{eventId}/{fileName} {
+      allow read: if true;
+      allow write: if verified();
+    }
+
+    // QR kód pro platbu (nahraný adminem u akce)
+    match /qr-codes/{fileName} {
+      allow read: if true;
+      allow write: if verified();
+    }
+
+    // vše ostatní zůstává zakázané
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
