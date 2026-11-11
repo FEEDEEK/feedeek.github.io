@@ -1,18 +1,16 @@
 // Záznam změn: co který admin kdy udělal. Zápis (logAction) a výpis pro správce s oprávněním "zaznam".
-// Modul nezná zbytek aplikace – údaje o přihlášeném uživateli mu předá app.js přes initAudit().
+// Údaje o přihlášeném uživateli čte ze sdíleného stavu (js/state.js).
 import { collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { escapeHtml } from "./util.js";
-
-let ctx = { getUser: () => null, getNick: () => '', isAdmin: () => false, hasPerm: () => false };
-export function initAudit(c){ ctx = { ...ctx, ...c }; }
+import { S, hasPerm } from "./state.js";
 
 export const AUDIT_AREAS = { akce:'Akce', turnaj:'Turnaje', jidlo:'Jídlo', kontakty:'Kontakty', uzivatele:'Uživatelé', mail:'E-maily' };
 export function logAction(area, text){
   try{
-    const user = ctx.getUser();
-    if(!user || !ctx.isAdmin()) return;
-    addDoc(collection(db, 'auditLog'), { at: new Date().toISOString(), by: ctx.getNick() || '?', uid: user.uid, area, text }).catch(err => console.error('Záznam změn:', err));
+    const user = S.currentUser;
+    if(!user || !S.currentIsAdmin) return;
+    addDoc(collection(db, 'auditLog'), { at: new Date().toISOString(), by: S.currentNick || '?', uid: user.uid, area, text }).catch(err => console.error('Záznam změn:', err));
   }catch(e){ /* záznam nikdy nesmí shodit akci */ }
 }
 let auditUnsub = null, auditEntries = [], auditFilter = 'all';
@@ -26,7 +24,7 @@ function renderAuditLog(){
   box.innerHTML = list.length ? list.map(e => `<div class="audit-row"><span class="audit-when">${escapeHtml(fmt(e.at))}</span><span class="audit-by">${escapeHtml(e.by || '?')}</span><span class="audit-area">${escapeHtml(AUDIT_AREAS[e.area] || e.area || '')}</span><span class="audit-text">${escapeHtml(e.text || '')}</span></div>`).join('') : '<div class="empty">Zatím žádné záznamy.</div>';
 }
 export function startAuditListener(){
-  if(auditUnsub || !ctx.hasPerm('zaznam')) return;
+  if(auditUnsub || !hasPerm('zaznam')) return;
   auditUnsub = onSnapshot(collection(db, 'auditLog'), snap => {
     auditEntries = snap.docs.map(d => d.data()).sort((x, y) => (y.at || '').localeCompare(x.at || '')).slice(0, 500);
     renderAuditLog();
