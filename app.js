@@ -1056,7 +1056,7 @@ function renderWhenWhere(ev){
     <div class="ww-whenwrap" id="ed-ww-when"><div class="ww-card ww-when">${count ? '' : `<div class="ww-ico">${icon}</div>`}
       <div class="ww-body"><div class="ww-k">KDY</div><div class="ww-big">${big}<span class="ww-flag" title="Výsledky hlasování o termínu (jen pro adminy)"></span></div><div class="ww-sub">${escapeHtml(sub)}</div></div>${count}</div>
       <div class="ww-pop" id="ed-ww-pop"></div></div>
-    ${place ? `<a class="ww-card ww-where" href="${mapUrl}" target="_blank" rel="noopener"><div class="ww-ico ww-pin">📍</div>
+    ${place ? `<a class="ww-card ww-where" href="${mapUrl}" target="_blank" rel="noopener"><div class="ww-pinbox"><i></i><b></b></div>
       <div class="ww-body"><div class="ww-k">KDE</div><div class="ww-big">${escapeHtml(place)}</div><div class="ww-sub">Zobrazit v mapách ↗</div></div></a>` : ''}`;
   fillDateVotePopup(ev);
   const ww = document.getElementById('ed-ww-when');
@@ -1082,7 +1082,7 @@ function renderEventDetailStatic(ev){
 
   const mapBox = document.getElementById('ed-map');
   const q = encodeURIComponent(ev.place || '');
-  mapBox.innerHTML = `<iframe src="https://www.google.com/maps?q=${q}&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+  mapBox.innerHTML = `<iframe src="https://www.google.com/maps?q=${q}&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="map-ping" aria-hidden="true"><span></span><span></span></div>`;
 
   const tabPanels = { prehled:'tab-prehled', rozvrh:'tab-rozvrh', jidlo:'tab-jidlo', turnaj:'tab-turnaj', foto:'tab-foto' };
   Object.entries(tabPanels).forEach(([key, id]) => {
