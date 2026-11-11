@@ -1,40 +1,31 @@
-import {
-  collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, getDocFromServer, getDocs, setDoc,
-  updateDoc, deleteDoc, arrayUnion, arrayRemove, increment
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail, sendEmailVerification,
-  EmailAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, verifyBeforeUpdateEmail
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  ref, uploadBytes, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+import { collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, getDocFromServer, getDocs, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { ref } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 import { httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
 import { db, auth, storage, functionsApi } from "./js/firebase.js";
-import { escapeHtml, fmtDate, fmtDateShort, todayIso } from "./js/util.js";
-import { gameFieldHtml, setupGameField, searchGames, STEAM_SEARCH_FUNCTION_URL } from "./js/games.js";
+import { escapeHtml, fmtDate, todayIso } from "./js/util.js";
+
 import { S, hasPerm } from "./js/state.js";
 import { appApi } from "./js/hooks.js";
 import { logAction, startAuditListener, stopAuditListener } from "./js/audit.js";
-import { eventHasOwnPaymentAccount, renderPersonalPaymentQr } from "./js/payment.js";
-import { MEAL_SLOTS, emptyFoodSchedule, PERMISSION_AREAS } from "./js/constants.js";
-import { fmtDateRange, avatarTag, emojiTag, authorLabel, setupChatEmojiRow } from "./js/ui.js";
+
+import { PERMISSION_AREAS } from "./js/constants.js";
+import { fmtDateRange, avatarTag } from "./js/ui.js";
 import { renderTabFoto } from "./js/photos.js";
-import { renderTabRozvrh, renderScheduleComments } from "./js/schedule.js";
+import { renderScheduleComments } from "./js/schedule.js";
 import "./js/account.js";
 import { renderContacts, closeContactForm } from "./js/contacts.js";
-import { renderTabTurnaj } from "./js/tab-turnaj.js";
+
 import { renderTabPrehled } from "./js/tab-prehled.js";
 import { renderTabJidlo } from "./js/tab-jidlo.js";
 import { renderStatsAndRsvp, renderAttendees } from "./js/rsvp.js";
-import { openFoodEditor } from "./js/food-editor.js";
+
 import { renderEventDetailStatic, renderActiveTab, renderEntryFeeBlock, renderDateVoteBlock, isPastDeadline } from "./js/event-detail.js";
 import { normalizeGame, renderFormGames, renderFormFood, closeEventForm, renderEvents, startEditEvent } from "./js/event-form.js";
-import { TEAM_EMBLEMS, TEAM_COLORS, autoStyle, teamName, teamObj, teamCaptain, teamMembersHtml, trophySvg, computeFfaStandings, podiumCupHtml, buildFfaPodiumHtml, renderFfaBody } from "./js/turnaj-common.js";
-import { TB_BATCH_WINDOW, TB_REEL_ITEM_H, TB_SHOT_ICON, TB_JOINT_ICON, tbCalculateCurrentSkill, tbSaveSkill, tbLoadSkill, tbKey, handicapSessionKey, tbRawHandicap, tbGetPlayerStats, tbEffectiveStats, tbAddDrawPlayer, tbBeerUpMsgs, tbBeerDownMsgs, tbShotUpMsgs, tbShotDownMsgs, tbJointUpMsgs, tbJointDownMsgs, tbBeerCollectiveMsgs, tbShotCollectiveMsgs, tbJointCollectiveMsgs, tbJoinNamesCz, tbPick, tbShuffleArray, tbSleep } from "./js/tb-core.js";
-import { tbInvalidateDraw, tbTeamSizeVal, tbUpdateTeamCountHint, tbRenderDrawPlayers, tbRenderDrawnTeams, tbStartDrawFromForm, tbStartDraft, tbStopLive, tbEnsureLive, openTbDevGraphModal, closeTbDevGraphModal, tbCloseDrinkModal, openTbDrinkModal, tbRefreshDrinkModal, renderTourneyTeamsPanel, tbUnlockSound, computeSwissTournament, renderSwissBody, openTeamEditorModal, openTournamentResultModal, fitBracketToScreen, layoutBracketRounds, drawBracketConnectors } from "./js/tb-live.js";
+import { teamName, computeFfaStandings } from "./js/turnaj-common.js";
+import { tbEffectiveStats } from "./js/tb-core.js";
+import { tbStopLive, closeTbDevGraphModal, tbCloseDrinkModal, computeSwissTournament, fitBracketToScreen, layoutBracketRounds, drawBracketConnectors } from "./js/tb-live.js";
 import { renderTurnajPage } from "./js/turnaj-page.js";
 
 // funkce, které zatím zůstávají v app.js a potřebují je moduly (viz js/hooks.js)
