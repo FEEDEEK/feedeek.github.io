@@ -33,6 +33,21 @@ export const S = {
   usersNickLoading: false,
   allTournaments: [],
   gameLogoTargetIdx: null,
+  turnajProjectorMode: false,
+  tourneySetupStep: null, // null | format | team-draw | ffa-confirm
+  tbSoundEnabled: true,
+  tbAudioCtx: null,
+  tbDraftInProgress: false,
+  tbEventQueue: Promise.resolve(),
+  tbPendingEvents: [],
+  tbBatchTimer: null,
+  tbSelectedVoiceURI: "",
+  tbCurrentDraft: null,
+  tbSpinBusy: false,
+  tbDraftCancelled: false,
+  handicapCache: {},
+  tbDraw: { players: [], teams: null },
+  tbSoundUnlocked: false,
   currentTournamentId: null,
 };
 
