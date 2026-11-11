@@ -1251,3 +1251,12 @@ h1.headline.ed-page-title::after{
 .trophy-podium-label .tp-rank, .trophy-podium-label .tp-name{ display:block; font-size:1em; }
 .trophy-podium-label .tp-rank{ flex:0 0 auto; }
 .trophy-podium-label .tp-name{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
+
+/* Na štítku poháru jen číslo místa, vyryté do kovu */
+.trophy-podium-label, .podium-wrap-big .trophy-podium-label{ width:33%; font-size:calc(var(--cw) * 0.1); padding-top:.04em; }
+.trophy-podium-label .tp-rank{
+  font-family:'Cinzel', serif; font-weight:800; letter-spacing:0; line-height:1;
+  color:rgba(38,24,6,.82);
+  text-shadow:0 1px 0 rgba(255,255,255,.55), 0 -1px 0 rgba(0,0,0,.45), 0 0 1px rgba(0,0,0,.35);
+  mix-blend-mode:multiply;
+}
