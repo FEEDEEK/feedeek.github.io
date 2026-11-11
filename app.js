@@ -15,7 +15,8 @@ import { httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { db, auth, storage, functionsApi } from "./js/firebase.js";
 import { escapeHtml, fmtDate, fmtDateShort, todayIso } from "./js/util.js";
 import { gameFieldHtml, setupGameField, searchGames, STEAM_SEARCH_FUNCTION_URL } from "./js/games.js";
-import { initAudit, logAction, startAuditListener, stopAuditListener } from "./js/audit.js";
+import { S, hasPerm } from "./js/state.js";
+import { logAction, startAuditListener, stopAuditListener } from "./js/audit.js";
 import { eventHasOwnPaymentAccount, renderPersonalPaymentQr } from "./js/payment.js";
 
 // ověřovací e-mail z našeho Gmailu; když funkce selže, použije se výchozí e-mail Firebase
@@ -44,12 +45,6 @@ function emptyFoodSchedule(){
 
 let events = [];
 let regCounts = {};
-let currentUser = null;
-let currentNick = null;
-let currentIsAdmin = false;
-let currentIsSuperAdmin = false;
-let currentPermissions = {};
-initAudit({ getUser: () => currentUser, getNick: () => currentNick, isAdmin: () => currentIsAdmin, hasPerm: (a) => hasPerm(a) });
 const PERMISSION_AREAS = [
   { key:'akce', label:'Akce (vytváření, úprava, účastníci)' },
   { key:'turnaj', label:'Turnaje' },
@@ -58,14 +53,6 @@ const PERMISSION_AREAS = [
   { key:'uzivatele', label:'Uživatelé (správa profilů)' },
   { key:'zaznam', label:'Záznam změn (vidí historii akcí adminů)' }
 ];
-function hasPerm(area){
-  if(!currentUser) return false;
-  if(currentIsSuperAdmin) return true;
-  return currentIsAdmin && currentPermissions[area] === true;
-}
-let currentPhone = '';
-let currentEmoji = '';
-let currentAvatar = '';
 let pendingEventId = null;
 
 let currentEventGames = [];
@@ -179,7 +166,7 @@ onSnapshot(eventsQuery, (snapshot) => {
 const navItems = document.querySelectorAll('.nav-item');
 const views = document.querySelectorAll('.view');
 function showView(name){
-  if(name === 'ucet' && (!currentUser || !currentNick)){ openLoginModal(); return; }
+  if(name === 'ucet' && (!S.currentUser || !S.currentNick)){ openLoginModal(); return; }
   navItems.forEach(n => n.classList.toggle('active', n.dataset.view === name));
   views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
 }
@@ -1136,7 +1123,7 @@ function fillDateVotePopup(ev){
       <button type="button" class="btn-ghost btn-sm" id="btn-reopen-datevote" style="margin-top:12px;">↩ Znovu otevřít hlasování</button>`;
     pop.querySelector('#btn-reopen-datevote').addEventListener('click', async () => {
       if(!confirm('Znovu otevřít hlasování o termínu? Termín akce se označí jako nepotvrzený, hlasy zůstanou.')) return;
-      try{ await updateDoc(doc(db,'events',ev.id), { dateVotingClosed: false, dateUnconfirmed: true, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: 'hlasování znovu otevřeno' }) }); logAction('akce', `znovu otevřel hlasování o termínu u akce „${ev.name}“`); }
+      try{ await updateDoc(doc(db,'events',ev.id), { dateVotingClosed: false, dateUnconfirmed: true, dateHistory: arrayUnion({ at: new Date().toISOString(), by: S.currentNick || '', text: 'hlasování znovu otevřeno' }) }); logAction('akce', `znovu otevřel hlasování o termínu u akce „${ev.name}“`); }
       catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
     });
 }
@@ -1161,7 +1148,7 @@ function renderDateVoteBlock(ev){
   fillDateVotePopup(ev);
   box.style.display = 'block';
 
-  const myVotes = currentUser ? votesOf(currentUser.uid) : [];
+  const myVotes = S.currentUser ? votesOf(S.currentUser.uid) : [];
   const deadlinePassedForVote = ev.dateVoteDeadline && todayIso() > ev.dateVoteDeadline;
 
   box.className = 'panel';
@@ -1178,7 +1165,7 @@ function renderDateVoteBlock(ev){
       return `
         <div class="row" style="margin-top:8px; align-items:center; flex-wrap:wrap;">
           <span style="flex:1; font-size:13px;">${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} <span class="status-hint" title="${escapeHtml(countTitle)}" style="${hasPerm('akce')?'cursor:help; border-bottom:1px dotted var(--text-muted);':''}">(${voterNicks.length} hlasů)</span></span>
-          ${currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'✓ Hlasováno':'Hlasovat'}</button>` : ''}
+          ${S.currentUser ? `<button type="button" class="btn-sm ${isMine?'btn-active':''}" data-vote-date="${idx}" ${deadlinePassedForVote?'disabled':''}>${isMine?'✓ Hlasováno':'Hlasovat'}</button>` : ''}
           ${hasPerm('akce') ? `<button type="button" class="btn-ghost btn-sm" data-finalize-date="${idx}">Vybrat</button>` : ''}
         </div>
       `;
@@ -1187,11 +1174,11 @@ function renderDateVoteBlock(ev){
 
   box.querySelectorAll('[data-vote-date]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if(!currentUser){ showView('ucet'); return; }
+      if(!S.currentUser){ showView('ucet'); return; }
       const idx = parseInt(btn.dataset.voteDate,10);
-      const mine = votesOf(currentUser.uid);
+      const mine = votesOf(S.currentUser.uid);
       const newVotes = mine.includes(idx) ? mine.filter(i=>i!==idx) : [...mine, idx];
-      try{ await updateDoc(doc(db,'events',ev.id), { [`dateVotes.${currentUser.uid}`]: newVotes, [`dateVoteNicks.${currentUser.uid}`]: currentNick || '' }); }
+      try{ await updateDoc(doc(db,'events',ev.id), { [`dateVotes.${S.currentUser.uid}`]: newVotes, [`dateVoteNicks.${S.currentUser.uid}`]: S.currentNick || '' }); }
       catch(err){ console.error(err); }
     });
   });
@@ -1200,7 +1187,7 @@ function renderDateVoteBlock(ev){
       const idx = parseInt(btn.dataset.finalizeDate,10);
       const opt = options[idx];
       if(!confirm(`Nastavit termín akce na ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}?`)) return;
-      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true, dateUnconfirmed: false, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: `vybrán termín ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}` }) }); logAction('akce', `vybral termín ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} u akce „${ev.name}“`); }
+      try{ await updateDoc(doc(db,'events',ev.id), { dateStart: opt.start, dateEnd: opt.end, dateVotingClosed: true, dateUnconfirmed: false, dateHistory: arrayUnion({ at: new Date().toISOString(), by: S.currentNick || '', text: `vybrán termín ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}` }) }); logAction('akce', `vybral termín ${fmtDateShort(opt.start)} – ${fmtDate(opt.end)} u akce „${ev.name}“`); }
       catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
     });
   });
@@ -1217,14 +1204,14 @@ function renderStatsAndRsvp(){
 
   const rsvpBox = document.getElementById('ed-rsvp');
   const qrBoxEl = document.getElementById('ed-payment-qr');
-  if(!currentUser || !currentNick){
+  if(!S.currentUser || !S.currentNick){
     rsvpBox.innerHTML = `<button type="button" id="rsvp-login-btn">Přihlásit se na akci</button>`;
     document.getElementById('rsvp-login-btn').addEventListener('click', () => { pendingEventId = ev.id; showView('ucet'); });
     if(qrBoxEl) qrBoxEl.innerHTML = '';
     return;
   }
 
-  const myReg = currentRegistrationsMap[currentUser.uid];
+  const myReg = currentRegistrationsMap[S.currentUser.uid];
   const deadlinePassed = isPastDeadline(ev);
   const counts = regCounts[ev.id] || { going:0, maybe:0 };
   const full = counts.going >= ev.cap;
@@ -1235,8 +1222,8 @@ function renderStatsAndRsvp(){
     const btn = document.getElementById('rsvp-register-btn');
     if(btn) btn.addEventListener('click', async () => {
       try{
-        await setDoc(doc(db, 'events', ev.id, 'registrations', currentUser.uid), {
-          nick: currentNick, emoji: currentEmoji, avatar: currentAvatar, uid: currentUser.uid, status: 'going', food: {}, ts: new Date().toISOString()
+        await setDoc(doc(db, 'events', ev.id, 'registrations', S.currentUser.uid), {
+          nick: S.currentNick, emoji: S.currentEmoji, avatar: S.currentAvatar, uid: S.currentUser.uid, status: 'going', food: {}, ts: new Date().toISOString()
         });
       }catch(err){ alert('Přihlášení se nepovedlo.'); console.error(err); }
     });
@@ -1246,15 +1233,15 @@ function renderStatsAndRsvp(){
     if(cancelBtn) cancelBtn.addEventListener('click', async () => {
       if(!confirm('Opravdu se chceš z akce odhlásit?')) return;
       try{
-        await deleteDoc(doc(db, 'events', ev.id, 'registrations', currentUser.uid));
+        await deleteDoc(doc(db, 'events', ev.id, 'registrations', S.currentUser.uid));
         // nečekat jen na živý listener - rovnou celou stránku znovu vykreslit, ať nic nezůstane neaktuální bez ručního refreshe
-        delete currentRegistrationsMap[currentUser.uid];
+        delete currentRegistrationsMap[S.currentUser.uid];
         applyRoute();
       }
       catch(err){ alert('Odhlášení se nepovedlo.'); console.error(err); }
     });
     const qrBox = qrBoxEl;
-    if(qrBox) renderPersonalPaymentQr(ev, currentUser.uid, currentNick, qrBox);
+    if(qrBox) renderPersonalPaymentQr(ev, S.currentUser.uid, S.currentNick, qrBox);
   }
 }
 
@@ -1356,7 +1343,7 @@ function renderAttendees(){
     html += '<div class="empty">Zatím se nikdo nepřihlásil.</div>';
   }else{
     html += list.map(r => {
-      const isSelf = currentUser && r._docId === currentUser.uid;
+      const isSelf = S.currentUser && r._docId === S.currentUser.uid;
       let statusHtml;
       if(isSelf){
         statusHtml = `
@@ -1401,7 +1388,7 @@ function renderAttendees(){
   box.querySelectorAll('[data-self-status]').forEach(btn => {
     btn.addEventListener('click', async () => {
       try{
-        await updateDoc(doc(db, 'events', currentDetailEventId, 'registrations', currentUser.uid), { status: btn.dataset.selfStatus });
+        await updateDoc(doc(db, 'events', currentDetailEventId, 'registrations', S.currentUser.uid), { status: btn.dataset.selfStatus });
       }catch(err){ console.error(err); }
     });
   });
@@ -1469,12 +1456,12 @@ function renderTabPrehled(ev){
   renderComments(ev);
 
   document.getElementById('btn-add-suggestion').addEventListener('click', async () => {
-    if(!currentUser || !currentNick){ showView('ucet'); return; }
+    if(!S.currentUser || !S.currentNick){ showView('ucet'); return; }
     const input = document.getElementById('suggestion-input');
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'suggestions'), { text, image: pendingSuggestionImage, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'suggestions'), { text, image: pendingSuggestionImage, author: S.currentNick, authorEmoji: S.currentEmoji, authorAvatar: S.currentAvatar, uid: S.currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
       input.value = '';
       pendingSuggestionImage = '';
       document.getElementById('sug-autocomplete-list').style.display = 'none';
@@ -1517,12 +1504,12 @@ function renderTabPrehled(ev){
   });
 
   document.getElementById('btn-add-comment').addEventListener('click', async () => {
-    if(!currentUser || !currentNick){ showView('ucet'); return; }
+    if(!S.currentUser || !S.currentNick){ showView('ucet'); return; }
     const input = document.getElementById('comment-input');
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'comments'), { text, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'comments'), { text, author: S.currentNick, authorEmoji: S.currentEmoji, authorAvatar: S.currentAvatar, uid: S.currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
     }catch(err){ console.error(err); }
   });
@@ -1543,9 +1530,9 @@ function renderSuggestions(ev){
     return;
   }
   sugList.innerHTML = currentSuggestions.map(s => {
-    const liked = currentUser && (s.likes||[]).includes(currentUser.uid);
+    const liked = S.currentUser && (s.likes||[]).includes(S.currentUser.uid);
     const likers = (s.likeNicks||[]).join('\n');
-    const canEdit = currentUser && (s.uid === currentUser.uid || hasPerm('akce'));
+    const canEdit = S.currentUser && (s.uid === S.currentUser.uid || hasPerm('akce'));
     return `
     <div class="suggestion-row" data-sug-row="${s.id}">
       <span class="txt" data-sug-display="${s.id}">${s.image ? `<img src="${s.image.replace(/"/g,'&quot;')}" alt="" class="game-chip-logo" style="margin-right:6px; vertical-align:middle;">` : ''}Hráč: ${authorLabel(s.author, s.authorEmoji, s.authorAvatar)} — ${escapeHtml(s.text)}</span>
@@ -1558,13 +1545,13 @@ function renderSuggestions(ev){
 
   sugList.querySelectorAll('[data-sug-like]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if(!currentUser || !currentNick){ showView('ucet'); return; }
+      if(!S.currentUser || !S.currentNick){ showView('ucet'); return; }
       const sug = currentSuggestions.find(s => s.id === btn.dataset.sugLike);
-      const liked = (sug.likes||[]).includes(currentUser.uid);
+      const liked = (sug.likes||[]).includes(S.currentUser.uid);
       try{
         await updateDoc(doc(db,'events',ev.id,'suggestions',sug.id), {
-          likes: liked ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
-          likeNicks: liked ? arrayRemove(currentNick) : arrayUnion(currentNick)
+          likes: liked ? arrayRemove(S.currentUser.uid) : arrayUnion(S.currentUser.uid),
+          likeNicks: liked ? arrayRemove(S.currentNick) : arrayUnion(S.currentNick)
         });
       }catch(err){ console.error(err); }
     });
@@ -1646,7 +1633,7 @@ function renderComments(ev){
     return;
   }
   commentsList.innerHTML = currentComments.map(c => {
-    const canEdit = currentUser && (c.uid === currentUser.uid || hasPerm('akce'));
+    const canEdit = S.currentUser && (c.uid === S.currentUser.uid || hasPerm('akce'));
     return `
     <div class="comment-row" data-comment-row="${c.id}">
       <span class="who">${authorLabel(c.author, c.authorEmoji, c.authorAvatar)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
@@ -1690,7 +1677,7 @@ function renderComments(ev){
 // ---- Jídlo: zaškrtávací výběr + potvrzení + počty porcí pro admina ----
 function renderTabJidlo(ev){
   const box = document.getElementById('tab-jidlo');
-  const myReg = currentUser ? currentRegistrationsMap[currentUser.uid] : null;
+  const myReg = S.currentUser ? currentRegistrationsMap[S.currentUser.uid] : null;
   const deadlinePassed = isPastDeadline(ev);
   const schedule = ev.foodSchedule || {};
   const votingSlots = ev.foodVotingSlots || {};
@@ -1719,7 +1706,7 @@ function renderTabJidlo(ev){
 
           if(isVoting){
             const votesForSlot = foodVotes[slot.key] || {};
-            const myVotesArr = (currentUser && Array.isArray(votesForSlot[currentUser.uid])) ? votesForSlot[currentUser.uid] : [];
+            const myVotesArr = (S.currentUser && Array.isArray(votesForSlot[S.currentUser.uid])) ? votesForSlot[S.currentUser.uid] : [];
             const tally = {};
             options.forEach(o => tally[o] = 0);
             Object.values(votesForSlot).forEach(v => { (Array.isArray(v) ? v : []).forEach(o => { if(tally[o] !== undefined) tally[o]++; }); });
@@ -1822,13 +1809,13 @@ function renderTabJidlo(ev){
   box.querySelectorAll('[data-food-vote]').forEach(el => {
     if(el.closest('.food-vote-row').classList.contains('disabled')) return;
     el.addEventListener('click', async () => {
-      if(!currentUser) return;
+      if(!S.currentUser) return;
       const slotKey = el.dataset.slot;
       const value = el.dataset.value;
-      const current = (foodVotes[slotKey] && Array.isArray(foodVotes[slotKey][currentUser.uid])) ? foodVotes[slotKey][currentUser.uid] : [];
+      const current = (foodVotes[slotKey] && Array.isArray(foodVotes[slotKey][S.currentUser.uid])) ? foodVotes[slotKey][S.currentUser.uid] : [];
       const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
       try{
-        await updateDoc(doc(db,'events',ev.id), { [`foodVotes.${slotKey}.${currentUser.uid}`]: next });
+        await updateDoc(doc(db,'events',ev.id), { [`foodVotes.${slotKey}.${S.currentUser.uid}`]: next });
       }catch(err){ console.error(err); }
     });
   });
@@ -1842,7 +1829,7 @@ function renderTabJidlo(ev){
     });
     confirmBtn.disabled = true;
     try{
-      await updateDoc(doc(db,'events',ev.id,'registrations',currentUser.uid), { food: newFood });
+      await updateDoc(doc(db,'events',ev.id,'registrations',S.currentUser.uid), { food: newFood });
       document.getElementById('food-confirm-msg').textContent = 'Menu uloženo.';
     }catch(err){
       alert('Nepovedlo se uložit.'); console.error(err);
@@ -1855,7 +1842,7 @@ function renderTabJidlo(ev){
   foodCommentsList.innerHTML = currentFoodComments.length === 0
     ? '<div class="empty">Zatím žádná diskuze.</div>'
     : currentFoodComments.map(c => {
-        const canEdit = currentUser && (c.uid === currentUser.uid || hasPerm('jidlo'));
+        const canEdit = S.currentUser && (c.uid === S.currentUser.uid || hasPerm('jidlo'));
         return `
         <div class="comment-row" data-food-comment-row="${c.id}">
           <span class="who">${authorLabel(c.author, c.authorEmoji, c.authorAvatar)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
@@ -1875,12 +1862,12 @@ function renderTabJidlo(ev){
   foodCommentsList.scrollTop = foodCommentsList.scrollHeight;
 
   document.getElementById('btn-add-food-comment').addEventListener('click', async () => {
-    if(!currentUser || !currentNick){ showView('ucet'); return; }
+    if(!S.currentUser || !S.currentNick){ showView('ucet'); return; }
     const input = document.getElementById('food-comment-input');
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'foodComments'), { text, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'foodComments'), { text, author: S.currentNick, authorEmoji: S.currentEmoji, authorAvatar: S.currentAvatar, uid: S.currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
     }catch(err){ console.error(err); }
   });
@@ -2283,7 +2270,7 @@ function renderTurnajPage(){
         <h3>${escapeHtml(t.name)}</h3>
         <div class="meta">${ev ? escapeHtml(ev.name) : 'Bez přiřazené akce'}${t.game ? ' · ' + escapeHtml(t.game) : ''}</div>
         <p class="desc">${statusTxt}</p>
-        ${(t.status === 'signup' && currentNick && !(t.signups||[]).includes(currentNick)) ? `<button type="button" class="btn-sm" data-quick-signup="${t.id}" style="width:100%; margin-top:4px;">✅ Přihlásit se do turnaje</button>` : ''}
+        ${(t.status === 'signup' && S.currentNick && !(t.signups||[]).includes(S.currentNick)) ? `<button type="button" class="btn-sm" data-quick-signup="${t.id}" style="width:100%; margin-top:4px;">✅ Přihlásit se do turnaje</button>` : ''}
         ${hasPerm('turnaj') ? `
         <div class="row" style="margin-top:2px;">
           <button type="button" class="btn-ghost btn-sm" data-edit-tourney="${t.id}" style="flex:1;">Upravit</button>
@@ -2295,7 +2282,7 @@ function renderTurnajPage(){
   grid.querySelectorAll('[data-quick-signup]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      try{ await updateDoc(doc(db,'tournaments',btn.dataset.quickSignup), { signups: arrayUnion(currentNick) }); }
+      try{ await updateDoc(doc(db,'tournaments',btn.dataset.quickSignup), { signups: arrayUnion(S.currentNick) }); }
       catch(err){ console.error(err); }
     });
   });
@@ -2334,7 +2321,7 @@ function renderTurnajPage(){
 // ---------- Fáze "Přihlašování" ----------
 function renderTournamentSignupPhase(t, box){
   const signups = t.signups || [];
-  const iAmIn = currentNick && signups.includes(currentNick);
+  const iAmIn = S.currentNick && signups.includes(S.currentNick);
   box.innerHTML = `
     <div class="tourney-title-top" style="margin-bottom:18px;">
       <span class="tag tourney-signup-badge">Přihlášky otevřeny</span>
@@ -2356,7 +2343,7 @@ function renderTournamentSignupPhase(t, box){
   `;
 
   const ctaBox = document.getElementById('signup-cta');
-  if(!currentUser || !currentNick){
+  if(!S.currentUser || !S.currentNick){
     ctaBox.innerHTML = `<p class="lede" style="margin-top:0;"><a href="#ucet">Přihlas se</a>, abys mohl(a) se přihlásit.</p>`;
   }else{
     const btn = document.createElement('button');
@@ -2366,13 +2353,13 @@ function renderTournamentSignupPhase(t, box){
       btn.style.cssText = 'color:var(--crimson); border-color:var(--crimson);';
       btn.textContent = 'Odhlásit se';
       btn.addEventListener('click', async () => {
-        try{ await updateDoc(doc(db,'tournaments',t.id), { signups: arrayRemove(currentNick) }); }
+        try{ await updateDoc(doc(db,'tournaments',t.id), { signups: arrayRemove(S.currentNick) }); }
         catch(err){ console.error(err); }
       });
     }else{
       btn.textContent = 'Zúčastním se';
       btn.addEventListener('click', async () => {
-        try{ await updateDoc(doc(db,'tournaments',t.id), { signups: arrayUnion(currentNick) }); }
+        try{ await updateDoc(doc(db,'tournaments',t.id), { signups: arrayUnion(S.currentNick) }); }
         catch(err){ console.error(err); }
       });
     }
@@ -4029,7 +4016,7 @@ function tbEnsureLive(t){
             if(ch.type !== 'added') return;
             const d = ch.doc.data();
             if(!d || !d.name) return;
-            if(d.by && d.by === currentNick) return; // vlastní právě potvrzené změny už byly přehrány okamžitě
+            if(d.by && d.by === S.currentNick) return; // vlastní právě potvrzené změny už byly přehrány okamžitě
             tbQueueSubstanceEvent(d.type, { name: d.name }, 0, 0, d.amount || 1);
         });
     }, (err) => console.error('Živé události:', err));
@@ -4219,7 +4206,7 @@ async function tbConfirmDrinkChanges(){
     const writes = entries.map(([key, delta]) => {
         const [name, type] = key.split('|');
         return setDoc(doc(db, 'handicapSessions', sessionKey), { [`drinks.${tbKey(name)}.${type}`]: increment(delta) }, { merge: true })
-            .then(() => addDoc(collection(db, 'handicapSessions', sessionKey, 'drinkEvents'), { type, name, amount: delta, by: currentNick || '', ts: new Date().toISOString() }))
+            .then(() => addDoc(collection(db, 'handicapSessions', sessionKey, 'drinkEvents'), { type, name, amount: delta, by: S.currentNick || '', ts: new Date().toISOString() }))
             .catch(err => { console.error(err); });
     });
 
@@ -4844,7 +4831,7 @@ function renderTabTurnaj(ev){
         </div>
         <h3>${escapeHtml(t.name)}</h3>
         <p class="desc">${statusTxt}</p>
-        ${(t.status === 'signup' && currentNick && !(t.signups||[]).includes(currentNick)) ? `<button type="button" class="btn-sm" data-quick-signup-compact="${t.id}" style="width:100%; margin-top:4px;">✅ Přihlásit se do turnaje</button>` : ''}
+        ${(t.status === 'signup' && S.currentNick && !(t.signups||[]).includes(S.currentNick)) ? `<button type="button" class="btn-sm" data-quick-signup-compact="${t.id}" style="width:100%; margin-top:4px;">✅ Přihlásit se do turnaje</button>` : ''}
         <span class="status-hint">${t.status === 'signup' ? 'Zobrazit přihlášené →' : 'Zobrazit celý pavouk →'}</span>
       </div>
     `;
@@ -4853,7 +4840,7 @@ function renderTabTurnaj(ev){
   box.querySelectorAll('[data-quick-signup-compact]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      try{ await updateDoc(doc(db,'tournaments',btn.dataset.quickSignupCompact), { signups: arrayUnion(currentNick) }); }
+      try{ await updateDoc(doc(db,'tournaments',btn.dataset.quickSignupCompact), { signups: arrayUnion(S.currentNick) }); }
       catch(err){ console.error(err); }
     });
   });
@@ -4983,12 +4970,12 @@ function setupScheduleDiscussion(ev){
   setupChatEmojiRow('emoji-btn-schedule', 'emoji-panel-schedule', 'schedule-comment-input');
   renderScheduleComments(ev);
   document.getElementById('btn-add-schedule-comment').addEventListener('click', async () => {
-    if(!currentUser || !currentNick){ showView('ucet'); return; }
+    if(!S.currentUser || !S.currentNick){ showView('ucet'); return; }
     const input = document.getElementById('schedule-comment-input');
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'scheduleComments'), { text, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'scheduleComments'), { text, author: S.currentNick, authorEmoji: S.currentEmoji, authorAvatar: S.currentAvatar, uid: S.currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
     }catch(err){ console.error(err); }
   });
@@ -4999,7 +4986,7 @@ function renderScheduleComments(ev){
   list.innerHTML = currentScheduleComments.length === 0
     ? '<div class="empty">Zatím žádná diskuze.</div>'
     : currentScheduleComments.map(c => {
-        const canEdit = currentUser && (c.uid === currentUser.uid || hasPerm('akce') || hasPerm('turnaj'));
+        const canEdit = S.currentUser && (c.uid === S.currentUser.uid || hasPerm('akce') || hasPerm('turnaj'));
         return `
         <div class="comment-row">
           <span class="who">${authorLabel(c.author, c.authorEmoji, c.authorAvatar)}</span><span class="when">${c.ts ? new Date(c.ts).toLocaleDateString('cs-CZ') : ''}</span>
@@ -5036,7 +5023,7 @@ function renderTabFoto(ev){
   `;
 
   document.getElementById('btn-upload-photo').addEventListener('click', async () => {
-    if(!currentUser || !currentNick){ showView('ucet'); return; }
+    if(!S.currentUser || !S.currentNick){ showView('ucet'); return; }
     const fileInput = document.getElementById('photo-file-input');
     const msg = document.getElementById('photo-add-msg');
     const files = Array.from(fileInput.files || []);
@@ -5052,7 +5039,7 @@ function renderTabFoto(ev){
         const fileRef = ref(storage, `event-photos/${ev.id}/${safeName}`);
         await uploadBytes(fileRef, file);
         const url = await getDownloadURL(fileRef);
-        await addDoc(collection(db,'events',ev.id,'photos'), { url, kind, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, ts: new Date().toISOString() });
+        await addDoc(collection(db,'events',ev.id,'photos'), { url, kind, author: S.currentNick, authorEmoji: S.currentEmoji, authorAvatar: S.currentAvatar, uid: S.currentUser.uid, ts: new Date().toISOString() });
       }catch(err){ console.error(err); msg.textContent = `Nahrání souboru "${file.name}" se nepovedlo.`; return; }
     }
     fileInput.value = '';
@@ -5060,7 +5047,7 @@ function renderTabFoto(ev){
   });
 
   document.getElementById('btn-add-photo').addEventListener('click', async () => {
-    if(!currentUser || !currentNick){ showView('ucet'); return; }
+    if(!S.currentUser || !S.currentNick){ showView('ucet'); return; }
     const input = document.getElementById('photo-url-input');
     const msg = document.getElementById('photo-add-msg');
     const url = input.value.trim();
@@ -5072,7 +5059,7 @@ function renderTabFoto(ev){
       return;
     }
     try{
-      await addDoc(collection(db,'events',ev.id,'photos'), { url, kind, author: currentNick, authorEmoji: currentEmoji, authorAvatar: currentAvatar, uid: currentUser.uid, ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'photos'), { url, kind, author: S.currentNick, authorEmoji: S.currentEmoji, authorAvatar: S.currentAvatar, uid: S.currentUser.uid, ts: new Date().toISOString() });
       input.value = '';
       msg.textContent = '';
     }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se přidat.'; }
@@ -5111,7 +5098,7 @@ function renderPhotoGrid(ev){
     return;
   }
   grid.innerHTML = currentPhotos.map(p => {
-    const canDelete = currentUser && (p.uid === currentUser.uid || hasPerm('akce'));
+    const canDelete = S.currentUser && (p.uid === S.currentUser.uid || hasPerm('akce'));
     const mediaHtml = p.kind === 'video'
       ? `<video src="${p.url.replace(/"/g,'&quot;')}" muted controls></video>`
       : `<img src="${p.url.replace(/"/g,'&quot;')}" alt="Foto od ${escapeHtml(p.author)}" loading="lazy">`;
@@ -5174,14 +5161,14 @@ formAuth.addEventListener('submit', async (e) => {
       try{ await sendVerifyMail(cred.user); }catch(e){ console.error('Ověřovací e-mail:', e); }
       await setDoc(usernameDocRef(pendingNickForRegistration), { uid: cred.user.uid, email });
       await setDoc(doc(db, 'users', cred.user.uid), { nick: pendingNickForRegistration, email, phone, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() });
-      currentUser = cred.user;
-      currentNick = pendingNickForRegistration;
-      currentPhone = phone;
-      currentEmoji = '';
-      currentAvatar = '';
-      currentIsAdmin = false;
-      currentIsSuperAdmin = false;
-      currentPermissions = {};
+      S.currentUser = cred.user;
+      S.currentNick = pendingNickForRegistration;
+      S.currentPhone = phone;
+      S.currentEmoji = '';
+      S.currentAvatar = '';
+      S.currentIsAdmin = false;
+      S.currentIsSuperAdmin = false;
+      S.currentPermissions = {};
       suppressAuthStateHandling = false;
       updateAuthUI();
     }
@@ -5253,15 +5240,15 @@ document.getElementById('btn-google').addEventListener('click', async () => {
 document.getElementById('btn-google-nick-submit').addEventListener('click', async () => {
   const nick = document.getElementById('google-nick-input').value.trim();
   const phone = document.getElementById('google-phone-input').value.trim();
-  if(!nick || !currentUser) return;
+  if(!nick || !S.currentUser) return;
   const btn = document.getElementById('btn-google-nick-submit');
   btn.disabled = true;
   try{
     const existing = await getDoc(usernameDocRef(nick));
     if(existing.exists()){ alert('Tahle přezdívka je už obsazená, zkus jinou.'); btn.disabled = false; return; }
-    await setDoc(usernameDocRef(nick), { uid: currentUser.uid, email: currentUser.email });
-    await setDoc(doc(db, 'users', currentUser.uid), { nick, email: currentUser.email, phone, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() });
-    currentNick = nick;
+    await setDoc(usernameDocRef(nick), { uid: S.currentUser.uid, email: S.currentUser.email });
+    await setDoc(doc(db, 'users', S.currentUser.uid), { nick, email: S.currentUser.email, phone, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() });
+    S.currentNick = nick;
     updateAuthUI();
   }catch(err){ console.error(err); alert('Uložení přezdívky se nepovedlo. Zkus to znovu.'); }
   finally{ btn.disabled = false; }
@@ -5279,7 +5266,7 @@ document.getElementById('btn-toggle-nick').addEventListener('click', () => {
   const opening = form.style.display === 'none';
   closeAllAccountPanels();
   if(opening){
-    document.getElementById('new-nick-input').value = currentNick || '';
+    document.getElementById('new-nick-input').value = S.currentNick || '';
     form.style.display = 'flex';
   }
 });
@@ -5290,8 +5277,8 @@ document.getElementById('form-change-nick').addEventListener('submit', async (e)
   e.preventDefault();
   const msg = document.getElementById('nick-change-msg');
   const newNick = document.getElementById('new-nick-input').value.trim();
-  if(!newNick || !currentUser) return;
-  if(newNick.toLowerCase() === (currentNick||'').toLowerCase()){
+  if(!newNick || !S.currentUser) return;
+  if(newNick.toLowerCase() === (S.currentNick||'').toLowerCase()){
     document.getElementById('form-change-nick').style.display = 'none';
     return;
   }
@@ -5299,10 +5286,10 @@ document.getElementById('form-change-nick').addEventListener('submit', async (e)
   try{
     const existing = await getDoc(usernameDocRef(newNick));
     if(existing.exists()){ msg.textContent = 'Tahle přezdívka je už obsazená.'; return; }
-    await setDoc(usernameDocRef(newNick), { uid: currentUser.uid, email: currentUser.email });
-    await deleteDoc(usernameDocRef(currentNick));
-    await updateDoc(doc(db,'users',currentUser.uid), { nick: newNick });
-    currentNick = newNick;
+    await setDoc(usernameDocRef(newNick), { uid: S.currentUser.uid, email: S.currentUser.email });
+    await deleteDoc(usernameDocRef(S.currentNick));
+    await updateDoc(doc(db,'users',S.currentUser.uid), { nick: newNick });
+    S.currentNick = newNick;
     document.getElementById('form-change-nick').style.display = 'none';
     msg.textContent = '';
     updateAuthUI();
@@ -5313,15 +5300,15 @@ document.getElementById('form-change-nick').addEventListener('submit', async (e)
 document.getElementById('new-avatar-input').addEventListener('change', async (e) => {
   const msg = document.getElementById('avatar-change-msg');
   const file = e.target.files[0];
-  if(!currentUser || !file) return;
+  if(!S.currentUser || !file) return;
   if(file.size > 5 * 1024 * 1024){ msg.textContent = 'Soubor je moc velký (max 5 MB).'; e.target.value = ''; return; }
   msg.textContent = 'Nahrávám...';
   try{
-    const fileRef = ref(storage, `avatars/${currentUser.uid}`);
+    const fileRef = ref(storage, `avatars/${S.currentUser.uid}`);
     await uploadBytes(fileRef, file);
     const url = await getDownloadURL(fileRef);
-    await updateDoc(doc(db,'users',currentUser.uid), { avatar: url });
-    currentAvatar = url;
+    await updateDoc(doc(db,'users',S.currentUser.uid), { avatar: url });
+    S.currentAvatar = url;
     msg.textContent = 'Hotovo!';
     setTimeout(() => { msg.textContent = ''; }, 1500);
     updateAuthUI();
@@ -5329,10 +5316,10 @@ document.getElementById('new-avatar-input').addEventListener('change', async (e)
   e.target.value = '';
 });
 document.getElementById('btn-remove-avatar').addEventListener('click', async () => {
-  if(!currentUser) return;
+  if(!S.currentUser) return;
   try{
-    await updateDoc(doc(db,'users',currentUser.uid), { avatar: '' });
-    currentAvatar = '';
+    await updateDoc(doc(db,'users',S.currentUser.uid), { avatar: '' });
+    S.currentAvatar = '';
     updateAuthUI();
   }catch(err){ console.error(err); }
 });
@@ -5343,7 +5330,7 @@ document.getElementById('btn-toggle-phone').addEventListener('click', () => {
   const opening = form.style.display === 'none';
   closeAllAccountPanels();
   if(opening){
-    document.getElementById('new-phone-input').value = currentPhone || '';
+    document.getElementById('new-phone-input').value = S.currentPhone || '';
     form.style.display = 'flex';
   }
 });
@@ -5354,11 +5341,11 @@ document.getElementById('form-change-phone').addEventListener('submit', async (e
   e.preventDefault();
   const msg = document.getElementById('phone-change-msg');
   const newPhone = document.getElementById('new-phone-input').value.trim();
-  if(!currentUser) return;
+  if(!S.currentUser) return;
   msg.textContent = '';
   try{
-    await updateDoc(doc(db,'users',currentUser.uid), { phone: newPhone });
-    currentPhone = newPhone;
+    await updateDoc(doc(db,'users',S.currentUser.uid), { phone: newPhone });
+    S.currentPhone = newPhone;
     document.getElementById('form-change-phone').style.display = 'none';
     updateAuthUI();
   }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se — zkus to prosím znovu.'; }
@@ -5376,20 +5363,20 @@ document.getElementById('btn-cancel-email').addEventListener('click', () => {
 });
 document.getElementById('form-change-email').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if(!currentUser) return;
+  if(!S.currentUser) return;
   const msg = document.getElementById('email-change-msg');
   const newEmail = document.getElementById('new-email').value.trim();
   if(!newEmail) return;
   msg.textContent = '';
   try{
-    if(hasPasswordProvider(currentUser)){
+    if(hasPasswordProvider(S.currentUser)){
       const pw = document.getElementById('reauth-password').value;
-      const cred = EmailAuthProvider.credential(currentUser.email, pw);
-      await reauthenticateWithCredential(currentUser, cred);
+      const cred = EmailAuthProvider.credential(S.currentUser.email, pw);
+      await reauthenticateWithCredential(S.currentUser, cred);
     }else{
-      await reauthenticateWithPopup(currentUser, new GoogleAuthProvider());
+      await reauthenticateWithPopup(S.currentUser, new GoogleAuthProvider());
     }
-    await verifyBeforeUpdateEmail(currentUser, newEmail);
+    await verifyBeforeUpdateEmail(S.currentUser, newEmail);
     msg.textContent = `Ověřovací odkaz byl odeslán na ${newEmail}. Po kliknutí na něj se e-mail změní.`;
   }catch(err){
     console.error(err);
@@ -5405,7 +5392,7 @@ document.getElementById('btn-toggle-password').addEventListener('click', () => {
   const opening = panel.style.display === 'none';
   closeAllAccountPanels();
   if(opening){
-    document.getElementById('pw-reset-target-email').textContent = currentUser?.email || '';
+    document.getElementById('pw-reset-target-email').textContent = S.currentUser?.email || '';
     panel.style.display = 'flex';
   }
 });
@@ -5414,11 +5401,11 @@ document.getElementById('btn-cancel-password').addEventListener('click', () => {
   document.getElementById('pw-reset-msg').textContent = '';
 });
 document.getElementById('btn-change-password').addEventListener('click', async () => {
-  if(!currentUser || !currentUser.email) return;
+  if(!S.currentUser || !S.currentUser.email) return;
   const msg = document.getElementById('pw-reset-msg');
   try{
-    await sendPasswordResetEmail(auth, currentUser.email);
-    msg.textContent = `Odkaz pro změnu hesla byl odeslán na ${currentUser.email}.`;
+    await sendPasswordResetEmail(auth, S.currentUser.email);
+    msg.textContent = `Odkaz pro změnu hesla byl odeslán na ${S.currentUser.email}.`;
   }catch(err){ console.error(err); msg.textContent = 'Nepovedlo se odeslat odkaz. Zkus to znovu.'; }
 });
 
@@ -5459,7 +5446,7 @@ function openMailComposer(title, presets){
       </div>
       <div class="mc-recipients" id="mc-recipients"></div>
       <label class="mc-label">Odpovědi chodí na <span class="mc-dim">(Reply-To; odesílatel je adresa nastavená v rozšíření)</span></label>
-      <input type="email" id="mc-replyto" value="${escapeHtml(currentUser?.email || '')}">
+      <input type="email" id="mc-replyto" value="${escapeHtml(S.currentUser?.email || '')}">
       <div class="mc-status" id="mc-status"></div>
       <div class="mc-actions">
         <button type="button" class="btn-ghost" id="mc-cancel">Zavřít</button>
@@ -5513,7 +5500,7 @@ function openMailComposer(title, presets){
     try{
       for(const r of list){
         const text = body.replace(/\{nick\}/g, r.nick || '');
-        const docData = { to: [r.email], message: { subject, text, html: mailTextToHtml(text) }, createdBy: currentUser.uid, createdAt: new Date().toISOString() };
+        const docData = { to: [r.email], message: { subject, text, html: mailTextToHtml(text) }, createdBy: S.currentUser.uid, createdAt: new Date().toISOString() };
         if(replyTo) docData.replyTo = replyTo;
         const ref = await addDoc(collection(db,'mail'), docData);
         states[ref.id] = 'PENDING';
@@ -5546,7 +5533,7 @@ async function renderUsersList(){
     const users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a,b) => (a.nick||'').localeCompare(b.nick||'', 'cs', { sensitivity:'base' }));
     if(users.length === 0){ box.innerHTML = '<div class="empty">Zatím žádní uživatelé.</div>'; return; }
 
-    const showPerms = currentIsSuperAdmin;
+    const showPerms = S.currentIsSuperAdmin;
     const allEmails = [...new Set(users.map(u => u.email).filter(Boolean))];
     box.innerHTML = `
       <div class="row" style="margin-bottom:16px; gap:10px;">
@@ -5574,7 +5561,7 @@ async function renderUsersList(){
               <td style="padding:8px 10px;"><input type="date" data-edit-created="${u.uid}" value="${u.createdAt ? u.createdAt.slice(0,10) : ''}" style="background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px; color:var(--text-muted);">${u.lastLogin ? fmtDate(u.lastLogin.slice(0,10)) : '—'}</td>
               <td style="padding:8px 10px;"><button type="button" class="btn-ghost btn-sm" data-save-user="${u.uid}">Uložit</button></td>
-              <td style="padding:8px 10px;">${(u.isSuperAdmin || (u.isAdmin && !currentIsSuperAdmin)) ? '' : `<button type="button" class="btn-ghost btn-sm" data-delete-user="${u.uid}" data-delete-nick="${escapeHtml(u.nick||'')}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>`}</td>
+              <td style="padding:8px 10px;">${(u.isSuperAdmin || (u.isAdmin && !S.currentIsSuperAdmin)) ? '' : `<button type="button" class="btn-ghost btn-sm" data-delete-user="${u.uid}" data-delete-nick="${escapeHtml(u.nick||'')}" style="color:var(--crimson); border-color:var(--crimson);">Smazat</button>`}</td>
               ${showPerms ? (u.isSuperAdmin ? `<td style="border-left:1px solid var(--line);"></td><td colspan="${1+PERMISSION_AREAS.length}" style="padding:8px 10px; color:var(--text-muted); font-style:italic;">má vše automaticky</td>` : `
               <td style="border-left:1px solid var(--line);"></td>
               <td style="padding:8px 10px; text-align:center; background:rgba(201,162,75,0.08);"><input type="checkbox" data-perm-admin="${u.uid}" ${u.isAdmin?'checked':''} style="width:18px; height:18px; accent-color:var(--gold);"></td>
@@ -5701,7 +5688,7 @@ async function renderUsersList(){
 // Upozornění pro uživatele s nepotvrzeným e-mailem (přihlášení heslem): bez potvrzení nejde komentovat, nahrávat ani se přihlásit na akci
 function updateVerifyBanner(){
   let bar = document.getElementById('verify-banner');
-  const need = currentUser && currentNick && !currentUser.emailVerified && hasPasswordProvider(currentUser);
+  const need = S.currentUser && S.currentNick && !S.currentUser.emailVerified && hasPasswordProvider(S.currentUser);
   if(!need){ if(bar) bar.remove(); return; }
   if(!bar){
     bar = document.createElement('div');
@@ -5709,19 +5696,19 @@ function updateVerifyBanner(){
     bar.style.cssText = 'position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#3a2c0b; color:#f3e3b0; border-top:2px solid var(--gold); padding:12px 16px; font-size:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center;';
     document.body.appendChild(bar);
   }
-  bar.innerHTML = `<span>📧 Potvrď svůj e-mail (<b>${escapeHtml(currentUser.email || '')}</b>) odkazem, který jsme ti poslali. Do té doby nejde komentovat, nahrávat fotky ani se přihlásit na akci.</span>
+  bar.innerHTML = `<span>📧 Potvrď svůj e-mail (<b>${escapeHtml(S.currentUser.email || '')}</b>) odkazem, který jsme ti poslali. Do té doby nejde komentovat, nahrávat fotky ani se přihlásit na akci.</span>
     <button type="button" class="btn-sm" id="vb-resend">Poslat odkaz znovu</button>
     <button type="button" class="btn-sm btn-ghost" id="vb-check">Už jsem potvrdil</button>
     <span id="vb-msg"></span>`;
   bar.querySelector('#vb-resend').addEventListener('click', async () => {
-    try{ await sendVerifyMail(currentUser); bar.querySelector('#vb-msg').textContent = 'Odesláno, zkontroluj poštu (i spam a hromadné). Když nic nepřijde, napiš adminovi, ověří tě ručně.'; }
+    try{ await sendVerifyMail(S.currentUser); bar.querySelector('#vb-msg').textContent = 'Odesláno, zkontroluj poštu (i spam a hromadné). Když nic nepřijde, napiš adminovi, ověří tě ručně.'; }
     catch(e){ bar.querySelector('#vb-msg').textContent = (e && e.code === 'functions/resource-exhausted') ? 'Počkej minutu a zkus to znovu.' : 'Teď to nejde, zkus to za chvíli.'; }
   });
   bar.querySelector('#vb-check').addEventListener('click', async () => {
     try{
-      await currentUser.reload();
-      await currentUser.getIdToken(true);
-      if(currentUser.emailVerified){ updateVerifyBanner(); }
+      await S.currentUser.reload();
+      await S.currentUser.getIdToken(true);
+      if(S.currentUser.emailVerified){ updateVerifyBanner(); }
       else bar.querySelector('#vb-msg').textContent = 'Zatím nepotvrzeno.';
     }catch(e){ bar.querySelector('#vb-msg').textContent = 'Nepovedlo se ověřit.'; }
   });
@@ -5734,22 +5721,22 @@ function updateAuthUI(){
   const googleNickPrompt = document.getElementById('auth-google-nick-prompt');
   const navLabel = document.getElementById('nav-ucet-label');
 
-  if(currentUser && currentNick){
+  if(S.currentUser && S.currentNick){
     loggedOutBox.style.display = 'none';
     loggedInBox.style.display = 'block';
     googleNickPrompt.style.display = 'none';
     closeLoginModal();
-    document.getElementById('account-nick-display').textContent = currentNick + (currentIsSuperAdmin ? ' (hlavní admin)' : (currentIsAdmin ? ' (admin)' : ''));
-    document.getElementById('account-email-display').textContent = currentUser.email || '';
-    document.getElementById('account-phone-display').textContent = currentPhone || '—';
-    document.getElementById('account-avatar-big').style.display = currentAvatar ? 'block' : 'none';
-    document.getElementById('account-avatar-big').src = currentAvatar || '';
-    document.getElementById('account-avatar-placeholder').style.display = currentAvatar ? 'none' : 'flex';
-    document.getElementById('btn-remove-avatar').style.display = currentAvatar ? 'inline-flex' : 'none';
-    document.getElementById('reauth-password-field').style.display = hasPasswordProvider(currentUser) ? 'block' : 'none';
-    document.getElementById('password-row').style.display = hasPasswordProvider(currentUser) ? 'flex' : 'none';
+    document.getElementById('account-nick-display').textContent = S.currentNick + (S.currentIsSuperAdmin ? ' (hlavní admin)' : (S.currentIsAdmin ? ' (admin)' : ''));
+    document.getElementById('account-email-display').textContent = S.currentUser.email || '';
+    document.getElementById('account-phone-display').textContent = S.currentPhone || '—';
+    document.getElementById('account-avatar-big').style.display = S.currentAvatar ? 'block' : 'none';
+    document.getElementById('account-avatar-big').src = S.currentAvatar || '';
+    document.getElementById('account-avatar-placeholder').style.display = S.currentAvatar ? 'none' : 'flex';
+    document.getElementById('btn-remove-avatar').style.display = S.currentAvatar ? 'inline-flex' : 'none';
+    document.getElementById('reauth-password-field').style.display = hasPasswordProvider(S.currentUser) ? 'block' : 'none';
+    document.getElementById('password-row').style.display = hasPasswordProvider(S.currentUser) ? 'flex' : 'none';
     navLabel.textContent = 'Účet';
-  }else if(currentUser && !currentNick){
+  }else if(S.currentUser && !S.currentNick){
     loggedOutBox.style.display = 'block';
     loggedInBox.style.display = 'none';
     formAuth.style.display = 'none';
@@ -5788,8 +5775,8 @@ function updateAuthUI(){
   if(!hasPerm('zaznam') && document.getElementById('view-zaznam').classList.contains('active')) showView('akce');
 
   const accWidget = document.getElementById('topbar-account-widget');
-  if(currentUser && currentNick){
-    accWidget.innerHTML = `<span class="acc-nick">${currentAvatar ? avatarTag(currentAvatar, 24) : ''}${escapeHtml(currentNick)}</span><button type="button" class="btn-ghost btn-sm" id="topbar-logout-btn" style="color:var(--crimson); border-color:var(--crimson);">Odhlásit</button>`;
+  if(S.currentUser && S.currentNick){
+    accWidget.innerHTML = `<span class="acc-nick">${S.currentAvatar ? avatarTag(S.currentAvatar, 24) : ''}${escapeHtml(S.currentNick)}</span><button type="button" class="btn-ghost btn-sm" id="topbar-logout-btn" style="color:var(--crimson); border-color:var(--crimson);">Odhlásit</button>`;
     document.getElementById('topbar-logout-btn').addEventListener('click', async () => { closeContactForm(); closeEventForm(); await signOut(auth); });
   }else{
     accWidget.innerHTML = `<button type="button" class="btn-sm" id="topbar-login-btn">Přihlásit / Registrovat</button>`;
@@ -5802,30 +5789,30 @@ let authStateGeneration = 0;
 onAuthStateChanged(auth, async (user) => {
   if(suppressAuthStateHandling) return;
   const myGen = ++authStateGeneration;
-  currentUser = user;
-  currentNick = null;
-  currentIsAdmin = false;
-  currentIsSuperAdmin = false;
-  currentPermissions = {};
-  currentPhone = '';
-  currentEmoji = '';
-  currentAvatar = '';
+  S.currentUser = user;
+  S.currentNick = null;
+  S.currentIsAdmin = false;
+  S.currentIsSuperAdmin = false;
+  S.currentPermissions = {};
+  S.currentPhone = '';
+  S.currentEmoji = '';
+  S.currentAvatar = '';
   if(user){
     try{
       const userDoc = await getDocFromServer(doc(db, 'users', user.uid));
       if(myGen !== authStateGeneration) return; // mezitím se spustila novější kontrola, tuhle zahodíme
       if(userDoc.exists()){
-        currentNick = userDoc.data().nick;
-        currentIsSuperAdmin = userDoc.data().isSuperAdmin === true || userDoc.data().isSuperAdmin === 'true';
-        currentIsAdmin = currentIsSuperAdmin || userDoc.data().isAdmin === true || userDoc.data().isAdmin === 'true';
-        currentPermissions = userDoc.data().permissions || {};
-        currentPhone = userDoc.data().phone || '';
-        currentEmoji = userDoc.data().emoji || '';
-        currentAvatar = userDoc.data().avatar || '';
+        S.currentNick = userDoc.data().nick;
+        S.currentIsSuperAdmin = userDoc.data().isSuperAdmin === true || userDoc.data().isSuperAdmin === 'true';
+        S.currentIsAdmin = S.currentIsSuperAdmin || userDoc.data().isAdmin === true || userDoc.data().isAdmin === 'true';
+        S.currentPermissions = userDoc.data().permissions || {};
+        S.currentPhone = userDoc.data().phone || '';
+        S.currentEmoji = userDoc.data().emoji || '';
+        S.currentAvatar = userDoc.data().avatar || '';
         if(userDoc.data().email !== user.email){
           try{
             await updateDoc(doc(db,'users',user.uid), { email: user.email });
-            await updateDoc(usernameDocRef(currentNick), { email: user.email });
+            await updateDoc(usernameDocRef(S.currentNick), { email: user.email });
           }catch(e){ /* tichý fail, není kritické */ }
           if(myGen !== authStateGeneration) return;
         }
@@ -5835,7 +5822,7 @@ onAuthStateChanged(auth, async (user) => {
     }catch(err){ console.error(err); }
     if(myGen !== authStateGeneration) return;
     updateAuthUI();
-    if(currentNick && pendingEventId){
+    if(S.currentNick && pendingEventId){
       const evId = pendingEventId;
       pendingEventId = null;
       setRoute('#event/' + evId);
