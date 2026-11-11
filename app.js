@@ -1,36 +1,23 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, getDocFromServer, getDocs, setDoc,
+  collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, getDocFromServer, getDocs, setDoc,
   updateDoc, deleteDoc, arrayUnion, arrayRemove, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail, sendEmailVerification,
   EmailAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, verifyBeforeUpdateEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getStorage, ref, uploadBytes, getDownloadURL
+  ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+import { httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
+import { db, auth, storage, functionsApi } from "./js/firebase.js";
 import { escapeHtml, fmtDate, fmtDateShort, todayIso } from "./js/util.js";
 import { gameFieldHtml, setupGameField, searchGames, STEAM_SEARCH_FUNCTION_URL } from "./js/games.js";
+import { initAudit, logAction, startAuditListener, stopAuditListener } from "./js/audit.js";
 import { eventHasOwnPaymentAccount, renderPersonalPaymentQr } from "./js/payment.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyA3iXxS2Ffr1-DDyGHVFW4O2a5dKkOX6Q0",
-  authDomain: "lan-feedek.firebaseapp.com",
-  projectId: "lan-feedek",
-  storageBucket: "lan-feedek.firebasestorage.app",
-  messagingSenderId: "632018940301",
-  appId: "1:632018940301:web:9f4869524c22c4ca460dc4"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const storage = getStorage(app);
-const functionsApi = getFunctions(app, 'europe-west9');
 // ověřovací e-mail z našeho Gmailu; když funkce selže, použije se výchozí e-mail Firebase
 async function sendVerifyMail(user){
   try{ await httpsCallable(functionsApi, 'sendVerificationMail')(); }
@@ -62,6 +49,7 @@ let currentNick = null;
 let currentIsAdmin = false;
 let currentIsSuperAdmin = false;
 let currentPermissions = {};
+initAudit({ getUser: () => currentUser, getNick: () => currentNick, isAdmin: () => currentIsAdmin, hasPerm: (a) => hasPerm(a) });
 const PERMISSION_AREAS = [
   { key:'akce', label:'Akce (vytváření, úprava, účastníci)' },
   { key:'turnaj', label:'Turnaje' },
@@ -5147,32 +5135,7 @@ function renderPhotoGrid(ev){
   });
 }
 
-// ==================== ZÁZNAM ZMĚN (co který admin kdy udělal) ====================
-const AUDIT_AREAS = { akce:'Akce', turnaj:'Turnaje', jidlo:'Jídlo', kontakty:'Kontakty', uzivatele:'Uživatelé', mail:'E-maily' };
-function logAction(area, text){
-  try{
-    if(!currentUser || !currentIsAdmin) return;
-    addDoc(collection(db, 'auditLog'), { at: new Date().toISOString(), by: currentNick || '?', uid: currentUser.uid, area, text }).catch(err => console.error('Záznam změn:', err));
-  }catch(e){ /* záznam nikdy nesmí shodit akci */ }
-}
-let auditUnsub = null, auditEntries = [], auditFilter = 'all';
-function renderAuditLog(){
-  const box = document.getElementById('audit-list');
-  if(!box) return;
-  const list = auditEntries.filter(e => auditFilter === 'all' || e.area === auditFilter);
-  const fmt = ts => { try{ return new Date(ts).toLocaleString('cs-CZ', { day:'numeric', month:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' }); }catch(e){ return ts || ''; } };
-  document.getElementById('audit-filter').innerHTML = ['all', ...Object.keys(AUDIT_AREAS)].map(k => `<button type="button" class="btn-sm ${auditFilter === k ? 'btn-active' : 'btn-ghost'}" data-audit-filter="${k}">${k === 'all' ? 'Vše' : AUDIT_AREAS[k]}</button>`).join(' ');
-  document.querySelectorAll('[data-audit-filter]').forEach(b => b.addEventListener('click', () => { auditFilter = b.dataset.auditFilter; renderAuditLog(); }));
-  box.innerHTML = list.length ? list.map(e => `<div class="audit-row"><span class="audit-when">${escapeHtml(fmt(e.at))}</span><span class="audit-by">${escapeHtml(e.by || '?')}</span><span class="audit-area">${escapeHtml(AUDIT_AREAS[e.area] || e.area || '')}</span><span class="audit-text">${escapeHtml(e.text || '')}</span></div>`).join('') : '<div class="empty">Zatím žádné záznamy.</div>';
-}
-function startAuditListener(){
-  if(auditUnsub || !hasPerm('zaznam')) return;
-  auditUnsub = onSnapshot(collection(db, 'auditLog'), snap => {
-    auditEntries = snap.docs.map(d => d.data()).sort((x, y) => (y.at || '').localeCompare(x.at || '')).slice(0, 500);
-    renderAuditLog();
-  }, err => console.error('Záznam změn:', err));
-}
-function stopAuditListener(){ if(auditUnsub){ auditUnsub(); auditUnsub = null; } auditEntries = []; }
+// (Záznam změn je v js/audit.js)
 
 // ==================== ÚČET / AUTENTIZACE ====================
 function usernameDocRef(nick){ return doc(db, 'usernames', nick.trim().toLowerCase()); }
