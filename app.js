@@ -1036,14 +1036,14 @@ function renderWhenWhere(ev){
     if(ev.timeStart) sub += ` · ${ev.timeStart}${ev.timeEnd ? '–' + ev.timeEnd : ''}`;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const toStart = Math.round((s - today) / 86400000);
-    if(toStart > 0) count = `<div class="ww-count"><b data-count="${toStart}">${toStart}</b><span>${czDays(toStart)} DO AKCE</span></div>`;
+    if(toStart > 0) count = `<div class="ww-count"><b data-count="${toStart}">${toStart}</b><span>${czDays(toStart)}</span></div>`;
     else if(today <= e) count = `<div class="ww-count ww-live"><b>🔥</b><span>PROBÍHÁ</span></div>`;
   }
   const place = ev.place || '';
   const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(place)}`;
   box.innerHTML = `
     <div class="ww-whenwrap" id="ed-ww-when"><div class="ww-card ww-when"><div class="ww-ico">${icon}</div>
-      <div class="ww-body"><div class="ww-k">KDY</div><div class="ww-big">${big}<span class="ww-flag" title="Výsledky hlasování o termínu (jen pro adminy)">🗳</span></div><div class="ww-sub">${escapeHtml(sub)}</div></div>${count}</div>
+      <div class="ww-body"><div class="ww-k">KDY</div><div class="ww-big">${big}<span class="ww-flag" title="Výsledky hlasování o termínu (jen pro adminy)"></span></div><div class="ww-sub">${escapeHtml(sub)}</div></div>${count}</div>
       <div class="ww-pop" id="ed-ww-pop"></div></div>
     ${place ? `<a class="ww-card ww-where" href="${mapUrl}" target="_blank" rel="noopener"><div class="ww-ico ww-pin">📍</div>
       <div class="ww-body"><div class="ww-k">KDE</div><div class="ww-big">${escapeHtml(place)}</div><div class="ww-sub">Zobrazit v mapách ↗</div></div></a>` : ''}`;
