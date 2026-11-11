@@ -1126,7 +1126,7 @@ button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):n
 .ww-count b{ display:inline; font-size:16px; }
 .ww-count span{ font-size:9px; }
 .ww-whenwrap{ position:relative; }
-.ww-flag{ display:none; width:16px; height:16px; margin-left:6px; border-radius:50%; background:var(--gold); color:#14171f; font-size:9px; align-items:center; justify-content:center; vertical-align:middle; animation:wwPulse 2s infinite; }
+.ww-flag{ display:none; width:11px; height:11px; margin-left:8px; border-radius:50%; background:var(--gold); color:#14171f; font-size:9px; align-items:center; justify-content:center; vertical-align:middle; animation:wwPulse 2s infinite; }
 .ww-adm .ww-flag{ display:inline-flex; }
 .ww-adm{ cursor:help; }
 @keyframes wwPulse{ 0%{ box-shadow:0 0 0 0 rgba(201,162,75,.7); } 70%,100%{ box-shadow:0 0 0 8px rgba(201,162,75,0); } }
@@ -1160,3 +1160,43 @@ h1.headline.ed-page-title::after{
 }
 @media (max-width:1100px){ h1.headline.ed-page-title{ max-width:100%; } }
 @media (max-width:700px){ h1.headline.ed-page-title{ white-space:normal; font-size:20px !important; } }
+
+/* ===== Větší levý a pravý sloupec detailu akce ===== */
+.ww-card{ padding:10px 18px 10px 22px; }
+.ww-k{ font-size:12px; }
+.ww-big{ font-size:22px; }
+.ww-big small{ font-size:14px; }
+.ww-sub{ font-size:13px; }
+.ww-count b{ font-size:22px; }
+.ww-count span{ font-size:10px; }
+.ww-ico{ font-size:32px; }
+@media (min-width:901px){
+  #view-event{ margin-left:-2.2vw; margin-right:-2.2vw; }
+  .detail-grid{ grid-template-columns:1fr 380px; }
+  .ed-header-left-col{ flex:0 0 300px; }
+  .ed-header-map{ width:300px; height:200px; }
+  .ed-header-left-col .tab-switch{ width:300px; }
+  .ed-header-left-col .tab-btn{ font-size:15px; }
+}
+.attendee-sidebar{ padding:20px; }
+.attendee-stats .row-stat{ font-size:14px; }
+.attendee-row{ font-size:16px; padding:10px 0; }
+.attendee-row .status-pill{ font-size:12px; }
+
+/* všechny tři sloupce začínají ve stejné výšce */
+.ed-header{ margin-top:0 !important; }
+.detail-grid{ align-items:start; }
+.ed-top-row{ align-items:flex-start; }
+.attendee-sidebar{ margin-top:0; }
+
+/* odpočet: větší a pulzuje */
+.ww-count{ top:8px; right:16px; padding:3px 12px; border-radius:20px; background:rgba(201,162,75,.16); animation:wwPulse 2s infinite; }
+.ww-count b{ font-size:30px; line-height:1; }
+.ww-count span{ font-size:11px; }
+.ww-live b{ font-size:24px; }
+@media (prefers-reduced-motion: reduce){ .ww-count{ animation:none; } }
+.ww-when{ min-height:74px; }
+.ww-when .ww-count{ top:50%; transform:translateY(-50%); right:64px; flex-direction:column; align-items:center; gap:2px; padding:5px 12px 4px; border-radius:16px; }
+.ww-when .ww-count b{ font-size:28px; }
+.ww-when .ww-count span{ font-size:10px; letter-spacing:.12em; line-height:1; }
+.ww-when .ww-ico{ display:block; font-size:30px; opacity:.6; right:20px; bottom:auto; top:calc(50% - 19px); }
