@@ -33,6 +33,8 @@ export const S = {
   usersNickLoading: false,
   allTournaments: [],
   gameLogoTargetIdx: null,
+  initialAuthSettled: false,
+  suppressAuthStateHandling: false,
   turnajProjectorMode: false,
   tourneySetupStep: null, // null | format | team-draw | ffa-confirm
   tbSoundEnabled: true,
