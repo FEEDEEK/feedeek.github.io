@@ -1042,10 +1042,14 @@ function renderWhenWhere(ev){
   const place = ev.place || '';
   const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(place)}`;
   box.innerHTML = `
-    <div class="ww-card ww-when"><div class="ww-ico">${icon}</div>
-      <div class="ww-body"><div class="ww-k">KDY</div><div class="ww-big">${big}</div><div class="ww-sub">${escapeHtml(sub)}</div></div>${count}</div>
+    <div class="ww-whenwrap" id="ed-ww-when"><div class="ww-card ww-when"><div class="ww-ico">${icon}</div>
+      <div class="ww-body"><div class="ww-k">KDY</div><div class="ww-big">${big}<span class="ww-flag" title="Výsledky hlasování o termínu (jen pro adminy)">🗳</span></div><div class="ww-sub">${escapeHtml(sub)}</div></div>${count}</div>
+      <div class="ww-pop" id="ed-ww-pop"></div></div>
     ${place ? `<a class="ww-card ww-where" href="${mapUrl}" target="_blank" rel="noopener"><div class="ww-ico ww-pin">📍</div>
       <div class="ww-body"><div class="ww-k">KDE</div><div class="ww-big">${escapeHtml(place)}</div><div class="ww-sub">Zobrazit v mapách ↗</div></div></a>` : ''}`;
+  fillDateVotePopup(ev);
+  const ww = document.getElementById('ed-ww-when');
+  if(ww) ww.addEventListener('click', (e) => { if(ww.classList.contains('ww-adm') && !e.target.closest('.ww-pop')) ww.classList.toggle('show'); });
   // odpočet se rozjede od nuly
   box.querySelectorAll('[data-count]').forEach(el => {
     const target = parseInt(el.dataset.count, 10), t0 = performance.now(), dur = 900;
@@ -1262,6 +1266,41 @@ function ensureUsersNickCache(){
 function dateVoterNick(ev, uid){
   return (ev.dateVoteNicks || {})[uid] || currentRegistrationsMap[uid]?.nick || (usersNickCache && usersNickCache[uid]) || '(neznámý)';
 }
+function fillDateVotePopup(ev){
+  const wrap = document.getElementById('ed-ww-when'), pop = document.getElementById('ed-ww-pop');
+  if(!wrap || !pop) return;
+  const options = ev.dateOptions || [];
+  const votes = ev.dateVotes || {};
+  const show = options.length > 0 && ev.dateVotingClosed && hasPerm('akce');
+  wrap.classList.toggle('ww-adm', !!show);
+  if(!show){ pop.innerHTML = ''; return; }
+  function votesOf(uid){
+    const v = votes[uid];
+    if(Array.isArray(v)) return v;
+    if(typeof v === 'number') return [v];
+    return [];
+  }
+    const nickMap = ev.dateVoteNicks || {};
+    const fmtTs = ts => { try{ return new Date(ts).toLocaleString('cs-CZ', { day:'numeric', month:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' }); }catch(e){ return ts || ''; } };
+    const hist = Array.isArray(ev.dateHistory) ? ev.dateHistory : [];
+    pop.innerHTML = `
+      <div class="section-title" style="font-size:15px;">🗳️ Hlasování o termínu <span class="status-hint">(uzavřeno)</span></div>
+      ${options.map((opt, idx) => {
+        const nicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => dateVoterNick(ev, uid));
+        const chosen = ev.dateStart === opt.start && ev.dateEnd === opt.end;
+        return `<div style="margin-top:8px; font-size:13px;${chosen ? 'color:var(--gold);' : ''}">
+          ${chosen ? '✓ ' : ''}<b>${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}</b> <span class="status-hint">(${nicks.length} hlasů)</span>
+          <div class="status-hint" style="font-size:12px;">${nicks.length ? escapeHtml(nicks.join(', ')) : 'nikdo'}</div>
+        </div>`;
+      }).join('')}
+      ${hist.length ? `<div class="mc-label" style="margin-top:12px;">Historie</div>` + hist.slice().reverse().map(h => `<div class="status-hint" style="font-size:12px;">${escapeHtml(fmtTs(h.at))} – ${escapeHtml(h.by || '?')}: ${escapeHtml(h.text || '')}</div>`).join('') : '<div class="status-hint" style="font-size:12px; margin-top:10px;">Historie změn se zapisuje od teď.</div>'}
+      <button type="button" class="btn-ghost btn-sm" id="btn-reopen-datevote" style="margin-top:12px;">↩ Znovu otevřít hlasování</button>`;
+    pop.querySelector('#btn-reopen-datevote').addEventListener('click', async () => {
+      if(!confirm('Znovu otevřít hlasování o termínu? Termín akce se označí jako nepotvrzený, hlasy zůstanou.')) return;
+      try{ await updateDoc(doc(db,'events',ev.id), { dateVotingClosed: false, dateUnconfirmed: true, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: 'hlasování znovu otevřeno' }) }); logAction('akce', `znovu otevřel hlasování o termínu u akce „${ev.name}“`); }
+      catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
+    });
+}
 function renderDateVoteBlock(ev){
   ensureUsersNickCache();
   const box = document.getElementById('ed-datevote');
@@ -1275,33 +1314,12 @@ function renderDateVoteBlock(ev){
   }
   if(options.length === 0){ box.innerHTML = ''; box.style.display = 'none'; return; }
   if(ev.dateVotingClosed){
-    // uzavřené hlasování: výsledky + historie vidí jen správce akcí, který ho může znovu otevřít
-    if(!hasPerm('akce')){ box.innerHTML = ''; box.style.display = 'none'; return; }
-    box.style.display = 'block';
-    box.className = 'panel';
-    box.style.cssText = 'flex:0 0 300px; margin-top:0;';
-    const nickMap = ev.dateVoteNicks || {};
-    const fmtTs = ts => { try{ return new Date(ts).toLocaleString('cs-CZ', { day:'numeric', month:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' }); }catch(e){ return ts || ''; } };
-    const hist = Array.isArray(ev.dateHistory) ? ev.dateHistory : [];
-    box.innerHTML = `
-      <div class="section-title" style="font-size:15px;">🗳️ Hlasování o termínu <span class="status-hint">(uzavřeno)</span></div>
-      ${options.map((opt, idx) => {
-        const nicks = Object.keys(votes).filter(uid => votesOf(uid).includes(idx)).map(uid => dateVoterNick(ev, uid));
-        const chosen = ev.dateStart === opt.start && ev.dateEnd === opt.end;
-        return `<div style="margin-top:8px; font-size:13px;${chosen ? 'color:var(--gold);' : ''}">
-          ${chosen ? '✓ ' : ''}<b>${fmtDateShort(opt.start)} – ${fmtDate(opt.end)}</b> <span class="status-hint">(${nicks.length} hlasů)</span>
-          <div class="status-hint" style="font-size:12px;">${nicks.length ? escapeHtml(nicks.join(', ')) : 'nikdo'}</div>
-        </div>`;
-      }).join('')}
-      ${hist.length ? `<div class="mc-label" style="margin-top:12px;">Historie</div>` + hist.slice().reverse().map(h => `<div class="status-hint" style="font-size:12px;">${escapeHtml(fmtTs(h.at))} – ${escapeHtml(h.by || '?')}: ${escapeHtml(h.text || '')}</div>`).join('') : '<div class="status-hint" style="font-size:12px; margin-top:10px;">Historie změn se zapisuje od teď.</div>'}
-      <button type="button" class="btn-ghost btn-sm" id="btn-reopen-datevote" style="margin-top:12px;">↩ Znovu otevřít hlasování</button>`;
-    box.querySelector('#btn-reopen-datevote').addEventListener('click', async () => {
-      if(!confirm('Znovu otevřít hlasování o termínu? Termín akce se označí jako nepotvrzený, hlasy zůstanou.')) return;
-      try{ await updateDoc(doc(db,'events',ev.id), { dateVotingClosed: false, dateUnconfirmed: true, dateHistory: arrayUnion({ at: new Date().toISOString(), by: currentNick || '', text: 'hlasování znovu otevřeno' }) }); logAction('akce', `znovu otevřel hlasování o termínu u akce „${ev.name}“`); }
-      catch(err){ alert('Nepovedlo se uložit.'); console.error(err); }
-    });
+    // uzavřené hlasování: výsledky + historie jsou ve vyskakovacím okně u data (jen správce akcí)
+    box.innerHTML = ''; box.style.display = 'none';
+    fillDateVotePopup(ev);
     return;
   }
+  fillDateVotePopup(ev);
   box.style.display = 'block';
 
   const myVotes = currentUser ? votesOf(currentUser.uid) : [];
