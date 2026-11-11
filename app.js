@@ -18,6 +18,8 @@ import { gameFieldHtml, setupGameField, searchGames, STEAM_SEARCH_FUNCTION_URL }
 import { S, hasPerm } from "./js/state.js";
 import { logAction, startAuditListener, stopAuditListener } from "./js/audit.js";
 import { eventHasOwnPaymentAccount, renderPersonalPaymentQr } from "./js/payment.js";
+import { MEAL_SLOTS, emptyFoodSchedule, PERMISSION_AREAS } from "./js/constants.js";
+import { fmtDateRange, avatarTag, emojiTag, authorLabel, setupChatEmojiRow } from "./js/ui.js";
 
 // ověřovací e-mail z našeho Gmailu; když funkce selže, použije se výchozí e-mail Firebase
 async function sendVerifyMail(user){
@@ -29,134 +31,34 @@ async function sendVerifyMail(user){
   }
 }
 
-const MEAL_SLOTS = [
-  { key:'pivo',          label:'Pivo', day:'Pivo' },
-  { key:'fri-dinner',    label:'Pátek — Večeře', day:'Pátek' },
-  { key:'sat-breakfast', label:'Sobota — Snídaně', day:'Sobota' },
-  { key:'sat-lunch',     label:'Sobota — Oběd', day:'Sobota' },
-  { key:'sat-dinner',    label:'Sobota — Večeře', day:'Sobota' },
-  { key:'sun-breakfast', label:'Neděle — Snídaně', day:'Neděle' }
-];
-function emptyFoodSchedule(){
-  const o = {};
-  MEAL_SLOTS.forEach(s => o[s.key] = []);
-  return o;
-}
 
-let events = [];
-let regCounts = {};
-const PERMISSION_AREAS = [
-  { key:'akce', label:'Akce (vytváření, úprava, účastníci)' },
-  { key:'turnaj', label:'Turnaje' },
-  { key:'jidlo', label:'Jídlo' },
-  { key:'kontakty', label:'Kontakty' },
-  { key:'uzivatele', label:'Uživatelé (správa profilů)' },
-  { key:'zaznam', label:'Záznam změn (vidí historii akcí adminů)' }
-];
-let pendingEventId = null;
 
-let currentEventGames = [];
-let currentEventFood = emptyFoodSchedule();
-let currentEventFoodVoting = {}; // { slotKey: true } - tenhle blok se hlasuje místo pevné nabídky
-let currentEventDateOptions = [];
-
-function fmtDateRange(ev){
-  if(ev.dateUnconfirmed) return 'Termín se vybírá hlasováním';
-  if(!ev.dateStart) return '';
-  const multiDay = ev.dateEnd && ev.dateEnd !== ev.dateStart;
-  if(!multiDay){
-    let s = fmtDate(ev.dateStart);
-    if(ev.timeStart) s += `, ${ev.timeStart}${ev.timeEnd ? '–'+ev.timeEnd : ''}`;
-    return s;
-  }
-  const startPart = fmtDateShort(ev.dateStart) + (ev.timeStart ? ` ${ev.timeStart}` : '');
-  const endPart = fmtDate(ev.dateEnd) + (ev.timeEnd ? ` ${ev.timeEnd}` : '');
-  return `${startPart} – ${endPart}`;
-}
-function avatarTag(avatar, size){
-  size = size || 20;
-  return `<img src="${avatar.replace(/"/g,'&quot;')}" alt="" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; vertical-align:middle; margin-right:5px; flex-shrink:0;">`;
-}
-// Emotikon může být krátký textový znak, nebo URL vlastního obrázku (nahraného/vloženého) - v obou
-// případech se zobrazí ve stejné standardní velikosti.
-function emojiTag(emoji, size){
-  if(!emoji) return '';
-  size = size || 18;
-  if(/^https?:\/\//i.test(emoji)){
-    return `<img src="${emoji.replace(/"/g,'&quot;')}" alt="" style="width:${size}px; height:${size}px; object-fit:cover; border-radius:4px; vertical-align:middle; display:inline-block;">`;
-  }
-  return `<span style="font-size:${size}px; vertical-align:middle; display:inline-block; line-height:1;">${escapeHtml(emoji)}</span>`;
-}
-function authorLabel(author, emoji, avatar){
-  if(avatar) return `${avatarTag(avatar)}${escapeHtml(author)}`;
-  return `${emoji ? emojiTag(emoji)+' ' : ''}${escapeHtml(author)}`;
-}
-const CHAT_EMOJIS = ['😀','😂','😎','👍','👎','🔥','🎉','❤️','😢','🤔','🎮','🕹️','👾','💻','🖱️','⌨️','🍕','🍺','🌙','⚡','💀','👑','🐉','🚗'];
-function setupChatEmojiRow(btnId, panelId, inputId){
-  const btn = document.getElementById(btnId);
-  const panel = document.getElementById(panelId);
-  if(!btn || !panel) return;
-  panel.innerHTML = CHAT_EMOJIS.map(e => `<span data-chat-emoji="${e}">${e}</span>`).join('');
-  panel.style.position = 'fixed';
-
-  function positionPanel(){
-    const rect = btn.getBoundingClientRect();
-    const panelWidth = panel.offsetWidth || 220;
-    let left = rect.right - panelWidth;
-    left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
-    panel.style.left = left + 'px';
-    panel.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
-    panel.style.top = 'auto';
-    panel.style.right = 'auto';
-    panel.style.marginBottom = '0';
-  }
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const opening = panel.style.display === 'none';
-    if(opening) positionPanel();
-    panel.style.display = opening ? 'grid' : 'none';
-  });
-  panel.querySelectorAll('[data-chat-emoji]').forEach(el => {
-    el.addEventListener('click', () => {
-      const input = document.getElementById(inputId);
-      input.value += el.dataset.chatEmoji;
-      input.focus();
-      panel.style.display = 'none';
-    });
-  });
-  document.addEventListener('click', (e) => {
-    if(!panel.contains(e.target) && e.target !== btn) panel.style.display = 'none';
-  });
-  window.addEventListener('resize', () => { if(panel.style.display !== 'none') positionPanel(); });
-  window.addEventListener('scroll', () => { if(panel.style.display !== 'none') positionPanel(); }, true);
-}
 
 // ---- Živé napojení na kolekci akcí ----
 const eventsQuery = query(collection(db, 'events'), orderBy('dateStart'));
 onSnapshot(eventsQuery, (snapshot) => {
-  events = snapshot.docs.map(d => {
+  S.events = snapshot.docs.map(d => {
     const data = d.data();
     const dateStart = data.dateStart || data.date || '';
     const dateEnd = data.dateEnd || dateStart;
     return { id: d.id, ...data, dateStart, dateEnd };
   });
-  events.forEach(ev => {
-    if(!(ev.id in regCounts)){
-      regCounts[ev.id] = { going:0, maybe:0 };
+  S.events.forEach(ev => {
+    if(!(ev.id in S.regCounts)){
+      S.regCounts[ev.id] = { going:0, maybe:0 };
       onSnapshot(collection(db, 'events', ev.id, 'registrations'), (rsnap) => {
         let going=0, maybe=0;
         rsnap.forEach(r => { const st=r.data().status; if(st==='maybe') maybe++; else going++; });
-        regCounts[ev.id] = { going, maybe };
+        S.regCounts[ev.id] = { going, maybe };
         renderHome(); renderEvents();
-        if(currentDetailEventId === ev.id) renderStatsAndRsvp();
+        if(S.currentDetailEventId === ev.id) renderStatsAndRsvp();
       });
     }
   });
   renderHome();
   renderEvents();
-  if(currentDetailEventId){
-    const ev = events.find(x=>x.id===currentDetailEventId);
+  if(S.currentDetailEventId){
+    const ev = S.events.find(x=>x.id===S.currentDetailEventId);
     if(ev) renderEventDetailStatic(ev);
   }
   tryInitialRoute();
@@ -196,10 +98,10 @@ function applyRoute(){
   if(view !== 'turnaj'){ tbStopLive(); tbCloseDrinkModal(); closeTbDevGraphModal(); }
 
   if(view === 'event' && id){
-    currentTournamentId = null;
+    S.currentTournamentId = null;
     openEventDetail(id);
   }else if(view === 'turnaj'){
-    currentTournamentId = id || null;
+    S.currentTournamentId = id || null;
     tourneySetupStep = null;
     showView('turnaj');
     renderTurnajPage();
@@ -217,11 +119,11 @@ function tryInitialRoute(){
   if(initialRouteApplied) return;
   if(location.hash.startsWith('#event/')){
     const id = location.hash.split('/')[1];
-    if(!events.find(e => e.id === id)) return; // data z Firestore ještě nedorazila, zkusíme znovu příště
+    if(!S.events.find(e => e.id === id)) return; // data z Firestore ještě nedorazila, zkusíme znovu příště
   }
   if(location.hash.startsWith('#turnaj/')){
     const id = location.hash.split('/')[1];
-    if(!allTournaments.find(x => x.id === id)) return;
+    if(!S.allTournaments.find(x => x.id === id)) return;
   }
   initialRouteApplied = true;
   applyRoute();
@@ -340,7 +242,7 @@ formContact.addEventListener('submit', async (e) => {
 // ---- Home ----
 function renderHome(){
   const card = document.getElementById('next-event-card');
-  const upcoming = events.filter(e => e.dateEnd >= todayIso());
+  const upcoming = S.events.filter(e => e.dateEnd >= todayIso());
   const metaBox = document.getElementById('next-event-metastrong');
   const subBox = document.getElementById('next-event-sub');
   if(upcoming.length === 0){
@@ -370,7 +272,7 @@ function normalizeGame(g){
 function renderFormGames(){
   const list = document.getElementById('ev-games-list');
   list.innerHTML = '';
-  currentEventGames.forEach((rawGame, idx) => {
+  S.currentEventGames.forEach((rawGame, idx) => {
     const game = normalizeGame(rawGame);
     const li = document.createElement('li');
     li.className = 'tag-chip';
@@ -379,7 +281,7 @@ function renderFormGames(){
   });
   list.querySelectorAll('[data-remove-game]').forEach(el => {
     el.addEventListener('click', () => {
-      currentEventGames.splice(parseInt(el.dataset.removeGame,10), 1);
+      S.currentEventGames.splice(parseInt(el.dataset.removeGame,10), 1);
       renderFormGames();
     });
   });
@@ -388,7 +290,7 @@ function renderFormGames(){
       const idx = parseInt(el.dataset.findLogo, 10);
       gameLogoTargetIdx = idx;
       const input = document.getElementById('input-add-game');
-      input.value = normalizeGame(currentEventGames[idx]).name;
+      input.value = normalizeGame(S.currentEventGames[idx]).name;
       input.focus();
       input.dispatchEvent(new Event('input'));
     });
@@ -406,7 +308,7 @@ document.getElementById('btn-add-game').addEventListener('click', () => {
     document.getElementById('game-autocomplete-list').style.display = 'none';
     return;
   }
-  currentEventGames.push({ name: val, image: '' });
+  S.currentEventGames.push({ name: val, image: '' });
   input.value = '';
   document.getElementById('game-autocomplete-list').style.display = 'none';
   renderFormGames();
@@ -432,10 +334,10 @@ document.getElementById('input-add-game').addEventListener('input', (e) => {
       box.querySelectorAll('[data-pick-game]').forEach(item => {
         item.addEventListener('click', () => {
           if(gameLogoTargetIdx !== null){
-            currentEventGames[gameLogoTargetIdx] = { name: item.dataset.pickGame, image: item.dataset.pickImage || '' };
+            S.currentEventGames[gameLogoTargetIdx] = { name: item.dataset.pickGame, image: item.dataset.pickImage || '' };
             gameLogoTargetIdx = null;
           }else{
-            currentEventGames.push({ name: item.dataset.pickGame, image: item.dataset.pickImage || '' });
+            S.currentEventGames.push({ name: item.dataset.pickGame, image: item.dataset.pickImage || '' });
           }
           document.getElementById('input-add-game').value = '';
           box.style.display = 'none';
@@ -455,8 +357,8 @@ document.addEventListener('click', (e) => {
 function renderFormFood(){
   const box = document.getElementById('food-schedule-preview');
   box.innerHTML = MEAL_SLOTS.map(slot => {
-    const items = currentEventFood[slot.key] || [];
-    const isVoting = !!currentEventFoodVoting[slot.key];
+    const items = S.currentEventFood[slot.key] || [];
+    const isVoting = !!S.currentEventFoodVoting[slot.key];
     const chips = items.length
       ? items.map((food, idx) => `<span class="tag-chip">${escapeHtml(food)}<span class="x" data-remove-food="${slot.key}|${idx}">×</span></span>`).join(' ')
       : '<span style="color:var(--text-muted);">Žádné položky</span>';
@@ -474,13 +376,13 @@ function renderFormFood(){
   box.querySelectorAll('[data-remove-food]').forEach(el => {
     el.addEventListener('click', () => {
       const [key, idxStr] = el.dataset.removeFood.split('|');
-      currentEventFood[key].splice(parseInt(idxStr,10), 1);
+      S.currentEventFood[key].splice(parseInt(idxStr,10), 1);
       renderFormFood();
     });
   });
   box.querySelectorAll('[data-food-voting-toggle]').forEach(el => {
     el.addEventListener('change', () => {
-      currentEventFoodVoting[el.dataset.foodVotingToggle] = el.checked;
+      S.currentEventFoodVoting[el.dataset.foodVotingToggle] = el.checked;
     });
   });
 }
@@ -489,8 +391,8 @@ document.getElementById('btn-add-food').addEventListener('click', () => {
   const input = document.getElementById('input-add-food');
   const val = input.value.trim();
   if(!val) return;
-  if(!currentEventFood[select.value]) currentEventFood[select.value] = [];
-  currentEventFood[select.value].push(val);
+  if(!S.currentEventFood[select.value]) S.currentEventFood[select.value] = [];
+  S.currentEventFood[select.value].push(val);
   input.value = '';
   renderFormFood();
 });
@@ -498,12 +400,12 @@ document.getElementById('btn-add-food').addEventListener('click', () => {
 // ==================== FORMULÁŘ AKCE: termíny k hlasování ====================
 function renderFormDateOptions(){
   const list = document.getElementById('ev-dateopts-list');
-  list.innerHTML = currentEventDateOptions.map((d, idx) => `
+  list.innerHTML = S.currentEventDateOptions.map((d, idx) => `
     <li class="tag-chip"><span>${fmtDateShort(d.start)} – ${fmtDate(d.end)}</span><span class="x" data-remove-dateopt="${idx}">×</span></li>
   `).join('');
   list.querySelectorAll('[data-remove-dateopt]').forEach(el => {
     el.addEventListener('click', () => {
-      currentEventDateOptions.splice(parseInt(el.dataset.removeDateopt,10), 1);
+      S.currentEventDateOptions.splice(parseInt(el.dataset.removeDateopt,10), 1);
       renderFormDateOptions();
     });
   });
@@ -514,7 +416,7 @@ document.getElementById('btn-add-dateopt').addEventListener('click', () => {
   const start = startInput.value, end = endInput.value || startInput.value;
   if(!start){ alert('Zadej alespoň počáteční datum.'); return; }
   if(end < start){ alert('Konec nemůže být dřív než začátek.'); return; }
-  currentEventDateOptions.push({ start, end });
+  S.currentEventDateOptions.push({ start, end });
   startInput.value = ''; endInput.value = '';
   renderFormDateOptions();
 });
@@ -550,10 +452,10 @@ document.getElementById('ev-qr-file').addEventListener('change', async () => {
 });
 
 function resetEventFormHelpers(){
-  currentEventGames = [];
-  currentEventFood = emptyFoodSchedule();
-  currentEventFoodVoting = {};
-  currentEventDateOptions = [];
+  S.currentEventGames = [];
+  S.currentEventFood = emptyFoodSchedule();
+  S.currentEventFoodVoting = {};
+  S.currentEventDateOptions = [];
   gameLogoTargetIdx = null;
   document.getElementById('ev-qr-upload-msg').textContent = '';
   updateEvQrPreview();
@@ -595,7 +497,7 @@ formEvent.addEventListener('submit', async (e) => {
 
   const enteredStart = document.getElementById('ev-date-start').value;
   const enteredEnd = document.getElementById('ev-date-end').value;
-  const dateOptions = [...currentEventDateOptions];
+  const dateOptions = [...S.currentEventDateOptions];
 
   if(!enteredStart && dateOptions.length === 0){
     alert('Zadej datum akce, nebo přidej alespoň jeden termín k hlasování.');
@@ -635,10 +537,10 @@ formEvent.addEventListener('submit', async (e) => {
     accBank: document.getElementById('ev-acc-bank').value.trim(),
     dateOptions,
     dateVoteDeadline: document.getElementById('ev-dateopt-deadline').value || '',
-    games: [...currentEventGames],
+    games: [...S.currentEventGames],
     foodPlan: document.getElementById('ev-foodplan').value.trim(),
-    foodSchedule: JSON.parse(JSON.stringify(currentEventFood)),
-    foodVotingSlots: JSON.parse(JSON.stringify(currentEventFoodVoting)),
+    foodSchedule: JSON.parse(JSON.stringify(S.currentEventFood)),
+    foodVotingSlots: JSON.parse(JSON.stringify(S.currentEventFoodVoting)),
     changeDeadline: document.getElementById('ev-deadline').value || ''
   };
   try{
@@ -677,20 +579,20 @@ function startEditEvent(ev){
   document.getElementById('ev-acc-number').value = ev.accNumber || '';
   document.getElementById('ev-acc-bank').value = ev.accBank || '';
   updateEvQrPreview();
-  currentEventDateOptions = Array.isArray(ev.dateOptions) ? [...ev.dateOptions] : [];
+  S.currentEventDateOptions = Array.isArray(ev.dateOptions) ? [...ev.dateOptions] : [];
   renderFormDateOptions();
   document.getElementById('ev-dateopt-deadline').value = ev.dateVoteDeadline || '';
   document.getElementById('ev-foodplan').value = ev.foodPlan || '';
   document.getElementById('ev-deadline').value = ev.changeDeadline || '';
 
-  currentEventGames = Array.isArray(ev.games) ? [...ev.games] : [];
-  currentEventFood = emptyFoodSchedule();
+  S.currentEventGames = Array.isArray(ev.games) ? [...ev.games] : [];
+  S.currentEventFood = emptyFoodSchedule();
   if(ev.foodSchedule){
     MEAL_SLOTS.forEach(slot => {
-      currentEventFood[slot.key] = Array.isArray(ev.foodSchedule[slot.key]) ? [...ev.foodSchedule[slot.key]] : [];
+      S.currentEventFood[slot.key] = Array.isArray(ev.foodSchedule[slot.key]) ? [...ev.foodSchedule[slot.key]] : [];
     });
   }
-  currentEventFoodVoting = ev.foodVotingSlots ? { ...ev.foodVotingSlots } : {};
+  S.currentEventFoodVoting = ev.foodVotingSlots ? { ...ev.foodVotingSlots } : {};
   renderFormGames();
   renderFormFood();
 
@@ -715,13 +617,13 @@ function renderEvents(){
   grid.innerHTML = '';
   historyWrap.innerHTML = '';
 
-  if(events.length === 0){
+  if(S.events.length === 0){
     grid.innerHTML = '<div class="empty">Zatím žádné akce.</div>';
     return;
   }
 
-  const upcoming = events.filter(e => e.dateEnd >= todayIso());
-  const past = events.filter(e => e.dateEnd < todayIso()).sort((a,b)=> b.dateStart.localeCompare(a.dateStart));
+  const upcoming = S.events.filter(e => e.dateEnd >= todayIso());
+  const past = S.events.filter(e => e.dateEnd < todayIso()).sort((a,b)=> b.dateStart.localeCompare(a.dateStart));
 
   if(upcoming.length === 0 && past.length > 0){
     grid.innerHTML = '<div class="empty">Žádná nadcházející akce zatím není vypsaná.</div>';
@@ -731,7 +633,7 @@ function renderEvents(){
     const featured = upcoming[0];
     const rest = upcoming.slice(1);
 
-    const taken = (regCounts[featured.id]?.going) || 0;
+    const taken = (S.regCounts[featured.id]?.going) || 0;
     const full = taken >= featured.cap;
     const fc = document.createElement('div');
     fc.className = 'featured-card';
@@ -762,7 +664,7 @@ function renderEvents(){
     featuredWrap.appendChild(fc);
 
     rest.forEach(ev => {
-      const t = (regCounts[ev.id]?.going) || 0;
+      const t = (S.regCounts[ev.id]?.going) || 0;
       const f = t >= ev.cap;
       const card = document.createElement('div');
       card.className = 'event-card';
@@ -822,78 +724,68 @@ function renderEvents(){
 }
 
 // ==================== DETAIL AKCE ====================
-let currentDetailEventId = null;
-let currentTab = 'prehled';
-let detailUnsubs = [];
-let currentRegistrationsMap = {};
 
 function clearDetailListeners(){
-  detailUnsubs.forEach(u => u());
-  detailUnsubs = [];
+  S.detailUnsubs.forEach(u => u());
+  S.detailUnsubs = [];
 }
 
 function openEventDetail(eventId){
-  currentDetailEventId = eventId;
-  currentTab = 'prehled';
-  currentTournamentId = null;
-  const ev = events.find(x => x.id === eventId);
+  S.currentDetailEventId = eventId;
+  S.currentTab = 'prehled';
+  S.currentTournamentId = null;
+  const ev = S.events.find(x => x.id === eventId);
   if(!ev) return;
   showView('event');
   renderEventDetailStatic(ev);
   clearDetailListeners();
 
   const unsubReg = onSnapshot(collection(db, 'events', eventId, 'registrations'), (snap) => {
-    currentRegistrationsMap = {};
-    snap.forEach(d => currentRegistrationsMap[d.id] = { ...d.data(), _docId: d.id });
+    S.currentRegistrationsMap = {};
+    snap.forEach(d => S.currentRegistrationsMap[d.id] = { ...d.data(), _docId: d.id });
     renderStatsAndRsvp();
     renderAttendees();
-    { const liveEv = events.find(x => x.id === eventId) || ev; renderDateVoteBlock(liveEv); }
-    if(currentTab === 'jidlo') renderTabJidlo(ev);
+    { const liveEv = S.events.find(x => x.id === eventId) || ev; renderDateVoteBlock(liveEv); }
+    if(S.currentTab === 'jidlo') renderTabJidlo(ev);
   });
-  detailUnsubs.push(unsubReg);
+  S.detailUnsubs.push(unsubReg);
 
   const unsubSug = onSnapshot(collection(db, 'events', eventId, 'suggestions'), (snap) => {
-    currentSuggestions = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
-    if(currentTab === 'prehled') renderTabPrehled(ev);
+    S.currentSuggestions = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+    if(S.currentTab === 'prehled') renderTabPrehled(ev);
   });
-  detailUnsubs.push(unsubSug);
+  S.detailUnsubs.push(unsubSug);
 
   const unsubComments = onSnapshot(collection(db, 'events', eventId, 'comments'), (snap) => {
-    currentComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
-    if(currentTab === 'prehled') renderTabPrehled(ev);
+    S.currentComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+    if(S.currentTab === 'prehled') renderTabPrehled(ev);
   });
-  detailUnsubs.push(unsubComments);
+  S.detailUnsubs.push(unsubComments);
 
   const unsubFood = onSnapshot(collection(db, 'events', eventId, 'foodComments'), (snap) => {
-    currentFoodComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
-    if(currentTab === 'jidlo') renderTabJidlo(ev);
+    S.currentFoodComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+    if(S.currentTab === 'jidlo') renderTabJidlo(ev);
   });
-  detailUnsubs.push(unsubFood);
+  S.detailUnsubs.push(unsubFood);
 
   const unsubSched = onSnapshot(collection(db, 'events', eventId, 'scheduleComments'), (snap) => {
-    currentScheduleComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
-    if(currentTab === 'rozvrh') renderScheduleComments(ev);   // jen seznam příspěvků, ať se nepřekreslí rozepsaný text
+    S.currentScheduleComments = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+    if(S.currentTab === 'rozvrh') renderScheduleComments(ev);   // jen seznam příspěvků, ať se nepřekreslí rozepsaný text
   });
-  detailUnsubs.push(unsubSched);
+  S.detailUnsubs.push(unsubSched);
 
   const unsubPhotos = onSnapshot(collection(db, 'events', eventId, 'photos'), (snap) => {
-    currentPhotos = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
-    if(currentTab === 'foto') renderTabFoto(ev);
+    S.currentPhotos = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+    if(S.currentTab === 'foto') renderTabFoto(ev);
   });
-  detailUnsubs.push(unsubPhotos);
+  S.detailUnsubs.push(unsubPhotos);
 }
 
-let currentSuggestions = [];
-let pendingSuggestionImage = '';
-let currentComments = [];
-let currentFoodComments = [];
-let currentScheduleComments = [];
-let currentPhotos = [];
 
 function renderTournamentSignupCta(ev){
   const box = document.getElementById('prehled-tourney-cta');
   if(!box) return;
-  const list = allTournaments.filter(x => x.eventId === ev.id && x.status === 'signup');
+  const list = S.allTournaments.filter(x => x.eventId === ev.id && x.status === 'signup');
   if(list.length === 0){ box.innerHTML = ''; return; }
   box.innerHTML = `
     <button type="button" class="tourney-signup-cta-btn" id="tourney-vote-announce-btn">
@@ -969,16 +861,16 @@ function renderEventDetailStatic(ev){
 
   const tabPanels = { prehled:'tab-prehled', rozvrh:'tab-rozvrh', jidlo:'tab-jidlo', turnaj:'tab-turnaj', foto:'tab-foto' };
   Object.entries(tabPanels).forEach(([key, id]) => {
-    document.getElementById(id).style.display = (key === currentTab) ? 'block' : 'none';
+    document.getElementById(id).style.display = (key === S.currentTab) ? 'block' : 'none';
   });
   updateHeaderVisibility();
   document.querySelectorAll('#ed-tabs .tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === currentTab);
+    btn.classList.toggle('active', btn.dataset.tab === S.currentTab);
     btn.onclick = () => {
-      currentTab = btn.dataset.tab;
+      S.currentTab = btn.dataset.tab;
       document.querySelectorAll('#ed-tabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
       Object.entries(tabPanels).forEach(([key, id]) => {
-        document.getElementById(id).style.display = (key === currentTab) ? 'block' : 'none';
+        document.getElementById(id).style.display = (key === S.currentTab) ? 'block' : 'none';
       });
       updateHeaderVisibility();
       renderActiveTab(ev);
@@ -991,7 +883,7 @@ function renderEventDetailStatic(ev){
 }
 
 function updateHeaderVisibility(){
-  const onPrehled = currentTab === 'prehled';
+  const onPrehled = S.currentTab === 'prehled';
   document.getElementById('ed-header').style.display = onPrehled ? 'flex' : 'none';
   const grid = document.querySelector('.detail-grid');
   const rightCol = document.querySelector('.detail-col-right');
@@ -1003,7 +895,7 @@ function updateHeaderVisibility(){
 async function openEventMail(ev){
     const users = await getAllUsersForMail();
     const body = `Zdar, tady FEEDEEK LAN!\n\nchystá se akce "${ev.name}" (${fmtDateRange(ev)}${ev.place ? ', ' + ev.place : ''}).\n\n${ev.desc ? ev.desc + '\n\n' : ''}Přihlas se tady: ${mailLink('event/' + ev.id)}`;
-    const going = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
+    const going = new Set(Object.values(S.currentRegistrationsMap).map(r => r.uid || r._docId));
     openMailComposer('E-mail k akci', [
       { label:'Nová akce – pozvánka', subject:`Nová akce: ${ev.name}`, body, recipients: users, hint:'Pozvánka pro všechny registrované.' },
       { label:'Připomínka – ještě nejsi přihlášený', subject:`Přihlas se na: ${ev.name}`, body:`Zdar, tady FEEDEEK LAN!\n\nještě jsi se nepřihlásil na akci "${ev.name}" (${fmtDateRange(ev)}). Dej vědět, jestli jedeš:\n\n${mailLink('event/' + ev.id)}`, recipients: users.filter(u => !going.has(u.uid)), hint:'Jen ti, kdo se na akci ještě nepřihlásili.' }
@@ -1011,7 +903,7 @@ async function openEventMail(ev){
   }
 async function openVoteMail(ev){
     const users = await getAllUsersForMail();
-    const regUids = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
+    const regUids = new Set(Object.values(S.currentRegistrationsMap).map(r => r.uid || r._docId));
     const reg = users.filter(u => regUids.has(u.uid));
     const schedule = ev.foodSchedule || {}; const votingSlots = ev.foodVotingSlots || {};
     const activeVotingSlots = MEAL_SLOTS.filter(s => votingSlots[s.key] && schedule[s.key] && schedule[s.key].length > 0);
@@ -1025,9 +917,9 @@ async function openVoteMail(ev){
   }
 async function openEventTourneysMail(ev){
   const users = await getAllUsersForMail();
-  const regUids = new Set(Object.values(currentRegistrationsMap).map(r => r.uid || r._docId));
+  const regUids = new Set(Object.values(S.currentRegistrationsMap).map(r => r.uid || r._docId));
   const reg = users.filter(u => regUids.has(u.uid));
-  const open = allTournaments.filter(t => t.eventId === ev.id && t.status === 'signup');
+  const open = S.allTournaments.filter(t => t.eventId === ev.id && t.status === 'signup');
   const list = open.length ? open.map(t => `• ${t.name}${t.game ? ' (' + t.game + ')' : ''}`).join('\n') : '';
   const link = mailLink('event/' + ev.id);
   const signed = new Set(open.flatMap(t => (t.signups || []).map(n => String(n).toLowerCase())));
@@ -1040,17 +932,17 @@ function updateMailSlot(ev){
   const slot = document.getElementById('ed-mail-slot');
   if(!slot) return;
   let label = '', fn = null;
-  if(currentTab === 'prehled' && hasPerm('akce')){ label = '✉️ Poslat e-mail k akci'; fn = openEventMail; }
-  else if(currentTab === 'jidlo' && hasPerm('jidlo')){
+  if(S.currentTab === 'prehled' && hasPerm('akce')){ label = '✉️ Poslat e-mail k akci'; fn = openEventMail; }
+  else if(S.currentTab === 'jidlo' && hasPerm('jidlo')){
     const sc = ev.foodSchedule || {}, vs = ev.foodVotingSlots || {};
     if(MEAL_SLOTS.some(m => vs[m.key] && sc[m.key] && sc[m.key].length > 0)){ label = '✉️ Poslat e-mail o hlasování'; fn = openVoteMail; }
   }
-  else if(currentTab === 'turnaj' && hasPerm('turnaj')){ label = '✉️ Poslat e-mail o turnajích'; fn = openEventTourneysMail; }
+  else if(S.currentTab === 'turnaj' && hasPerm('turnaj')){ label = '✉️ Poslat e-mail o turnajích'; fn = openEventTourneysMail; }
   const canEditEv = hasPerm('akce');
-  const canEditFood = currentTab === 'jidlo' && hasPerm('jidlo');
+  const canEditFood = S.currentTab === 'jidlo' && hasPerm('jidlo');
   if(!fn && !canEditEv && !canEditFood){ slot.innerHTML = ''; return; }
   slot.innerHTML = (canEditFood ? `<button type="button" class="btn-ghost mail-slot-edit mail-slot-food">🍔 Upravit jídlo</button>` : '') + (canEditEv ? `<button type="button" class="btn-ghost mail-slot-edit mail-slot-ev">✏️ Upravit akci</button>` : '') + (fn ? `<button type="button" class="mail-btn">${label}</button>` : '');
-  const liveEv = () => events.find(x => x.id === ev.id) || ev;
+  const liveEv = () => S.events.find(x => x.id === ev.id) || ev;
   const editB = slot.querySelector('.mail-slot-ev');
   if(editB) editB.addEventListener('click', () => startEditEvent(liveEv()));
   const foodB = slot.querySelector('.mail-slot-food');
@@ -1061,10 +953,10 @@ function updateMailSlot(ev){
 
 function renderActiveTab(ev){
   updateMailSlot(ev);
-  if(currentTab === 'prehled') renderTabPrehled(ev);
-  else if(currentTab === 'rozvrh') renderTabRozvrh(ev);
-  else if(currentTab === 'jidlo') renderTabJidlo(ev);
-  else if(currentTab === 'turnaj') renderTabTurnaj(ev);
+  if(S.currentTab === 'prehled') renderTabPrehled(ev);
+  else if(S.currentTab === 'rozvrh') renderTabRozvrh(ev);
+  else if(S.currentTab === 'jidlo') renderTabJidlo(ev);
+  else if(S.currentTab === 'turnaj') renderTabTurnaj(ev);
   else renderTabFoto(ev);
 }
 
@@ -1079,18 +971,17 @@ function renderEntryFeeBlock(ev){
   `;
 }
 
-let usersNickCache = null, usersNickLoading = false;
 function ensureUsersNickCache(){
-  if(usersNickCache || usersNickLoading || !hasPerm('akce')) return;
-  usersNickLoading = true;
+  if(S.usersNickCache || S.usersNickLoading || !hasPerm('akce')) return;
+  S.usersNickLoading = true;
   getAllUsersForMail().then(list => {
-    usersNickCache = {}; list.forEach(u => { usersNickCache[u.uid] = u.nick; });
-    const ev = events.find(x => x.id === currentDetailEventId);
+    S.usersNickCache = {}; list.forEach(u => { S.usersNickCache[u.uid] = u.nick; });
+    const ev = S.events.find(x => x.id === S.currentDetailEventId);
     if(ev) renderDateVoteBlock(ev);
-  }).finally(() => { usersNickLoading = false; });
+  }).finally(() => { S.usersNickLoading = false; });
 }
 function dateVoterNick(ev, uid){
-  return (ev.dateVoteNicks || {})[uid] || currentRegistrationsMap[uid]?.nick || (usersNickCache && usersNickCache[uid]) || '(neznámý)';
+  return (ev.dateVoteNicks || {})[uid] || S.currentRegistrationsMap[uid]?.nick || (S.usersNickCache && S.usersNickCache[uid]) || '(neznámý)';
 }
 function fillDateVotePopup(ev){
   const wrap = document.getElementById('ed-ww-when'), pop = document.getElementById('ed-ww-pop');
@@ -1199,21 +1090,21 @@ function isPastDeadline(ev){
 
 // ---- RSVP: dvoukrokové (nejdřív přihlásit, pak určitě/možná v sidebaru) ----
 function renderStatsAndRsvp(){
-  const ev = events.find(x => x.id === currentDetailEventId);
+  const ev = S.events.find(x => x.id === S.currentDetailEventId);
   if(!ev) return;
 
   const rsvpBox = document.getElementById('ed-rsvp');
   const qrBoxEl = document.getElementById('ed-payment-qr');
   if(!S.currentUser || !S.currentNick){
     rsvpBox.innerHTML = `<button type="button" id="rsvp-login-btn">Přihlásit se na akci</button>`;
-    document.getElementById('rsvp-login-btn').addEventListener('click', () => { pendingEventId = ev.id; showView('ucet'); });
+    document.getElementById('rsvp-login-btn').addEventListener('click', () => { S.pendingEventId = ev.id; showView('ucet'); });
     if(qrBoxEl) qrBoxEl.innerHTML = '';
     return;
   }
 
-  const myReg = currentRegistrationsMap[S.currentUser.uid];
+  const myReg = S.currentRegistrationsMap[S.currentUser.uid];
   const deadlinePassed = isPastDeadline(ev);
-  const counts = regCounts[ev.id] || { going:0, maybe:0 };
+  const counts = S.regCounts[ev.id] || { going:0, maybe:0 };
   const full = counts.going >= ev.cap;
 
   if(!myReg){
@@ -1235,7 +1126,7 @@ function renderStatsAndRsvp(){
       try{
         await deleteDoc(doc(db, 'events', ev.id, 'registrations', S.currentUser.uid));
         // nečekat jen na živý listener - rovnou celou stránku znovu vykreslit, ať nic nezůstane neaktuální bez ručního refreshe
-        delete currentRegistrationsMap[S.currentUser.uid];
+        delete S.currentRegistrationsMap[S.currentUser.uid];
         applyRoute();
       }
       catch(err){ alert('Odhlášení se nepovedlo.'); console.error(err); }
@@ -1265,7 +1156,7 @@ function coinSvg(paid){
 }
 
 async function openAddAttendeeModal(){
-  const eventId = currentDetailEventId;
+  const eventId = S.currentDetailEventId;
   const backdrop = document.createElement('div');
   backdrop.className = 'score-modal-backdrop';
   backdrop.innerHTML = `
@@ -1292,7 +1183,7 @@ async function openAddAttendeeModal(){
   const select = document.getElementById('add-att-select');
   try{
     const snap = await getDocs(collection(db,'users'));
-    const already = new Set(Object.values(currentRegistrationsMap).map(r=>r._docId));
+    const already = new Set(Object.values(S.currentRegistrationsMap).map(r=>r._docId));
     const options = snap.docs
       .map(d => ({ uid:d.id, ...d.data() }))
       .filter(u => !already.has(u.uid))
@@ -1325,10 +1216,10 @@ async function openAddAttendeeModal(){
 
 function renderAttendees(){
   const box = document.getElementById('ed-attendees');
-  const list = Object.values(currentRegistrationsMap).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+  const list = Object.values(S.currentRegistrationsMap).sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
   const going = list.filter(r => r.status !== 'maybe').length;
   const maybe = list.length - going;
-  const ev = events.find(x => x.id === currentDetailEventId);
+  const ev = S.events.find(x => x.id === S.currentDetailEventId);
   const cap = ev ? ev.cap : '?';
 
   let html = `
@@ -1380,22 +1271,22 @@ function renderAttendees(){
   box.querySelectorAll('[data-toggle-paid]').forEach(el => {
     if(!el.dataset.togglePaid) return;
     el.addEventListener('click', async () => {
-      const r = currentRegistrationsMap[el.dataset.togglePaid];
-      try{ await updateDoc(doc(db, 'events', currentDetailEventId, 'registrations', el.dataset.togglePaid), { paid: !r.paid }); }
+      const r = S.currentRegistrationsMap[el.dataset.togglePaid];
+      try{ await updateDoc(doc(db, 'events', S.currentDetailEventId, 'registrations', el.dataset.togglePaid), { paid: !r.paid }); }
       catch(err){ console.error(err); }
     });
   });
   box.querySelectorAll('[data-self-status]').forEach(btn => {
     btn.addEventListener('click', async () => {
       try{
-        await updateDoc(doc(db, 'events', currentDetailEventId, 'registrations', S.currentUser.uid), { status: btn.dataset.selfStatus });
+        await updateDoc(doc(db, 'events', S.currentDetailEventId, 'registrations', S.currentUser.uid), { status: btn.dataset.selfStatus });
       }catch(err){ console.error(err); }
     });
   });
   box.querySelectorAll('[data-remove-attendee]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if(!confirm('Odebrat tohoto účastníka z akce?')) return;
-      try{ await deleteDoc(doc(db, 'events', currentDetailEventId, 'registrations', btn.dataset.removeAttendee)); }
+      try{ await deleteDoc(doc(db, 'events', S.currentDetailEventId, 'registrations', btn.dataset.removeAttendee)); }
       catch(err){ alert('Odebrání se nepovedlo.'); console.error(err); }
     });
   });
@@ -1461,9 +1352,9 @@ function renderTabPrehled(ev){
     const text = input.value.trim();
     if(!text) return;
     try{
-      await addDoc(collection(db,'events',ev.id,'suggestions'), { text, image: pendingSuggestionImage, author: S.currentNick, authorEmoji: S.currentEmoji, authorAvatar: S.currentAvatar, uid: S.currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
+      await addDoc(collection(db,'events',ev.id,'suggestions'), { text, image: S.pendingSuggestionImage, author: S.currentNick, authorEmoji: S.currentEmoji, authorAvatar: S.currentAvatar, uid: S.currentUser.uid, likes: [], likeNicks: [], ts: new Date().toISOString() });
       input.value = '';
-      pendingSuggestionImage = '';
+      S.pendingSuggestionImage = '';
       document.getElementById('sug-autocomplete-list').style.display = 'none';
     }catch(err){ console.error(err); }
   });
@@ -1471,7 +1362,7 @@ function renderTabPrehled(ev){
   let sugSearchDebounce = null;
   document.getElementById('suggestion-input').addEventListener('input', (e) => {
     clearTimeout(sugSearchDebounce);
-    pendingSuggestionImage = '';
+    S.pendingSuggestionImage = '';
     const q = e.target.value.trim();
     const box = document.getElementById('sug-autocomplete-list');
     if(q.length < 2){ box.style.display = 'none'; return; }
@@ -1489,7 +1380,7 @@ function renderTabPrehled(ev){
         box.querySelectorAll('[data-pick-sug]').forEach(item => {
           item.addEventListener('click', () => {
             document.getElementById('suggestion-input').value = item.dataset.pickSug;
-            pendingSuggestionImage = item.dataset.pickSugImage || '';
+            S.pendingSuggestionImage = item.dataset.pickSugImage || '';
             box.style.display = 'none';
           });
         });
@@ -1525,11 +1416,11 @@ function renderTabPrehled(ev){
 function renderSuggestions(ev){
   const sugList = document.getElementById('suggestions-list');
   if(!sugList) return;
-  if(currentSuggestions.length === 0){
+  if(S.currentSuggestions.length === 0){
     sugList.innerHTML = '<div class="empty">Zatím nikdo nic nenavrhl.</div>';
     return;
   }
-  sugList.innerHTML = currentSuggestions.map(s => {
+  sugList.innerHTML = S.currentSuggestions.map(s => {
     const liked = S.currentUser && (s.likes||[]).includes(S.currentUser.uid);
     const likers = (s.likeNicks||[]).join('\n');
     const canEdit = S.currentUser && (s.uid === S.currentUser.uid || hasPerm('akce'));
@@ -1546,7 +1437,7 @@ function renderSuggestions(ev){
   sugList.querySelectorAll('[data-sug-like]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if(!S.currentUser || !S.currentNick){ showView('ucet'); return; }
-      const sug = currentSuggestions.find(s => s.id === btn.dataset.sugLike);
+      const sug = S.currentSuggestions.find(s => s.id === btn.dataset.sugLike);
       const liked = (sug.likes||[]).includes(S.currentUser.uid);
       try{
         await updateDoc(doc(db,'events',ev.id,'suggestions',sug.id), {
@@ -1568,7 +1459,7 @@ function renderSuggestions(ev){
   sugList.querySelectorAll('[data-sug-edit]').forEach(btn => {
     btn.addEventListener('click', () => {
       const sugId = btn.dataset.sugEdit;
-      const sug = currentSuggestions.find(s => s.id === sugId);
+      const sug = S.currentSuggestions.find(s => s.id === sugId);
       const row = sugList.querySelector(`[data-sug-row="${sugId}"]`);
       const display = row.querySelector('[data-sug-display]');
       let editPickedImage = sug.image || '';
@@ -1628,11 +1519,11 @@ function renderSuggestions(ev){
 function renderComments(ev){
   const commentsList = document.getElementById('comments-list');
   if(!commentsList) return;
-  if(currentComments.length === 0){
+  if(S.currentComments.length === 0){
     commentsList.innerHTML = '<div class="empty">Zatím žádná diskuze.</div>';
     return;
   }
-  commentsList.innerHTML = currentComments.map(c => {
+  commentsList.innerHTML = S.currentComments.map(c => {
     const canEdit = S.currentUser && (c.uid === S.currentUser.uid || hasPerm('akce'));
     return `
     <div class="comment-row" data-comment-row="${c.id}">
@@ -1653,7 +1544,7 @@ function renderComments(ev){
   commentsList.querySelectorAll('[data-comment-edit]').forEach(btn => {
     btn.addEventListener('click', () => {
       const cId = btn.dataset.commentEdit;
-      const c = currentComments.find(x => x.id === cId);
+      const c = S.currentComments.find(x => x.id === cId);
       const row = commentsList.querySelector(`[data-comment-row="${cId}"]`);
       const display = row.querySelector('[data-comment-display]');
       display.outerHTML = `
@@ -1677,7 +1568,7 @@ function renderComments(ev){
 // ---- Jídlo: zaškrtávací výběr + potvrzení + počty porcí pro admina ----
 function renderTabJidlo(ev){
   const box = document.getElementById('tab-jidlo');
-  const myReg = S.currentUser ? currentRegistrationsMap[S.currentUser.uid] : null;
+  const myReg = S.currentUser ? S.currentRegistrationsMap[S.currentUser.uid] : null;
   const deadlinePassed = isPastDeadline(ev);
   const schedule = ev.foodSchedule || {};
   const votingSlots = ev.foodVotingSlots || {};
@@ -1742,7 +1633,7 @@ function renderTabJidlo(ev){
 
           const portionCounts = {};
           options.forEach(o => portionCounts[o] = 0);
-          Object.values(currentRegistrationsMap).forEach(r => {
+          Object.values(S.currentRegistrationsMap).forEach(r => {
             if(r.food && Array.isArray(r.food[slot.key])){
               r.food[slot.key].forEach(o => { if(portionCounts[o] !== undefined) portionCounts[o]++; });
             }
@@ -1839,9 +1730,9 @@ function renderTabJidlo(ev){
   });
 
   const foodCommentsList = document.getElementById('food-comments-list');
-  foodCommentsList.innerHTML = currentFoodComments.length === 0
+  foodCommentsList.innerHTML = S.currentFoodComments.length === 0
     ? '<div class="empty">Zatím žádná diskuze.</div>'
-    : currentFoodComments.map(c => {
+    : S.currentFoodComments.map(c => {
         const canEdit = S.currentUser && (c.uid === S.currentUser.uid || hasPerm('jidlo'));
         return `
         <div class="comment-row" data-food-comment-row="${c.id}">
@@ -1874,8 +1765,6 @@ function renderTabJidlo(ev){
 }
 
 // ---- Turnaj: samostatná kolekce, propojená s konkrétní akcí přes eventId ----
-let allTournaments = [];
-let currentTournamentId = null;
 let turnajProjectorMode = false;
 const TEAM_EMBLEMS = ['🛡️','⚔️','🐺','🦅','🔥','💀','👑','🌙','⭐','🐉','🦁','🍀','🐍','🦂','⚡','🎯'];
 const TEAM_COLORS = ['#e8e3d8','#c9a24b','#8b2635','#2f8f8f','#4a90d9','#9b59b6','#e67e22','#2ecc71','#e84393','#95a5a6'];
@@ -1887,13 +1776,13 @@ function autoStyle(i){
 }
 
 onSnapshot(collection(db, 'tournaments'), (snap) => {
-  allTournaments = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  S.allTournaments = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   if(document.getElementById('view-turnaj')?.classList.contains('active')) renderTurnajPage();
-  if(currentDetailEventId){
-    const ev = events.find(x=>x.id===currentDetailEventId);
+  if(S.currentDetailEventId){
+    const ev = S.events.find(x=>x.id===S.currentDetailEventId);
     if(ev){
-      if(currentTab === 'prehled') renderTabPrehled(ev);
-      if(currentTab === 'turnaj') renderTabTurnaj(ev);
+      if(S.currentTab === 'prehled') renderTabPrehled(ev);
+      if(S.currentTab === 'turnaj') renderTabTurnaj(ev);
     }
   }
   tryInitialRoute();
@@ -1969,7 +1858,7 @@ function podiumCupHtml(t, rankClass, rank, labelName){
 }
 
 function avatarOrPlaceholder(name){
-  const reg = Object.values(currentRegistrationsMap || {}).find(r => r.nick === name);
+  const reg = Object.values(S.currentRegistrationsMap || {}).find(r => r.nick === name);
   const av = reg && reg.avatar;
   return av ? `<img src="${av.replace(/"/g,'&quot;')}" alt="" class="podium-avatar">` : `<div class="podium-avatar podium-avatar-blank">🎮</div>`;
 }
@@ -2076,9 +1965,9 @@ function renderTurnajPage(){
   document.querySelectorAll('.tb-unlock-sound').forEach(b => b.remove());
   tbRefreshDrinkModal();
 
-  if(currentTournamentId){
-    const t = allTournaments.find(x => x.id === currentTournamentId);
-    if(!t){ currentTournamentId = null; tourneySetupStep = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; renderTurnajPage(); return; }
+  if(S.currentTournamentId){
+    const t = S.allTournaments.find(x => x.id === S.currentTournamentId);
+    if(!t){ S.currentTournamentId = null; tourneySetupStep = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; renderTurnajPage(); return; }
 
     if(tourneySetupStep){
       tbStopLive();
@@ -2095,7 +1984,7 @@ function renderTurnajPage(){
     }
 
     const isFfa = t.format === 'ffa';
-    const ev = events.find(x => x.id === t.eventId);
+    const ev = S.events.find(x => x.id === t.eventId);
     const swissPreview = isFfa ? null : computeSwissTournament(t);
     const ffaStandings = isFfa ? computeFfaStandings(t) : null;
     box.innerHTML = `
@@ -2196,7 +2085,7 @@ function renderTurnajPage(){
       delBtn.textContent = 'Smazat turnaj';
       delBtn.addEventListener('click', async () => {
         if(!confirm(`Opravdu smazat turnaj "${t.name}"? Tohle nejde vrátit zpět.`)) return;
-        try{ await deleteDoc(doc(db,'tournaments',t.id)); logAction('turnaj', `smazal turnaj „${t.name}“`); currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; }
+        try{ await deleteDoc(doc(db,'tournaments',t.id)); logAction('turnaj', `smazal turnaj „${t.name}“`); S.currentTournamentId = null; if(location.hash !== '#turnaj') location.hash = '#turnaj'; }
         catch(err){ alert('Smazání se nepovedlo.'); console.error(err); }
       });
       cornerActions.appendChild(delBtn);
@@ -2239,12 +2128,12 @@ function renderTurnajPage(){
   if(newBtn) newBtn.addEventListener('click', () => openNewTournamentForm());
 
   const grid = document.getElementById('turnaj-list-grid');
-  if(allTournaments.length === 0){
+  if(S.allTournaments.length === 0){
     grid.innerHTML = '<div class="empty">Zatím žádný turnaj nebyl založen.</div>';
     return;
   }
-  grid.innerHTML = allTournaments.map(t => {
-    const ev = events.find(x => x.id === t.eventId);
+  grid.innerHTML = S.allTournaments.map(t => {
+    const ev = S.events.find(x => x.id === t.eventId);
     let badgeTag = '', statusTxt = '';
     if(t.status === 'signup'){
       badgeTag = `<span class="tag tourney-signup-badge">Přihlášky otevřeny</span>`;
@@ -2295,14 +2184,14 @@ function renderTurnajPage(){
   grid.querySelectorAll('[data-edit-tourney]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const t = allTournaments.find(x => x.id === btn.dataset.editTourney);
+      const t = S.allTournaments.find(x => x.id === btn.dataset.editTourney);
       if(t) openNewTournamentForm(t);
     });
   });
   grid.querySelectorAll('[data-delete-tourney]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const t = allTournaments.find(x => x.id === btn.dataset.deleteTourney);
+      const t = S.allTournaments.find(x => x.id === btn.dataset.deleteTourney);
       if(!t) return;
       if(!confirm(`Opravdu smazat turnaj "${t.name}"? Tohle nejde vrátit zpět.`)) return;
       try{ await deleteDoc(doc(db,'tournaments',t.id)); logAction('turnaj', `smazal turnaj „${t.name}“`); }
@@ -2313,7 +2202,7 @@ function renderTurnajPage(){
   if(pendingEditTournamentId){
     const editId = pendingEditTournamentId;
     pendingEditTournamentId = null;
-    const t = allTournaments.find(x => x.id === editId);
+    const t = S.allTournaments.find(x => x.id === editId);
     if(t) openNewTournamentForm(t);
   }
 }
@@ -2585,7 +2474,7 @@ function openNewTournamentForm(existing){
 
 function openSignupTournamentForm(){
   const slot = document.getElementById('turnaj-form-slot');
-  const evOptions = [...events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
+  const evOptions = [...S.events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
   slot.innerHTML = `
     <form class="panel" id="form-new-tourney" style="max-width:640px;">
       <div class="section-title" style="font-size:16px; margin-top:0;">Otevřít přihlašování</div>
@@ -2644,7 +2533,7 @@ async function seedHandicapSkills(t, skillsMap){
 
 function openDirectDrawTournamentForm(){
   const slot = document.getElementById('turnaj-form-slot');
-  const evOptions = [...events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
+  const evOptions = [...S.events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
   tbDraw = { players: [], teams: null };
   slot.innerHTML = `
     <form class="panel" id="form-new-tourney" style="max-width:940px;">
@@ -2765,7 +2654,7 @@ function openDirectDrawTournamentForm(){
 
 function openEditTournamentForm(existing){
   const slot = document.getElementById('turnaj-form-slot');
-  const evOptions = [...events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
+  const evOptions = [...S.events].sort((a,b) => (b.dateStart||'').localeCompare(a.dateStart||''));
   const isTeamFormat = existing.format !== 'ffa';
   const alreadyDrawn = isTeamFormat && (existing.teams||[]).some(t => (t.members||[]).length > 0);
 
@@ -3529,12 +3418,12 @@ function tbQueueSubstanceEvent(type, player, before, after, amount) {
 
 function tbFlushBatch() {
     tbBatchTimer = null;
-    const events = tbPendingEvents;
+    const batchEvents = tbPendingEvents;
     tbPendingEvents = [];
-    if (events.length === 0) return;
+    if (batchEvents.length === 0) return;
     // Seskupit podle typu (piva / panáky / jointy) a přehrát postupně, každý typ se svou vlastní hláškou
     const byType = {};
-    events.forEach(e => { (byType[e.type] = byType[e.type] || []).push(e); });
+    batchEvents.forEach(e => { (byType[e.type] = byType[e.type] || []).push(e); });
     const order = ['beers', 'shots', 'joints'].filter(ty => byType[ty] && byType[ty].length);
     tbEventQueue = tbEventQueue.then(async () => {
         for (const ty of order) {
@@ -3545,14 +3434,14 @@ function tbFlushBatch() {
     });
 }
 
-async function tbPlayBatchEvent(events) {
+async function tbPlayBatchEvent(batchEvents) {
     const overlay = document.getElementById('tbEventOverlay');
     const modal = document.getElementById('tbEventModal');
     if(!overlay || !modal) return;
 
     const counts = {};
-    events.forEach(e => counts[e.type] = (counts[e.type] || 0) + 1);
-    let domType = events[0].type, domCount = 0;
+    batchEvents.forEach(e => counts[e.type] = (counts[e.type] || 0) + 1);
+    let domType = batchEvents[0].type, domCount = 0;
     for (const t in counts) { if (counts[t] > domCount) { domCount = counts[t]; domType = t; } }
 
     let svgHTML, animDuration, titleWord, collectiveMsgs;
@@ -3560,7 +3449,7 @@ async function tbPlayBatchEvent(events) {
     else if (domType === 'shots') { svgHTML = tbShotSVG(); animDuration = 2200; titleWord = '🥃 Skupinová runda panáků!'; collectiveMsgs = tbShotCollectiveMsgs; }
     else { svgHTML = tbJointSVG(); animDuration = 5600; titleWord = '🍁 Skupinové zapalování!'; collectiveMsgs = tbJointCollectiveMsgs; }
 
-    const uniqueNames = [...new Set(events.map(e => e.player.name))];
+    const uniqueNames = [...new Set(batchEvents.map(e => e.player.name))];
     const msg = tbPick(collectiveMsgs).replace('{names}', tbJoinNamesCz(uniqueNames));
 
     modal.innerHTML = `<div class="tb-event-title">${titleWord}</div>${svgHTML}<div class="tb-event-message tb-show" id="tbEventMessage">${escapeHtml(msg)}</div>`;
@@ -4115,7 +4004,7 @@ function renderTbGraphBody(t, allNames, selectedNames){
 }
 
 function buildTbGraphSvg(t, allNames, selectedNames){
-  const events = (tbGraphAllEvents || []).filter(e => tbGraphTypes[e.type]);
+  const graphEvents = (tbGraphAllEvents || []).filter(e => tbGraphTypes[e.type]);
   const names = allNames.filter(n => selectedNames.has(n));
   if(names.length === 0) return '<p class="empty" style="color:#b89b6a;">Vyber aspoň jednoho hráče.</p>';
 
@@ -4127,7 +4016,7 @@ function buildTbGraphSvg(t, allNames, selectedNames){
     const base = tbGetPlayerStats(t, name).base;
     let beers = 0, shots = 0, joints = 0;
     const points = [{ t: 0, y: base === null ? 0 : base }];
-    events.filter(e => e.name === name).forEach((e, i) => {
+    graphEvents.filter(e => e.name === name).forEach((e, i) => {
       if(e.type === 'beers') beers = Math.max(0, beers + e.amount);
       if(e.type === 'shots') shots = Math.max(0, shots + e.amount);
       if(e.type === 'joints') joints = Math.max(0, joints + e.amount);
@@ -4195,7 +4084,7 @@ function tbAdjustPending(name, type, delta){
 }
 async function tbConfirmDrinkChanges(){
     const tid = tbDrinkModalTid;
-    const t = allTournaments.find(x => x.id === tid);
+    const t = S.allTournaments.find(x => x.id === tid);
     const entries = Object.entries(tbDrinkPending).filter(([,d]) => d !== 0);
     if(!tid || !t || entries.length === 0) return;
     tbDrinkPending = {};
@@ -4221,7 +4110,7 @@ async function tbConfirmDrinkChanges(){
     await Promise.all(writes);
 }
 function tbRenderDrinkModal(){
-    const t = allTournaments.find(x => x.id === tbDrinkModalTid);
+    const t = S.allTournaments.find(x => x.id === tbDrinkModalTid);
     if(!t){ tbCloseDrinkModal(); return; }
     let overlay = document.getElementById('tbDrinkOverlay');
     if(!overlay){
@@ -4799,7 +4688,7 @@ function renderSwissMatchBox(t, resultField, m, compact){
 // ---- Kompaktní zobrazení turnajů v záložce akce ----
 function renderTabTurnaj(ev){
   const box = document.getElementById('tab-turnaj');
-  const linked = allTournaments.filter(t => t.eventId === ev.id);
+  const linked = S.allTournaments.filter(t => t.eventId === ev.id);
 
   let html = `<div class="section-title" style="font-size:16px;">🏆 Turnaje</div>`;
   if(linked.length === 0){
@@ -4983,9 +4872,9 @@ function setupScheduleDiscussion(ev){
 function renderScheduleComments(ev){
   const list = document.getElementById('schedule-comments-list');
   if(!list) return;
-  list.innerHTML = currentScheduleComments.length === 0
+  list.innerHTML = S.currentScheduleComments.length === 0
     ? '<div class="empty">Zatím žádná diskuze.</div>'
-    : currentScheduleComments.map(c => {
+    : S.currentScheduleComments.map(c => {
         const canEdit = S.currentUser && (c.uid === S.currentUser.uid || hasPerm('akce') || hasPerm('turnaj'));
         return `
         <div class="comment-row">
@@ -5093,11 +4982,11 @@ function detectMediaKind(url){
 function renderPhotoGrid(ev){
   const grid = document.getElementById('photo-grid');
   if(!grid) return;
-  if(currentPhotos.length === 0){
+  if(S.currentPhotos.length === 0){
     grid.innerHTML = '<div class="empty">Zatím žádné fotky.</div>';
     return;
   }
-  grid.innerHTML = currentPhotos.map(p => {
+  grid.innerHTML = S.currentPhotos.map(p => {
     const canDelete = S.currentUser && (p.uid === S.currentUser.uid || hasPerm('akce'));
     const mediaHtml = p.kind === 'video'
       ? `<video src="${p.url.replace(/"/g,'&quot;')}" muted controls></video>`
@@ -5756,10 +5645,10 @@ function updateAuthUI(){
   }
   renderEvents();
   renderContacts();
-  if(currentDetailEventId){
+  if(S.currentDetailEventId){
     renderStatsAndRsvp(); renderAttendees();
     // po přihlášení/odhlášení musí odpovídat právům i zbytek detailu akce (panel hlasování, tlačítka správce, záložky)
-    const dEv = events.find(x => x.id === currentDetailEventId);
+    const dEv = S.events.find(x => x.id === S.currentDetailEventId);
     if(dEv){ renderEntryFeeBlock(dEv); renderDateVoteBlock(dEv); renderActiveTab(dEv); }
   }
 
@@ -5822,9 +5711,9 @@ onAuthStateChanged(auth, async (user) => {
     }catch(err){ console.error(err); }
     if(myGen !== authStateGeneration) return;
     updateAuthUI();
-    if(S.currentNick && pendingEventId){
-      const evId = pendingEventId;
-      pendingEventId = null;
+    if(S.currentNick && S.pendingEventId){
+      const evId = S.pendingEventId;
+      S.pendingEventId = null;
       setRoute('#event/' + evId);
     }
   }else{
