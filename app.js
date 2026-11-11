@@ -11,6 +11,7 @@ import {
 import {
   getStorage, ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA3iXxS2Ffr1-DDyGHVFW4O2a5dKkOX6Q0",
@@ -25,6 +26,16 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
+const functionsApi = getFunctions(app, 'europe-west9');
+// ověřovací e-mail z našeho Gmailu; když funkce selže, použije se výchozí e-mail Firebase
+async function sendVerifyMail(user){
+  try{ await httpsCallable(functionsApi, 'sendVerificationMail')(); }
+  catch(e){
+    if(e && e.code === 'functions/resource-exhausted') throw e;
+    console.warn('Ověřovací e-mail přes funkci selhal, zkouším výchozí:', e);
+    await sendEmailVerification(user);
+  }
+}
 
 const MEAL_SLOTS = [
   { key:'pivo',          label:'Pivo', day:'Pivo' },
@@ -5357,7 +5368,7 @@ formAuth.addEventListener('submit', async (e) => {
       if(!email){ setAuthMessage('Doplň prosím e-mail.'); authSubmitBtn.disabled = false; return; }
       suppressAuthStateHandling = true;
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      try{ await sendEmailVerification(cred.user); }catch(e){ console.error('Ověřovací e-mail:', e); }
+      try{ await sendVerifyMail(cred.user); }catch(e){ console.error('Ověřovací e-mail:', e); }
       await setDoc(usernameDocRef(pendingNickForRegistration), { uid: cred.user.uid, email });
       await setDoc(doc(db, 'users', cred.user.uid), { nick: pendingNickForRegistration, email, phone, createdAt: new Date().toISOString(), lastLogin: new Date().toISOString() });
       currentUser = cred.user;
@@ -5755,7 +5766,7 @@ async function renderUsersList(){
           ${users.map(u => `
             <tr style="border-top:1px solid var(--line);" data-user-row="${u.uid}">
               <td style="padding:8px 10px 8px 0;">${escapeHtml(u.nick||'')}${u.isSuperAdmin?' <span style="color:var(--gold); font-size:11px;">(hlavní admin)</span>':(u.isAdmin?' <span style="color:var(--gold); font-size:11px;">(admin)</span>':'')}</td>
-              <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.email||'')}</td>
+              <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.email||'')}<span data-verify-cell="${u.uid}"></span></td>
               <td style="padding:8px 10px;"><input type="tel" data-edit-phone="${u.uid}" value="${escapeHtml(u.phone||'')}" placeholder="—" style="width:120px; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px;"><input type="date" data-edit-created="${u.uid}" value="${u.createdAt ? u.createdAt.slice(0,10) : ''}" style="background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px; color:var(--text-muted);">${u.lastLogin ? fmtDate(u.lastLogin.slice(0,10)) : '—'}</td>
@@ -5810,6 +5821,24 @@ async function renderUsersList(){
         }catch(err){ alert('Uložení se nepovedlo.'); console.error(err); }
       });
     });
+    // e-maily, které nejsou ověřené, jdou ověřit ručně
+    httpsCallable(functionsApi, 'adminListVerification')().then(res => {
+      const ver = (res.data && res.data.verified) || {};
+      box.querySelectorAll('[data-verify-cell]').forEach(cell => {
+        const uid = cell.dataset.verifyCell;
+        if(ver[uid] !== false) return;
+        cell.innerHTML = ` <span style="color:#e0a030; font-size:11px;">⚠ neověřen</span> <button type="button" class="btn-ghost btn-sm" data-verify-user="${uid}" style="padding:2px 8px; font-size:11px;">Ověřit</button>`;
+        cell.querySelector('[data-verify-user]').addEventListener('click', async (e) => {
+          const b = e.currentTarget; b.disabled = true;
+          try{
+            await httpsCallable(functionsApi, 'adminVerifyUser')({ uid });
+            const un = (users.find(x => x.uid === uid) || {}).nick || uid;
+            logAction('uzivatele', `ručně ověřil e-mail uživatele „${un}“`);
+            cell.innerHTML = ' <span style="color:var(--gold); font-size:11px;">✓ ověřeno</span>';
+          }catch(err){ b.disabled = false; alert('Ověření se nepovedlo.'); console.error(err); }
+        });
+      });
+    }).catch(err => console.warn('Seznam ověření nelze načíst (funkce nenasazená?):', err));
     box.querySelectorAll('[data-delete-user]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const uid = btn.dataset.deleteUser;
@@ -5882,8 +5911,8 @@ function updateVerifyBanner(){
     <button type="button" class="btn-sm btn-ghost" id="vb-check">Už jsem potvrdil</button>
     <span id="vb-msg"></span>`;
   bar.querySelector('#vb-resend').addEventListener('click', async () => {
-    try{ await sendEmailVerification(currentUser); bar.querySelector('#vb-msg').textContent = 'Odesláno, zkontroluj poštu (i spam).'; }
-    catch(e){ bar.querySelector('#vb-msg').textContent = 'Teď to nejde, zkus to za chvíli.'; }
+    try{ await sendVerifyMail(currentUser); bar.querySelector('#vb-msg').textContent = 'Odesláno, zkontroluj poštu (i spam a hromadné). Když nic nepřijde, napiš adminovi, ověří tě ručně.'; }
+    catch(e){ bar.querySelector('#vb-msg').textContent = (e && e.code === 'functions/resource-exhausted') ? 'Počkej minutu a zkus to znovu.' : 'Teď to nejde, zkus to za chvíli.'; }
   });
   bar.querySelector('#vb-check').addEventListener('click', async () => {
     try{
