@@ -6,7 +6,7 @@ Web pro pořádání LAN party (HTML/CSS/JS + Firebase Firestore, Storage, Auth,
 
 | Složka / soubor | Co v ní je |
 |---|---|
-| `index.html`, `style.css`, `app.js` | samotný web (`app.js` se postupně dělí na moduly) |
+| `index.html`, `app.js`, `js/`, `css/` | samotný web (`app.js` je jen úvod, zbytek je v modulech `js/`; styly jsou ve `css/` a načítají se v tomto pořadí: base, pages, losovacka, turnaj, komponenty, akce-hlavicka) |
 | `js/` | moduly vyndané z `app.js`: `util.js` (text, datum), `payment.js` (QR platba), `games.js` (vyhledávání her; zde se vkládá RAWG klíč), `firebase.js` (připojení k Firebase), `audit.js` (záznam změn), `state.js` (sdílený stav: přihlášený uživatel, oprávnění, akce), `constants.js` (jídelní bloky, oprávnění), `ui.js` (drobné pomocníky pro vykreslení), `hooks.js` (přemostění funkcí, které zatím zůstávají v app.js) |
 | `assets/img/` | **upravené** obrázky, které web používá (webp, zmenšené) |
 | `assets/audio/` | zvuky, které web používá |
