@@ -1111,3 +1111,52 @@ button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):n
 @keyframes wwGlow{ 0%,100%{ text-shadow:0 0 0 rgba(201,162,75,0); } 50%{ text-shadow:0 0 14px rgba(201,162,75,.75); } }
 @media (prefers-reduced-motion: reduce){ .ww-card, .ww-card::before, .ww-ico, .ww-count b{ animation:none !important; } }
 @media (max-width:480px){ .ww-big{ font-size:21px; } .ww-count b{ font-size:26px; } }
+
+/* ===== Detail akce: kompaktní hlavička ===== */
+
+/* KDY / KDE: šířka jako blok s mapou, nízké karty */
+.ww-cards{ gap:8px; margin-bottom:0; }
+.ww-card{ --sl:10px; padding:7px 14px 7px 18px; gap:0; display:block; min-height:0; }
+.ww-ico{ position:absolute; right:12px; bottom:4px; width:auto; height:auto; flex:none; background:none; clip-path:none; font-size:26px; opacity:.28; }
+.ww-k{ font-size:10px; display:inline-block; }
+.ww-big{ font-size:17px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ww-big small{ font-size:12px; }
+.ww-sub{ font-size:11px; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ww-count{ position:absolute; top:6px; right:14px; margin:0; padding:0; border:0; display:flex; align-items:baseline; gap:4px; text-align:right; }
+.ww-count b{ display:inline; font-size:16px; }
+.ww-count span{ font-size:9px; }
+.ww-whenwrap{ position:relative; }
+.ww-flag{ display:none; width:16px; height:16px; margin-left:6px; border-radius:50%; background:var(--gold); color:#14171f; font-size:9px; align-items:center; justify-content:center; vertical-align:middle; animation:wwPulse 2s infinite; }
+.ww-adm .ww-flag{ display:inline-flex; }
+.ww-adm{ cursor:help; }
+@keyframes wwPulse{ 0%{ box-shadow:0 0 0 0 rgba(201,162,75,.7); } 70%,100%{ box-shadow:0 0 0 8px rgba(201,162,75,0); } }
+.ww-pop{ display:none; position:absolute; left:calc(100% + 12px); top:0; width:320px; z-index:60; padding:12px 14px; text-align:left;
+  background:#14171f; border:1px solid var(--gold-dim); box-shadow:0 12px 30px rgba(0,0,0,.65); font-size:13px; }
+.ww-adm:hover .ww-pop, .ww-adm.show .ww-pop, .ww-adm:focus-within .ww-pop{ display:block; }
+@media (max-width:700px){ .ww-pop{ left:0; top:calc(100% + 6px); width:min(320px, 86vw); } }
+/* hlavní blok: menší na výšku (popis, částka + QR vedle sebe, přihlášení) */
+.ed-header{ min-height:0; }
+.ed-header-inner{ padding:14px 22px; gap:0; }
+.ed-header-main{ display:grid; grid-template-columns:1fr auto; column-gap:22px; align-items:start; }
+.ed-header-main .lede{ grid-column:1 / -1; margin:0 0 4px; }
+#ed-entryfee{ grid-column:1; grid-row:2; margin-top:6px !important; }
+.ed-payment-inline{ grid-column:2; grid-row:2 / span 2; margin-top:6px !important; }
+.rsvp-box{ grid-column:1; grid-row:3; margin-top:8px; }
+#ed-entryfee > div:first-child{ font-size:24px !important; }
+@media (max-width:600px){ .ed-header-main{ grid-template-columns:1fr; } .ed-payment-inline{ grid-column:1; grid-row:auto; } }
+
+/* Název akce ve stylu karet KDY / KDE */
+h1.headline.ed-page-title{
+  --sl:14px; position:relative; isolation:isolate; display:block; width:fit-content; max-width:calc(100% - 480px);
+  margin-bottom:14px; padding:9px 38px 9px 30px; font-size:24px !important; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  background:linear-gradient(135deg, rgba(201,162,75,.24), rgba(201,162,75,.07) 60%, rgba(20,23,31,.92));
+  clip-path:polygon(var(--sl) 0,100% 0,calc(100% - var(--sl)) 100%,0 100%);
+  text-shadow:0 2px 10px rgba(0,0,0,.6);
+}
+h1.headline.ed-page-title::after{
+  content:''; position:absolute; inset:0; z-index:5; pointer-events:none; background:var(--gold-dim);
+  clip-path:polygon(var(--sl) 0,100% 0,calc(100% - var(--sl)) 100%,0 100%,var(--sl) 0,
+    calc(var(--sl) + 2px) 2px, 2px calc(100% - 2px), calc(100% - var(--sl) - 2px) calc(100% - 2px), calc(100% - 2px) 2px, calc(var(--sl) + 2px) 2px);
+}
+@media (max-width:1100px){ h1.headline.ed-page-title{ max-width:100%; } }
+@media (max-width:700px){ h1.headline.ed-page-title{ white-space:normal; font-size:20px !important; } }
