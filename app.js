@@ -1013,10 +1013,50 @@ function renderTournamentSignupCta(ev){
   });
 }
 
+// ---- Výrazné "KDY a KDE" s animací ----
+function czDays(n){ return n === 1 ? 'DEN' : (n >= 2 && n <= 4 ? 'DNY' : 'DNÍ'); }
+function renderWhenWhere(ev){
+  const box = document.getElementById('ed-ww');
+  if(!box) return;
+  const WD = ['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota'];
+  let icon = '📅', big = '—', sub = '', count = '';
+  if(ev.dateUnconfirmed){
+    icon = '🗳️'; big = 'Termín se vybírá'; sub = 'Hlasuje se o termínu';
+  }else if(ev.dateStart){
+    const s = new Date(ev.dateStart + 'T00:00:00');
+    const e = new Date((ev.dateEnd || ev.dateStart) + 'T00:00:00');
+    const multi = e.getTime() !== s.getTime();
+    const dm = d => `${d.getDate()}. ${d.getMonth() + 1}.`;
+    big = multi
+      ? (s.getMonth() === e.getMonth() ? `${s.getDate()}. – ${dm(e)}` : `${dm(s)} – ${dm(e)}`)
+      : dm(s);
+    big += `<small> ${e.getFullYear()}</small>`;
+    const nDays = Math.round((e - s) / 86400000) + 1;
+    sub = multi ? `${WD[s.getDay()]} – ${WD[e.getDay()]} · ${nDays} ${nDays >= 5 ? 'dní' : 'dny'}` : WD[s.getDay()];
+    if(ev.timeStart) sub += ` · ${ev.timeStart}${ev.timeEnd ? '–' + ev.timeEnd : ''}`;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const toStart = Math.round((s - today) / 86400000);
+    if(toStart > 0) count = `<div class="ww-count"><b data-count="${toStart}">${toStart}</b><span>${czDays(toStart)} DO AKCE</span></div>`;
+    else if(today <= e) count = `<div class="ww-count ww-live"><b>🔥</b><span>PROBÍHÁ</span></div>`;
+  }
+  const place = ev.place || '';
+  const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(place)}`;
+  box.innerHTML = `
+    <div class="ww-card ww-when"><div class="ww-ico">${icon}</div>
+      <div class="ww-body"><div class="ww-k">KDY</div><div class="ww-big">${big}</div><div class="ww-sub">${escapeHtml(sub)}</div></div>${count}</div>
+    ${place ? `<a class="ww-card ww-where" href="${mapUrl}" target="_blank" rel="noopener"><div class="ww-ico ww-pin">📍</div>
+      <div class="ww-body"><div class="ww-k">KDE</div><div class="ww-big">${escapeHtml(place)}</div><div class="ww-sub">Zobrazit v mapách ↗</div></div></a>` : ''}`;
+  // odpočet se rozjede od nuly
+  box.querySelectorAll('[data-count]').forEach(el => {
+    const target = parseInt(el.dataset.count, 10), t0 = performance.now(), dur = 900;
+    const step = (t) => { const k = Math.min(1, (t - t0) / dur); el.textContent = Math.round(target * (1 - Math.pow(1 - k, 3))); if(k < 1) requestAnimationFrame(step); };
+    el.textContent = '0'; requestAnimationFrame(step);
+  });
+}
+
 function renderEventDetailStatic(ev){
   document.getElementById('ed-title').textContent = (ev.number ? ev.number + ' — ' : '') + ev.name;
-  document.getElementById('ed-when').textContent = fmtDateRange(ev);
-  document.getElementById('ed-where').textContent = ev.place || '—';
+  renderWhenWhere(ev);
   document.getElementById('ed-desc').textContent = ev.desc || '';
 
   const header = document.getElementById('ed-header');
