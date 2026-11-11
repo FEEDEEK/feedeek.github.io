@@ -2149,7 +2149,7 @@ function podiumCupHtml(t, rankClass, rank, labelName){
     <div class="aegis-glow aegis-glow-${rankClass}"></div>${rank===1?'<div class="aegis-sparks"></div>':''}
     ${isAegis
       ? trophyOrAegisImg(t, rankClass)
-      : `<div class="trophy-podium-img"><img src="assets/img/pohar.webp" alt="" class="trophy-img trophy-${rankClass}"><div class="trophy-podium-label"><span class="tp-rank">${rank}.</span><span class="tp-name">${escapeHtml(labelName)}</span></div></div>`}
+      : `<div class="trophy-podium-img tpi-${rankClass}"><img src="assets/img/pohar.webp" alt="" class="trophy-img trophy-${rankClass}"><div class="trophy-podium-label" style="--n:${Math.max(6, String(labelName||'').length + 3)}"><span class="tp-rank">${rank}.</span><span class="tp-name">${escapeHtml(labelName)}</span></div></div>`}
   </div>`;
 }
 

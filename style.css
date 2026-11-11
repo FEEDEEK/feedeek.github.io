@@ -1241,3 +1241,13 @@ h1.headline.ed-page-title::after{
 .map-ping{ position:absolute; left:50%; top:50%; width:0; height:0; pointer-events:none; z-index:3; }
 .map-ping span{ box-sizing:border-box; position:absolute; left:-11px; top:-5px; width:22px; height:10px; border-radius:50%; border:2px solid rgba(224,51,42,.95); opacity:0; animation:wwWave 2s ease-out infinite; }
 .map-ping span:nth-child(2){ animation-delay:1s; }
+
+/* Poháry: větší a text místa + týmu v jednom řádku přesně na štítku (štítek = 35 % šířky, 7,8 % výšky poháru) */
+.tpi-gold{ --cw:150px; } .tpi-silver{ --cw:120px; } .tpi-bronze{ --cw:102px; }
+.podium-wrap-big .tpi-gold{ --cw:220px; } .podium-wrap-big .tpi-silver{ --cw:176px; } .podium-wrap-big .tpi-bronze{ --cw:150px; }
+.trophy-podium-img .trophy-img{ width:var(--cw); max-width:100%; }
+.trophy-podium-label, .podium-wrap-big .trophy-podium-label{ left:50%; bottom:auto; top:80.6%; height:7.6%; width:33%; transform:translateX(-50%);
+  display:flex; align-items:center; justify-content:center; gap:.3em; white-space:nowrap; font-size:max(calc(var(--cw) * 0.05), min(calc(var(--cw) * 0.074), calc(var(--cw) * 0.62 / var(--n, 8)))); line-height:1; padding-top:.06em; }
+.trophy-podium-label .tp-rank, .trophy-podium-label .tp-name{ display:block; font-size:1em; }
+.trophy-podium-label .tp-rank{ flex:0 0 auto; }
+.trophy-podium-label .tp-name{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
