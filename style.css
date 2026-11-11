@@ -1227,7 +1227,7 @@ h1.headline.ed-page-title::after{
 @keyframes wwBlinkCal{ 0%,100%{ color:#1c1f29; transform:scale(1); } 50%{ color:#e0332a; transform:scale(1.12); } }
 
 /* špendlík u KDE (čisté CSS) + pulzující vlna */
-.ww-pinbox{ position:absolute; right:30px; top:50%; width:40px; height:50px; margin-top:-26px; }
+.ww-pinbox{ position:absolute; right:30px; top:50%; width:40px; height:36px; margin-top:-18px; }
 .ww-pinbox i{ position:absolute; left:8px; top:2px; width:24px; height:24px; background:linear-gradient(135deg,#ff5a4d,#b3261e); border-radius:50% 50% 50% 0; transform:rotate(-45deg);
   box-shadow:0 2px 8px rgba(0,0,0,.5); animation:wwPinHop 1.8s ease-in-out infinite; z-index:2; }
 .ww-pinbox i::after{ content:''; position:absolute; left:7px; top:7px; width:10px; height:10px; border-radius:50%; background:#fff3e6; }
