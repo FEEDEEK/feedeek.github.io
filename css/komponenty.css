@@ -1,0 +1,194 @@
+/* ---------- okno pro psaní e-mailů ---------- */
+.mail-composer{ background:var(--bg-panel); border:1px solid var(--gold-dim); padding:20px; width:min(560px,94vw); max-height:90vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+.mail-composer input[type=text], .mail-composer input[type=email], .mail-composer textarea{ width:100%; box-sizing:border-box; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:8px; font:inherit; text-align:left; }
+.mail-composer textarea{ resize:vertical; }
+.mc-label{ font-size:12px; color:var(--text-dim,#aaa); display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px; }
+.mc-dim{ opacity:.6; font-size:11px; }
+.mc-hint{ font-size:12px; color:var(--gold,#d4af37); }
+.mc-presets{ display:flex; gap:6px; flex-wrap:wrap; }
+.mc-preset{ background:transparent; border:1px solid var(--line); color:var(--text); padding:5px 10px; cursor:pointer; font-size:12px; }
+.mc-preset.active{ border-color:var(--gold-dim); background:rgba(212,175,55,.15); }
+.mc-recipients{ max-height:170px; overflow-y:auto; border:1px solid var(--line); padding:6px; display:flex; flex-direction:column; gap:3px; }
+.mc-rec{ display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+.mc-rec input{ width:auto !important; }
+.mc-status{ font-size:13px; min-height:18px; }
+.mc-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+
+/* výrazné tlačítko pro e-maily (vpravo nahoře) */
+.mail-btn{ position:relative; display:inline-flex; align-items:center; gap:8px; height:46px; padding:0 30px; cursor:pointer;
+  font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--gold);
+  background:linear-gradient(180deg,#3a3320 0%,#1c1912 100%); border:1px solid var(--gold-dim);
+  clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);
+  box-shadow:0 0 14px rgba(201,162,75,.25), inset 0 0 10px rgba(201,162,75,.08); transition:background .18s ease, color .18s ease; }
+.mail-btn::after{ content:''; position:absolute; left:12px; right:12px; bottom:-1px; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); box-shadow:0 0 8px rgba(201,162,75,.7); }
+.mail-btn:hover{ background:linear-gradient(180deg,#4d4326 0%,#2a2416 100%); color:#f0d27a; }
+.mail-btn:disabled{ opacity:.5; cursor:default; }
+.mail-btn-row{ display:flex; justify-content:flex-end; margin-bottom:12px; }
+#view-event{ position:relative; }
+.ed-mail-slot{ position:absolute; top:0; right:0; z-index:5; }
+@media (max-width:700px){ .ed-mail-slot{ position:static; display:flex; justify-content:flex-end; margin-bottom:8px; } }
+
+/* skosená tlačítka v okně e-mailu stejně jako v hlavičce */
+.mail-composer .btn-primary, .mail-composer .btn-ghost{ clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%); padding:10px 26px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:12px; }
+.ed-page-title{ padding-right:300px; }
+@media (max-width:700px){ .ed-page-title{ padding-right:0; } }
+
+/* ===== jednotný styl tlačítek: šikmé hrany + zlaté podtržení jako v horní liště ===== */
+button:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):not(.status-pill):not(.team-style-btn):not(.tb-draw-remove):not(.tb-sub-btn):not(.tb-btn-reroll):not(.tb-btn-confirm):not(.tourney-mode-btn):not(.format-choice-btn):not(.tourney-signup-cta-btn):not(.food-vote-announce):not(.mc-preset):not(.mail-btn):not(.google-signin-btn):not(.tab-btn):not(.nav-item):not(.tb-slot-actions *):not(.tb-form-group *):not(.tb-drink-modal *){
+  position:relative; border-radius:0; border:1px solid var(--gold-dim); color:var(--gold); font-weight:600;
+  background:linear-gradient(180deg,#3a3320 0%,#1c1912 100%);
+  clip-path:polygon(9px 0,100% 0,calc(100% - 9px) 100%,0 100%);
+  padding-left:20px; padding-right:20px;
+  box-shadow:inset 0 -2px 0 -1px var(--gold), inset 0 0 10px rgba(201,162,75,.08);
+  transition:background .18s ease, color .18s ease, filter .18s ease;
+}
+button:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):not(.status-pill):not(.team-style-btn):not(.tb-draw-remove):not(.tb-sub-btn):not(.tb-btn-reroll):not(.tb-btn-confirm):not(.tourney-mode-btn):not(.format-choice-btn):not(.tourney-signup-cta-btn):not(.food-vote-announce):not(.mc-preset):not(.mail-btn):not(.google-signin-btn):not(.tab-btn):not(.nav-item):not(.tb-slot-actions *):not(.tb-form-group *):not(.tb-drink-modal *):hover{ background:linear-gradient(180deg,#5a4d28 0%,#2d2615 100%); color:#f3dc92; }
+button.btn-ghost:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):not(.status-pill):not(.team-style-btn):not(.tb-draw-remove):not(.tb-sub-btn):not(.tb-btn-reroll):not(.tb-btn-confirm):not(.tourney-mode-btn):not(.format-choice-btn):not(.tourney-signup-cta-btn):not(.food-vote-announce):not(.mail-btn):not(.google-signin-btn):not(.tab-btn):not(.nav-item):not(.tb-slot-actions *):not(.tb-form-group *):not(.tb-drink-modal *){
+  color:var(--text-muted); border-color:#2c3140; background:linear-gradient(180deg,#232838 0%,#171a24 100%);
+  box-shadow:inset 0 0 10px rgba(255,255,255,.02);
+}
+button.btn-ghost:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):not(.status-pill):not(.team-style-btn):not(.tb-draw-remove):not(.tb-sub-btn):not(.tb-btn-reroll):not(.tb-btn-confirm):not(.tourney-mode-btn):not(.format-choice-btn):not(.tourney-signup-cta-btn):not(.food-vote-announce):not(.mail-btn):not(.google-signin-btn):not(.tab-btn):not(.nav-item):not(.tb-slot-actions *):not(.tb-form-group *):not(.tb-drink-modal *):hover{ background:linear-gradient(180deg,#2c3243 0%,#1c2029 100%); color:var(--text); }
+button.btn-sm:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):not(.status-pill):not(.team-style-btn):not(.tb-draw-remove):not(.tb-sub-btn):not(.tb-btn-reroll):not(.tb-btn-confirm):not(.tourney-mode-btn):not(.format-choice-btn):not(.tourney-signup-cta-btn):not(.food-vote-announce):not(.mc-preset):not(.mail-btn):not(.google-signin-btn):not(.tab-btn):not(.nav-item):not(.tb-slot-actions *):not(.tb-form-group *):not(.tb-drink-modal *){ clip-path:polygon(7px 0,100% 0,calc(100% - 7px) 100%,0 100%); padding-left:16px; padding-right:16px; }
+button.btn-active:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):not(.status-pill):not(.team-style-btn):not(.tb-draw-remove):not(.tb-sub-btn):not(.tb-btn-reroll):not(.tb-btn-confirm):not(.tourney-mode-btn):not(.format-choice-btn):not(.tourney-signup-cta-btn):not(.food-vote-announce):not(.mc-preset):not(.mail-btn):not(.google-signin-btn):not(.tab-btn):not(.nav-item):not(.tb-slot-actions *):not(.tb-form-group *):not(.tb-drink-modal *),button.btn-primary:not(.x):not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):not(.status-pill):not(.team-style-btn):not(.tb-draw-remove):not(.tb-sub-btn):not(.tb-btn-reroll):not(.tb-btn-confirm):not(.tourney-mode-btn):not(.format-choice-btn):not(.tourney-signup-cta-btn):not(.food-vote-announce):not(.mc-preset):not(.mail-btn):not(.google-signin-btn):not(.tab-btn):not(.nav-item):not(.tb-slot-actions *):not(.tb-form-group *):not(.tb-drink-modal *){ color:#1a1304; background:linear-gradient(180deg,#f0c94a,#c99a1c); border-color:#f6dc7a; }
+button:disabled:not(.tb-modal-close-btn):not(.emoji-picker-btn):not(.like-btn):not(.status-pill):not(.team-style-btn):not(.tb-draw-remove):not(.tb-sub-btn):not(.tb-btn-reroll):not(.tb-btn-confirm):not(.tourney-mode-btn):not(.format-choice-btn):not(.tourney-signup-cta-btn):not(.food-vote-announce):not(.mc-preset):not(.mail-btn):not(.google-signin-btn):not(.tab-btn):not(.nav-item):not(.tb-slot-actions *):not(.tb-form-group *):not(.tb-drink-modal *){ opacity:.4; filter:grayscale(.6); box-shadow:none; }
+.tab-btn{ border-radius:0; clip-path:polygon(9px 0,100% 0,calc(100% - 9px) 100%,0 100%); background:linear-gradient(180deg,#232838 0%,#171a24 100%); border-color:#2c3140; padding-left:22px; padding-right:22px; position:relative; }
+.tab-btn:hover{ background:linear-gradient(180deg,#2c3243 0%,#1c2029 100%); }
+.tab-btn.active{ color:var(--gold); background:linear-gradient(180deg,#3a3320 0%,#1c1912 100%); border-color:var(--gold-dim); box-shadow:inset 0 -2px 0 -1px var(--gold); }
+
+/* ===== šikmé bloky akcí a turnajů ===== */
+.event-card, .featured-card{
+  border-radius:0; border:1px solid #2c3140; border-left:1px solid #2c3140;
+  background:linear-gradient(180deg,#1b1f2b 0%,#12151d 100%);
+  clip-path:polygon(16px 0,100% 0,calc(100% - 16px) 100%,0 100%);
+  box-shadow:inset 0 -2px 0 -1px var(--gold-dim);
+  padding-left:34px; padding-right:34px;
+  transition:background .18s ease;
+}
+.event-card:hover{ background:linear-gradient(180deg,#232838 0%,#171a24 100%); }
+.featured-card{ border-color:var(--gold-dim); background:linear-gradient(180deg,#2c2718 0%,#17140d 100%); box-shadow:inset 0 -2px 0 -1px var(--gold); padding-top:26px; padding-bottom:26px; }
+.featured-card:hover{ box-shadow:inset 0 -2px 0 -1px var(--gold), inset 0 0 24px rgba(201,162,75,.12); }
+/* otevřené přihlášky: záře jde dovnitř (vnější stín by šikmý řez ořízl) */
+.event-card-signup-open{ border-color:#f2c94c; animation:eventCardSignupGlowIn 2.6s ease-in-out infinite; }
+@keyframes eventCardSignupGlowIn{
+  0%,100%{ box-shadow:inset 0 -2px 0 -1px #f2c94c, inset 0 0 14px rgba(242,201,76,.18); }
+  50%{ box-shadow:inset 0 -2px 0 -1px #f2c94c, inset 0 0 30px rgba(242,201,76,.38); }
+}
+
+/* zlatá oznámení na Přehledu (hlasování / přihlášky do turnajů) */
+.tourney-signup-cta-btn{
+  border-radius:0; clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);
+  padding-left:30px; padding-right:30px; box-shadow:inset 0 0 14px rgba(255,240,170,.5);
+  animation:tourneyCtaFlickerIn 2.6s ease-in-out infinite;
+}
+@keyframes tourneyCtaFlickerIn{
+  0%,100%{ box-shadow:inset 0 0 8px rgba(255,240,170,.35), inset 0 -2px 0 -1px #fff3b0; filter:brightness(1); }
+  50%{ box-shadow:inset 0 0 24px rgba(255,240,170,.85), inset 0 -2px 0 -1px #fff3b0; filter:brightness(1.12); }
+}
+
+/* ===== šikmé bloky – opravená verze: obrys i na šikmých stranách, i Proběhlé akce, hlavní akce ===== */
+.event-card, .featured-card, .history-card{
+  --sl:16px; --ring:#2c3140;
+  position:relative; isolation:isolate; border:0 !important; border-radius:0;
+  clip-path:polygon(var(--sl) 0,100% 0,calc(100% - var(--sl)) 100%,0 100%);
+}
+.event-card::after, .featured-card::after, .history-card::after{
+  content:''; position:absolute; inset:0; z-index:5; pointer-events:none; background:var(--ring);
+  clip-path:polygon(
+    var(--sl) 0, 100% 0, calc(100% - var(--sl)) 100%, 0 100%, var(--sl) 0,
+    calc(var(--sl) + 2px) 2px, 2px calc(100% - 2px), calc(100% - var(--sl) - 2px) calc(100% - 2px), calc(100% - 2px) 2px, calc(var(--sl) + 2px) 2px);
+}
+.event-card:hover, .history-card:hover{ --ring:var(--gold-dim); }
+.featured-card{ --ring:var(--gold-dim); }
+.featured-card:hover{ --ring:var(--gold); }
+.event-card-signup-open{ --ring:#f2c94c; }
+
+/* hlavní (nejbližší) akce – překryv s fotkou musí sahat až po šikmé okraje */
+.featured-card{ padding:26px 28px; }
+.featured-card > div{ padding-left:48px !important; padding-right:48px !important; }
+
+/* Proběhlé akce */
+.history-card{ --sl:12px; background:linear-gradient(180deg,#1b1f2b 0%,#12151d 100%); box-shadow:inset 0 -2px 0 -1px var(--gold-dim); }
+.history-card:hover{ background:linear-gradient(180deg,#232838 0%,#171a24 100%); }
+.history-card .info{ padding:10px 22px 14px; }
+
+/* turnaje: širší a nižší karty */
+#turnaj-list-grid{ grid-template-columns:repeat(auto-fill, minmax(380px,1fr)); }
+#turnaj-list-grid .event-card{ padding-top:16px; padding-bottom:18px; gap:8px; }
+.tourney-card-banner{ height:64px; }
+.tourney-card-banner img{ max-height:52px; }
+.event-card .tourney-signup-badge{ color:#06251f; }
+.event-card .tourney-card-banner{ margin:-20px -34px 0; }
+#turnaj-list-grid .event-card .tourney-card-banner{ margin:-16px -34px 0; }
+
+/* ===== kontakty, hlavní akce na úvodní stránce, menší karty turnajů v akci ===== */
+.contact-card, .hero-big{ --sl:16px; --ring:#2c3140; position:relative; isolation:isolate; border:0 !important; border-radius:0; clip-path:polygon(var(--sl) 0,100% 0,calc(100% - var(--sl)) 100%,0 100%); }
+.contact-card::after, .hero-big::after{
+  content:''; position:absolute; inset:0; z-index:5; pointer-events:none; background:var(--ring);
+  clip-path:polygon(
+    var(--sl) 0, 100% 0, calc(100% - var(--sl)) 100%, 0 100%, var(--sl) 0,
+    calc(var(--sl) + 2px) 2px, 2px calc(100% - 2px), calc(100% - var(--sl) - 2px) calc(100% - 2px), calc(100% - 2px) 2px, calc(var(--sl) + 2px) 2px);
+}
+.contact-card{ background:linear-gradient(180deg,#1b1f2b 0%,#12151d 100%); box-shadow:inset 0 -2px 0 -1px var(--gold-dim); padding:20px 34px; transition:background .18s ease; }
+.contact-card:hover{ background:linear-gradient(180deg,#232838 0%,#171a24 100%); --ring:var(--gold-dim); }
+.hero-big{ --sl:26px; --ring:var(--gold-dim); box-shadow:inset 0 -2px 0 -1px var(--gold); }
+.hero-big:hover{ --ring:var(--gold); }
+.hero-big-inner{ padding-left:60px; padding-right:60px; }
+
+.tourney-compact-grid{ grid-template-columns:repeat(auto-fill, minmax(250px, 300px)); gap:14px; }
+.tourney-compact-grid .event-card{ --sl:12px; padding:12px 26px 14px; gap:6px; }
+.tourney-compact-grid .event-card h3{ font-size:15px; }
+.tourney-compact-grid .event-card .meta, .tourney-compact-grid .event-card .desc{ font-size:12px; }
+.tourney-compact-grid .tourney-card-banner{ height:48px; margin:-12px -26px 0; }
+.tourney-compact-grid .tourney-card-banner img{ max-height:38px; }
+@media (max-width:640px){ .tourney-compact-grid{ grid-template-columns:1fr; } }
+.tourney-compact-grid{ align-items:start; }
+
+/* ===== turnaje: všechny karty stejně velké ===== */
+#turnaj-list-grid{ grid-template-columns:repeat(auto-fill, minmax(300px, 340px)); grid-auto-rows:280px; gap:16px; align-items:stretch; }
+#turnaj-list-grid .event-card{ height:100%; padding:12px 30px 14px; gap:6px; --sl:14px; }
+#turnaj-list-grid .tourney-card-banner{ height:52px; margin:-12px -30px 0; }
+#turnaj-list-grid .tourney-card-banner img{ max-height:42px; }
+#turnaj-list-grid .event-card h3{ font-size:16px; }
+#turnaj-list-grid .event-card .meta, #turnaj-list-grid .event-card .desc{ font-size:12.5px; }
+.tourney-compact-grid{ grid-auto-rows:190px; align-items:stretch; }
+.tourney-compact-grid .event-card{ height:100%; }
+
+/* ===== turnaje: menší karty, větší loga her ===== */
+#turnaj-list-grid{ grid-template-columns:repeat(auto-fill, minmax(240px, 270px)); grid-auto-rows:285px; gap:14px; }
+#turnaj-list-grid .event-card{ padding:10px 28px 12px; gap:5px; }
+#turnaj-list-grid .tourney-card-banner{ height:100px; margin:-10px -28px 0; }
+#turnaj-list-grid .tourney-card-banner img{ max-width:92%; max-height:90px; }
+#turnaj-list-grid .event-card .meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tourney-compact-grid{ grid-template-columns:repeat(auto-fill, minmax(230px, 260px)); grid-auto-rows:218px; }
+.tourney-compact-grid .tourney-card-banner{ height:78px; margin:-12px -26px 0; }
+.tourney-compact-grid .tourney-card-banner img{ max-width:92%; max-height:68px; }
+.tourney-compact-grid .event-card .meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* hlavní stránka Turnaje: čtvercové karty (šířka = výška) */
+#turnaj-list-grid{ grid-template-columns:repeat(auto-fill, 285px); grid-auto-rows:285px; justify-content:start; }
+@media (max-width:640px){ #turnaj-list-grid{ grid-template-columns:1fr; grid-auto-rows:285px; } }
+
+/* hlavní stránka Turnaje: karty zřetelně širší než vyšší */
+#turnaj-list-grid{ grid-template-columns:repeat(auto-fill, 340px); grid-auto-rows:280px; gap:16px; }
+@media (max-width:760px){ #turnaj-list-grid{ grid-template-columns:1fr; } }
+
+.ed-mail-slot{ display:flex; gap:10px; align-items:center; }
+.mail-slot-edit{ height:46px; }
+.ed-page-title{ padding-right:470px; } @media (max-width:1100px){ .ed-page-title{ padding-right:0; } .ed-mail-slot{ position:static; margin-bottom:8px; justify-content:flex-end; flex-wrap:wrap; } }
+
+/* Handicap tlačítko: kosočtverec nesmí překrývat text (šikmý ořez tlačítek ukusuje levý okraj) */
+.dota-btn{ padding:12px 30px 12px 58px !important; white-space:nowrap; }
+.dota-btn::before{ left:28px !important; }
+
+/* QR platby je pod částkou vstupného, ať je to pohromadě */
+.ed-payment-inline:not(:empty){ margin-top:10px; }
+.ed-payment-inline .payment-qr-box-compact{ display:inline-flex; width:auto; max-width:none; }
+
+/* Záznam změn */
+.audit-row{ display:grid; grid-template-columns:150px 140px 90px 1fr; gap:12px; padding:9px 12px; border-bottom:1px solid var(--line); font-size:13px; align-items:baseline; }
+.audit-row:nth-child(odd){ background:rgba(255,255,255,0.02); }
+.audit-when{ color:var(--text-muted); white-space:nowrap; }
+.audit-by{ color:var(--gold); font-weight:600; }
+.audit-area{ color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; font-size:11px; }
+@media (max-width:760px){ .audit-row{ grid-template-columns:1fr; gap:2px; } }
+
