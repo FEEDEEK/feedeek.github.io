@@ -138,3 +138,59 @@ exports.adminVerifyUser = onCall({ region: REGION }, async (req) => {
   await admin.auth().updateUser(uid, { emailVerified: true });
   return { ok: true };
 });
+
+
+// ---------- Obnova hesla ----------
+// Odkaz pro nastavení nového hesla se pošle z našeho Gmailu na registrační e-mail uživatele (přes kolekci "mail").
+async function sendResetMailToUid(uid, byAdmin) {
+  const db = admin.firestore();
+  let user;
+  try { user = await admin.auth().getUser(uid); } catch (e) { return false; }
+  if (!user.email) return false;
+  const ref = db.doc(`users/${uid}`);
+  const snap = await ref.get();
+  const last = snap.exists ? Number(snap.data().resetMailAt || 0) : 0;
+  if (!byAdmin && Date.now() - last < 60 * 1000) return true;   // krátká pojistka proti zahlcení, navenek se tváří jako odesláno
+  if (snap.exists) await ref.update({ resetMailAt: Date.now() });
+
+  const link = await admin.auth().generatePasswordResetLink(user.email, { url: SITE_URL });
+  const nick = snap.exists ? (snap.data().nick || '') : '';
+  const text =
+    `Ahoj feedere ${nick},\n\n` +
+    `na webu FEEDEEK LAN byla vyžádána obnova hesla. Nové heslo nastavíš na tomto odkazu:\n\n${link}\n\n` +
+    `Pokud jsi o to nežádal(a), nech tento e-mail být, heslo zůstane stejné.\n\nFeedu zdar`;
+  const html =
+    `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;">Ahoj feedere <b>${esc(nick)}</b>,<br><br>` +
+    `na webu FEEDEEK LAN byla vyžádána obnova hesla:<br><br>` +
+    `<a href="${link}" style="display:inline-block;padding:10px 18px;background:#c9a24b;color:#14171f;text-decoration:none;font-weight:bold;">Nastavit nové heslo</a><br><br>` +
+    `Pokud tlačítko nefunguje, otevři tento odkaz:<br><span style="font-size:12px;word-break:break-all;">${esc(link)}</span><br><br>` +
+    `Pokud jsi o to nežádal(a), nech tento e-mail být, heslo zůstane stejné.<br><br>Feedu zdar</div>`;
+  await db.collection('mail').add({
+    to: [user.email],
+    message: { subject: 'Obnova hesla na FEEDEEK LAN', text, html },
+    createdBy: byAdmin ? 'admin-reset' : 'system-reset',
+    createdAt: new Date().toISOString()
+  });
+  return true;
+}
+
+// Zapomenuté heslo (bez přihlášení): zadá se přezdívka. Odpověď je vždy stejná, ať účet existuje nebo ne.
+exports.requestPasswordReset = onCall({ region: REGION }, async (req) => {
+  const nick = req.data && typeof req.data.nick === 'string' ? req.data.nick.trim().toLowerCase() : '';
+  if (!nick || nick.length > 60 || nick.includes('/')) throw new HttpsError('invalid-argument', 'Zadej přezdívku.');
+  try {
+    const u = await admin.firestore().doc(`usernames/${nick}`).get();
+    if (u.exists && u.data().uid) await sendResetMailToUid(u.data().uid, false);
+  } catch (e) { console.error('requestPasswordReset', e); }
+  return { ok: true };
+});
+
+// Admin pošle uživateli odkaz pro nové heslo na jeho registrační e-mail
+exports.adminSendPasswordReset = onCall({ region: REGION }, async (req) => {
+  await requireUsersAdmin(req);
+  const uid = req.data && req.data.uid;
+  if (!uid || typeof uid !== 'string') throw new HttpsError('invalid-argument', 'Chybí uživatel.');
+  const ok = await sendResetMailToUid(uid, true);
+  if (!ok) throw new HttpsError('failed-precondition', 'Uživatel nemá e-mail.');
+  return { sent: true };
+});

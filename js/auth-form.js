@@ -1,7 +1,8 @@
 // (vyjmuto z app.js, řádky 251-386)
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { db, auth } from "./firebase.js";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { db, auth, functionsApi } from "./firebase.js";
+import { httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { S } from "./state.js";
 import { closeContactForm } from "./contacts.js";
 import { closeEventForm } from "./event-form.js";
@@ -142,3 +143,25 @@ export function hasPasswordProvider(user){
   return user.providerData.some(p => p.providerId === 'password');
 }
 
+
+// Zapomenuté heslo: odkaz pro nové heslo se pošle na registrační e-mail účtu s touto přezdívkou
+document.getElementById('auth-forgot-btn').addEventListener('click', async () => {
+  const nick = document.getElementById('auth-nick').value.trim();
+  if(!nick){ setAuthMessage('Napiš nahoře svou přezdívku a klikni znovu na „Zapomněl(a) jsi heslo?“.'); return; }
+  const btn = document.getElementById('auth-forgot-btn');
+  btn.disabled = true;
+  try{
+    try{ await httpsCallable(functionsApi, 'requestPasswordReset')({ nick }); }
+    catch(e){
+      // funkce není nasazená / nedostupná: záložní cesta přes výchozí e-mail Firebase
+      console.warn('Obnova hesla přes funkci selhala, zkouším výchozí:', e);
+      const snap = await getDoc(usernameDocRef(nick));
+      if(snap.exists() && snap.data().email) await sendPasswordResetEmail(auth, snap.data().email);
+    }
+    setAuthMessage('Pokud takový účet existuje, poslali jsme na jeho registrační e-mail odkaz pro nastavení nového hesla. Zkontroluj i spam a hromadnou poštu.');
+  }catch(err){
+    console.error(err);
+    setAuthMessage('Teď to nejde, zkus to za chvíli znovu.');
+  }
+  setTimeout(() => { btn.disabled = false; }, 5000);
+});
