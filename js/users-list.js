@@ -40,7 +40,7 @@ export async function renderUsersList(){
           ${users.map(u => `
             <tr style="border-top:1px solid var(--line);" data-user-row="${u.uid}">
               <td style="padding:8px 10px 8px 0;">${escapeHtml(u.nick||'')}${u.isSuperAdmin?' <span style="color:var(--gold); font-size:11px;">(hlavní admin)</span>':(u.isAdmin?' <span style="color:var(--gold); font-size:11px;">(admin)</span>':'')}</td>
-              <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.email||'')}<span data-verify-cell="${u.uid}"></span></td>
+              <td style="padding:8px 10px; color:var(--text-muted);">${escapeHtml(u.email||'')}<span data-verify-cell="${u.uid}"></span> <button type="button" class="btn-ghost btn-sm" data-reset-user="${u.uid}" title="Pošle uživateli na jeho registrační e-mail odkaz pro nové heslo" style="padding:2px 8px; font-size:11px;">Reset hesla</button></td>
               <td style="padding:8px 10px;"><input type="tel" data-edit-phone="${u.uid}" value="${escapeHtml(u.phone||'')}" placeholder="—" style="width:120px; background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px;"><input type="date" data-edit-created="${u.uid}" value="${u.createdAt ? u.createdAt.slice(0,10) : ''}" style="background:var(--bg-void); border:1px solid var(--line); color:var(--text); padding:4px 6px; font-size:13px;"></td>
               <td style="padding:8px 10px; color:var(--text-muted);">${u.lastLogin ? fmtDate(u.lastLogin.slice(0,10)) : '—'}</td>
@@ -113,6 +113,23 @@ export async function renderUsersList(){
         });
       });
     }).catch(err => console.warn('Seznam ověření nelze načíst (funkce nenasazená?):', err));
+    box.querySelectorAll('[data-reset-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const uid = btn.dataset.resetUser;
+        const usr = users.find(x => x.uid === uid) || {};
+        if(!confirm(`Poslat uživateli „${usr.nick || uid}“ na e-mail ${usr.email || ''} odkaz pro nastavení nového hesla?`)) return;
+        btn.disabled = true;
+        try{
+          await httpsCallable(functionsApi, 'adminSendPasswordReset')({ uid });
+          logAction('uzivatele', `poslal uživateli „${usr.nick || uid}“ odkaz pro obnovu hesla`);
+          btn.textContent = 'Odesláno ✓';
+        }catch(err){
+          btn.disabled = false;
+          console.error(err);
+          alert('Odeslání se nepovedlo (je nasazená funkce adminSendPasswordReset?).');
+        }
+      });
+    });
     box.querySelectorAll('[data-delete-user]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const uid = btn.dataset.deleteUser;
