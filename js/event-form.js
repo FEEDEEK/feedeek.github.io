@@ -392,7 +392,7 @@ export function renderEvents(){
       <div style="background:linear-gradient(90deg, rgba(20,23,31,0.95), rgba(20,23,31,0.75)); margin:-26px -28px; padding:26px 28px;">
         <span class="tag">${full ? 'Obsazeno' : 'Nejbližší akce'}</span>
         <h3>${featured.number ? escapeHtml(featured.number) + ' — ' : ''}${escapeHtml(featured.name)}</h3>
-        <div class="meta-strong">${fmtDateRange(featured)} · <span class="place">${escapeHtml(featured.place)}</span> · ${taken}/${featured.cap} míst</div>
+        <div class="meta-strong">${fmtDateRange(featured)} · <span class="place">${featured.place ? escapeHtml(featured.place) : 'místo upřesníme'}</span> · ${taken}/${featured.cap} míst</div>
         <p class="desc">${escapeHtml(featured.desc || '')}</p>
         ${hasPerm('akce') ? `
         <div class="row" style="margin-top:14px; max-width:280px;">
@@ -419,7 +419,7 @@ export function renderEvents(){
       card.innerHTML = `
         <span class="tag ${f ? 'full' : ''}">${f ? 'Obsazeno' : 'Volná místa'}</span>
         <h3>${ev.number ? escapeHtml(ev.number) + ' — ' : ''}${escapeHtml(ev.name)}</h3>
-        <div class="meta" style="font-weight:600; color:var(--gold); font-size:14px;">${fmtDateRange(ev)} · <span style="color:var(--teal);">${escapeHtml(ev.place)}</span></div>
+        <div class="meta" style="font-weight:600; color:var(--gold); font-size:14px;">${fmtDateRange(ev)} · <span style="color:var(--teal);">${ev.place ? escapeHtml(ev.place) : 'místo upřesníme'}</span></div>
         <p class="desc">${escapeHtml(ev.desc || 'Bez popisu.')}</p>
         <div class="row"><span class="slots">${t} / ${ev.cap} míst</span></div>
         ${hasPerm('akce') ? `

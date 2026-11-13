@@ -162,7 +162,7 @@ function renderHome(){
   }
   const next = upcoming[0];
   card.querySelector('h2').textContent = (next.number ? next.number + ' — ' : '') + next.name;
-  metaBox.innerHTML = `${fmtDateRange(next)} · <span class="place">${escapeHtml(next.place)}</span>`;
+  metaBox.innerHTML = `${fmtDateRange(next)} · <span class="place">${next.place ? escapeHtml(next.place) : 'místo upřesníme'}</span>`;
   subBox.textContent = next.desc || '';
   card.style.backgroundImage = next.imageUrl ? `url('${next.imageUrl.replace(/'/g,"")}')` : 'none';
   card.onclick = () => setRoute('#event/' + next.id);
