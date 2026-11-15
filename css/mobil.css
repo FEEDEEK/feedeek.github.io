@@ -6,3 +6,9 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
   input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),
   textarea, select{ font-size:16px !important; }
 }
+
+/* Světelný pruh na kartách KDY/KDE (animace wwShine) přejíždí až za pravý okraj karty. Šikmý ořez
+   karty ho sice skryje, ale stránka se kvůli němu na okamžik rozšíří a telefon ji začne zmenšovat
+   a posouvat (pozadí se "přibližuje", okna ujíždí). Vodorovné přetečení se proto ořízne. */
+.ww-card{ overflow-x:clip; }
+html, body{ overflow-x:clip; }
