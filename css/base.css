@@ -66,13 +66,16 @@ body{
 /* ---- Background theme ---- */
 body::before{
   content:'';
-  position:fixed; inset:0; z-index:-1; pointer-events:none;
+  position:fixed; top:0; left:0; width:100%; z-index:-1; pointer-events:none;
+  /* Výška podle největšího okna (bez ohledu na to, jestli je na telefonu zrovna vidět adresní řádek),
+     aby se při posouvání stránky pozadí nezvětšovalo a nezmenšovalo. */
+  height:100vh; height:100lvh;
   opacity:0.2;
   background-image: url('../assets/img/theme.webp');
   background-size: cover;          /* Obrázek pokryje celou plochu */
   background-position: center;      /* Vycentrování obrázku */
-  background-attachment: fixed;
-  background-repeat: repeat;
+  background-repeat: no-repeat;
+  transform: translateZ(0);
 }
 
 /* ---- Main ---- */
