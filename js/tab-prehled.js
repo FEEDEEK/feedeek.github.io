@@ -1,7 +1,7 @@
 // (vyjmuto z app.js, řádky 1198-1470)
 import { MEAL_SLOTS } from "./constants.js";
 import { escapeHtml } from "./util.js";
-import { setupChatEmojiRow, authorLabel } from "./ui.js";
+import { setupChatEmojiRow, authorLabel, preserveUi } from "./ui.js";
 import { S, hasPerm } from "./state.js";
 import { addDoc, collection, updateDoc, doc, arrayRemove, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { db } from "./firebase.js";
@@ -10,6 +10,9 @@ import { appApi } from "./hooks.js";
 
 // ---- Přehled: hry + návrhy (editovatelné vlastníkem/adminem) + Diskuze (editovatelná vlastníkem/adminem) ----
 export function renderTabPrehled(ev){
+  preserveUi(document.getElementById('tab-prehled'), () => renderTabPrehledInner(ev));
+}
+function renderTabPrehledInner(ev){
   const box = document.getElementById('tab-prehled');
   const games = [...(ev.games || [])].map(appApi.normalizeGame).sort((a,b) => a.name.localeCompare(b.name, 'cs'));
   const schedule = ev.foodSchedule || {};

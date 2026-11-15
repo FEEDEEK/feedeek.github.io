@@ -72,3 +72,25 @@ export function setupChatEmojiRow(btnId, panelId, inputId){
   window.addEventListener('resize', () => { if(panel.style.display !== 'none') positionPanel(); });
   window.addEventListener('scroll', () => { if(panel.style.display !== 'none') positionPanel(); }, true);
 }
+
+// Překreslí část stránky (fn) tak, aby uživatel nepřišel o rozepsaný text, kurzor a pozici posunu.
+// Bez toho se při každé změně dat z databáze (někdo přidá komentář, hlas, přihlášku) pole smažou
+// a na telefonu zmizí klávesnice a stránka poskočí.
+export function preserveUi(container, fn){
+  if(!container){ fn(); return; }
+  const fields = () => [...container.querySelectorAll('textarea, input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=file])')];
+  const before = fields();
+  const saved = before.map(el => ({ v: el.value, d: el.defaultValue }));
+  const activeIdx = before.indexOf(document.activeElement);
+  const sel = activeIdx >= 0 ? { s: document.activeElement.selectionStart, e: document.activeElement.selectionEnd } : null;
+  const x = window.scrollX, y = window.scrollY;
+  fn();
+  const after = fields();
+  if(after.length === saved.length){
+    after.forEach((el, i) => { if(saved[i].v !== saved[i].d && el.value !== saved[i].v) el.value = saved[i].v; });
+    if(activeIdx >= 0 && after[activeIdx]){
+      try{ after[activeIdx].focus({ preventScroll:true }); if(sel && sel.s != null) after[activeIdx].setSelectionRange(sel.s, sel.e); }catch(e){ /* nic */ }
+    }
+  }
+  if(window.scrollY !== y || window.scrollX !== x) window.scrollTo(x, y);
+}

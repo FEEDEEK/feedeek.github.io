@@ -33,6 +33,7 @@ export const S = {
   usersNickLoading: false,
   allTournaments: [],
   gameLogoTargetIdx: null,
+  detailEventSig: '',
   initialAuthSettled: false,
   suppressAuthStateHandling: false,
   turnajProjectorMode: false,

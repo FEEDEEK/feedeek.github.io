@@ -72,7 +72,9 @@ onSnapshot(eventsQuery, (snapshot) => {
   renderEvents();
   if(S.currentDetailEventId){
     const ev = S.events.find(x=>x.id===S.currentDetailEventId);
-    if(ev) renderEventDetailStatic(ev);
+    // hlavičku překreslit jen když se data akce opravdu změnila (jinak se zbytečně obnovuje a stránka poskakuje)
+    const sig = ev ? JSON.stringify(ev) : '';
+    if(ev && sig !== S.detailEventSig){ S.detailEventSig = sig; renderEventDetailStatic(ev); }
   }
   tryInitialRoute();
 }, (err) => console.error('Chyba připojení k Firestore:', err));
@@ -183,6 +185,7 @@ function openEventDetail(eventId){
   const ev = S.events.find(x => x.id === eventId);
   if(!ev) return;
   showView('event');
+  S.detailEventSig = JSON.stringify(ev);
   renderEventDetailStatic(ev);
   clearDetailListeners();
 

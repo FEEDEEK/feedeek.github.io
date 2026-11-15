@@ -2,13 +2,16 @@
 import { S, hasPerm } from "./state.js";
 import { MEAL_SLOTS } from "./constants.js";
 import { escapeHtml } from "./util.js";
-import { setupChatEmojiRow, authorLabel } from "./ui.js";
+import { setupChatEmojiRow, authorLabel, preserveUi } from "./ui.js";
 import { updateDoc, doc, deleteDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { appApi } from "./hooks.js";
 
 // ---- Jídlo: zaškrtávací výběr + potvrzení + počty porcí pro admina ----
 export function renderTabJidlo(ev){
+  preserveUi(document.getElementById('tab-jidlo'), () => renderTabJidloInner(ev));
+}
+function renderTabJidloInner(ev){
   const box = document.getElementById('tab-jidlo');
   const myReg = S.currentUser ? S.currentRegistrationsMap[S.currentUser.uid] : null;
   const deadlinePassed = appApi.isPastDeadline(ev);
