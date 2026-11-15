@@ -59,6 +59,10 @@ function renderWhenWhere(ev){
   box.querySelectorAll('[data-count]').forEach(el => {
     const target = parseInt(el.dataset.count, 10), t0 = performance.now(), dur = 900;
     const step = (t) => { const k = Math.min(1, (t - t0) / dur); el.textContent = Math.round(target * (1 - Math.pow(1 - k, 3))); if(k < 1) requestAnimationFrame(step); };
+    // odpočet se rozjede od nuly jen při prvním zobrazení; při dalším překreslení (změna dat) jen skočí na hodnotu
+    const key = ev.id + ':' + target;
+    if(box.dataset.counted === key){ el.textContent = String(target); return; }
+    box.dataset.counted = key;
     el.textContent = '0'; requestAnimationFrame(step);
   });
 }
@@ -76,10 +80,16 @@ export function renderEventDetailStatic(ev){
 
   const mapBox = document.getElementById('ed-map');
   const q = encodeURIComponent(ev.place || '');
-  if(!ev.place){
+  const mapKey = ev.id + '|' + (ev.place || '');
+  if(mapBox.dataset.mapKey === mapKey && mapBox.firstElementChild){
+    // místo se nezměnilo: mapu nepřekreslovat (jinak by se při každé změně dat znovu načítala a stránka poskakovala)
+  }else if(!ev.place){
+    mapBox.dataset.mapKey = mapKey;
     mapBox.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; height:100%; min-height:200px; text-align:center; padding:20px; color:var(--text-muted);">Místo konání zatím není určeno.<br>Upřesníme ho, jakmile to bude jasné.</div>';
-  } else
+  }else{
+  mapBox.dataset.mapKey = mapKey;
   mapBox.innerHTML = `<iframe src="https://www.google.com/maps?q=${q}&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="map-ping" aria-hidden="true"><span></span><span></span></div>`;
+  }
 
   const tabPanels = { prehled:'tab-prehled', rozvrh:'tab-rozvrh', jidlo:'tab-jidlo', turnaj:'tab-turnaj', foto:'tab-foto' };
   Object.entries(tabPanels).forEach(([key, id]) => {
