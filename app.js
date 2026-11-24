@@ -276,6 +276,15 @@ function updateVerifyBanner(){
     <button type="button" class="btn-sm" id="vb-resend">Poslat odkaz znovu</button>
     <button type="button" class="btn-sm btn-ghost" id="vb-check">Už jsem potvrdil</button>
     <span id="vb-msg"></span>`;
+  if(!window.__verifyPoll){
+    window.__verifyPoll = setInterval(async () => {
+      if(!S.currentUser || !document.getElementById('verify-banner')) return;
+      try{
+        await S.currentUser.reload();
+        if(S.currentUser.emailVerified){ await S.currentUser.getIdToken(true); updateVerifyBanner(); }
+      }catch(e){ /* nic */ }
+    }, 20000);
+  }
   bar.querySelector('#vb-resend').addEventListener('click', async () => {
     try{ await sendVerifyMail(S.currentUser); bar.querySelector('#vb-msg').textContent = 'Odesláno, zkontroluj poštu (i spam a hromadné). Když nic nepřijde, napiš adminovi, ověří tě ručně.'; }
     catch(e){ bar.querySelector('#vb-msg').textContent = (e && e.code === 'functions/resource-exhausted') ? 'Počkej minutu a zkus to znovu.' : 'Teď to nejde, zkus to za chvíli.'; }
@@ -362,6 +371,12 @@ function updateAuthUI(){
 
 let authStateGeneration = 0;
 
+async function syncVerifiedToken(user){
+  await user.reload();
+  const r = await user.getIdTokenResult();
+  if(!!r.claims.email_verified !== !!user.emailVerified) await user.getIdToken(true);
+}
+
 onAuthStateChanged(auth, async (user) => {
   if(S.suppressAuthStateHandling) return;
   const myGen = ++authStateGeneration;
@@ -374,6 +389,10 @@ onAuthStateChanged(auth, async (user) => {
   S.currentEmoji = '';
   S.currentAvatar = '';
   if(user){
+    // Pravidla Firestore čtou příznak "e-mail ověřen" z přihlašovacího tokenu. Když byl e-mail ověřen později
+    // (odkazem, na jiném zařízení nebo adminem), starý token ho ještě nemá a zápisy by selhaly až do dalšího
+    // přihlášení. Proto se při načtení stav ověření srovná s tokenem.
+    try{ await syncVerifiedToken(user); }catch(e){ console.warn('Obnova tokenu se nepovedla', e); }
     try{
       const userDoc = await getDocFromServer(doc(db, 'users', user.uid));
       if(myGen !== authStateGeneration) return; // mezitím se spustila novější kontrola, tuhle zahodíme
