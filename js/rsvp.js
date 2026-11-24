@@ -3,7 +3,7 @@ import { S, hasPerm } from "./state.js";
 import { setDoc, doc, deleteDoc, getDocs, collection, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { renderPersonalPaymentQr } from "./payment.js";
-import { escapeHtml } from "./util.js";
+import { escapeHtml, retryAfterTokenRefresh } from "./util.js";
 import { avatarTag, emojiTag } from "./ui.js";
 import { appApi } from "./hooks.js";
 
@@ -32,9 +32,9 @@ export function renderStatsAndRsvp(){
     const btn = document.getElementById('rsvp-register-btn');
     if(btn) btn.addEventListener('click', async () => {
       try{
-        await setDoc(doc(db, 'events', ev.id, 'registrations', S.currentUser.uid), {
+        await retryAfterTokenRefresh(S.currentUser, () => setDoc(doc(db, 'events', ev.id, 'registrations', S.currentUser.uid), {
           nick: S.currentNick, emoji: S.currentEmoji, avatar: S.currentAvatar, uid: S.currentUser.uid, status: 'going', food: {}, ts: new Date().toISOString()
-        });
+        }));
       }catch(err){ alert('Přihlášení se nepovedlo.'); console.error(err); }
     });
   }else{

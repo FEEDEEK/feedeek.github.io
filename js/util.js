@@ -19,3 +19,17 @@ export function fmtDateShort(iso){
 }
 
 export function todayIso(){ return new Date().toISOString().slice(0,10); }
+
+// Zápis, který může selhat jen proto, že přihlašovací token ještě neví o ověřeném e-mailu: při odmítnutí
+// se token obnoví a zápis se zkusí ještě jednou.
+export async function retryAfterTokenRefresh(user, fn){
+  try{ return await fn(); }
+  catch(e){
+    if(user && e && (e.code === 'permission-denied' || /permission/i.test(e.message || ''))){
+      await user.reload();
+      await user.getIdToken(true);
+      return await fn();
+    }
+    throw e;
+  }
+}
