@@ -11,7 +11,32 @@ import { appApi } from "./hooks.js";
 export function renderTabJidlo(ev){
   preserveUi(document.getElementById('tab-jidlo'), () => renderTabJidloInner(ev));
 }
+// Admin (oprávnění jídlo/akce) vidí po najetí / klepnutí na položku, kdo ji zvolil.
+function canSeeWho(){ return hasPerm('jidlo') || hasPerm('akce'); }
+function whoNick(uid){
+  const r = S.currentRegistrationsMap[uid];
+  return (r && r.nick) || (S.usersNickCache && S.usersNickCache[uid]) || 'neznámý uživatel';
+}
+function whoAttr(names){
+  if(!canSeeWho()) return '';
+  return ` data-who="${escapeHtml(names.join('\n'))}"`;
+}
+let whoPop = null;
+function showWho(el){
+  const names = (el.dataset.who || '').split('\n').filter(Boolean);
+  if(!whoPop){ whoPop = document.createElement('div'); whoPop.className = 'food-who-pop'; document.body.appendChild(whoPop); }
+  whoPop.innerHTML = `<div class="mc-label">${escapeHtml(el.dataset.whoTitle || '')} (${names.length})</div>` + (names.length ? escapeHtml(names.join(', ')) : '<span class="status-hint">nikdo</span>');
+  whoPop.style.display = 'block';
+  const r = el.getBoundingClientRect();
+  const pw = whoPop.offsetWidth, ph = whoPop.offsetHeight;
+  let left = Math.min(Math.max(8, r.left), window.innerWidth - pw - 8);
+  let top = r.top - ph - 8; if(top < 8) top = r.bottom + 8;
+  whoPop.style.left = left + 'px'; whoPop.style.top = top + 'px';
+}
+function hideWho(){ if(whoPop) whoPop.style.display = 'none'; }
+
 function renderTabJidloInner(ev){
+  hideWho();
   const box = document.getElementById('tab-jidlo');
   const myReg = S.currentUser ? S.currentRegistrationsMap[S.currentUser.uid] : null;
   const deadlinePassed = appApi.isPastDeadline(ev);
@@ -51,8 +76,9 @@ function renderTabJidloInner(ev){
             const votingHtml = options.map(o => {
               const count = tally[o];
               const pct = Math.round((count / voterCount) * 100);
+              const who = Object.keys(votesForSlot).filter(uid => Array.isArray(votesForSlot[uid]) && votesForSlot[uid].includes(o)).map(whoNick);
               return `
-                <label class="food-vote-row ${(!myReg || deadlinePassed) ? 'disabled' : ''}">
+                <label class="food-vote-row ${(!myReg || deadlinePassed) ? 'disabled' : ''}"${whoAttr(who)} data-who-title="Hlasovali pro „${escapeHtml(o)}“">
                   <span class="food-toggle food-vote-hex ${myVotesArr.includes(o) ? 'checked' : ''}" data-food-vote data-slot="${slot.key}" data-value="${escapeHtml(o)}">
                     <svg viewBox="0 0 26 26" class="food-toggle-svg">
                       <polygon points="6.5,1.5 19.5,1.5 25,13 19.5,24.5 6.5,24.5 1,13"/>
@@ -69,7 +95,7 @@ function renderTabJidloInner(ev){
             return `
               <div class="meal-slot-block" style="margin-bottom:18px;">
                 <b style="font-size:13px;">🗳️ ${shortLabel}</b>
-                <div style="margin-top:6px;">${myReg ? votingHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš hlasovat.</span>'}</div>
+                <div style="margin-top:6px;">${(myReg || canSeeWho()) ? votingHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš hlasovat.</span>'}</div>
               </div>
             `;
           }
@@ -84,8 +110,10 @@ function renderTabJidloInner(ev){
             }
           });
 
-          const checkboxesHtml = options.map((o,idx) => `
-            <label class="food-checkbox-row">
+          const checkboxesHtml = options.map((o,idx) => {
+            const who = Object.values(S.currentRegistrationsMap).filter(r => r.food && Array.isArray(r.food[slot.key]) && r.food[slot.key].includes(o)).map(r => r.nick || 'neznámý uživatel');
+            return `
+            <label class="food-checkbox-row"${whoAttr(who)} data-who-title="Chtějí „${escapeHtml(o)}“">
               <span class="food-toggle ${myChoices.includes(o)?'checked':''} ${(!myReg || deadlinePassed) ? 'disabled' : ''}" data-food-toggle data-slot="${slot.key}" data-value="${escapeHtml(o)}">
                 <svg viewBox="0 0 26 26" class="food-toggle-svg">
                   <polygon points="6.5,1.5 19.5,1.5 25,13 19.5,24.5 6.5,24.5 1,13"/>
@@ -95,12 +123,12 @@ function renderTabJidloInner(ev){
               <span>${escapeHtml(o)}</span>
               ${hasPerm('jidlo') ? `<span class="portion-count">${portionCounts[o]}×</span>` : ''}
             </label>
-          `).join('');
+          `;}).join('');
 
           return `
             <div class="meal-slot-block" style="margin-bottom:18px;">
               <b style="font-size:13px;">${shortLabel}</b>
-              <div style="margin-top:6px;">${myReg ? checkboxesHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš vybrat.</span>'}</div>
+              <div style="margin-top:6px;">${(myReg || canSeeWho()) ? checkboxesHtml : '<span class="status-hint">Přihlas se na akci, ať můžeš vybrat.</span>'}</div>
             </div>
           `;
         }).join('')}
@@ -141,6 +169,21 @@ function renderTabJidloInner(ev){
       el.classList.toggle('checked');
     });
   });
+
+  // kdo co zvolil (jen admin): na počítači po najetí, na telefonu klepnutím na ikonu oka
+  const canHover = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+  box.querySelectorAll('[data-who]').forEach(row => {
+    if(canHover){
+      row.addEventListener('mouseenter', () => showWho(row));
+      row.addEventListener('mouseleave', hideWho);
+    }else{
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'food-who-btn'; b.textContent = '👁'; b.title = 'Kdo to zvolil';
+      b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); if(whoPop && whoPop.style.display === 'block'){ hideWho(); } else showWho(row); });
+      row.appendChild(b);
+    }
+  });
+  if(!canHover && !window.__whoCloser){ window.__whoCloser = true; document.addEventListener('click', hideWho); }
 
   box.querySelectorAll('[data-food-vote]').forEach(el => {
     if(el.closest('.food-vote-row').classList.contains('disabled')) return;
